@@ -11,7 +11,7 @@ from app.services.bot_service import bot
 
 router = APIRouter()
 
-# 自动为旧数据库添加 season 字段 (静默执行)
+# 自动为旧数据库添加 season 字段
 def ensure_db_schema():
     conn = sqlite3.connect(DB_PATH); c = conn.cursor()
     try: c.execute("ALTER TABLE media_requests ADD COLUMN season INTEGER DEFAULT 0")
@@ -28,7 +28,6 @@ def execute_sql(query, params=()):
         conn.rollback(); return False, str(e)
     finally: conn.close()
 
-# 扩展提交模型，支持选季
 class MediaRequestSubmitModel(BaseSubmitModel):
     season: int = 0
 
@@ -36,6 +35,7 @@ class RequestLoginModel(BaseModel):
     username: str
     password: str
 
+# ================= 独立登录状态管理 =================
 @router.post("/api/requests/auth")
 def request_system_login(data: RequestLoginModel, request: Request):
     host = cfg.get("emby_host")
@@ -50,46 +50,60 @@ def request_system_login(data: RequestLoginModel, request: Request):
         return {"status": "error", "message": "账号或密码错误"}
     except Exception as e: return {"status": "error", "message": f"连接 Emby 失败: {str(e)}"}
 
-# 🔥 新增：彻底清除 Session 的退出接口
+@router.get("/api/requests/check")
+def check_auth(request: Request):
+    user = request.session.get("req_user")
+    if user: return {"status": "success", "user": user}
+    return {"status": "error", "message": "未登录"}
+
 @router.post("/api/requests/logout")
 def request_system_logout(request: Request):
     request.session.clear()
-    return {"status": "success", "message": "已安全退出"}
+    return {"status": "success"}
 
-# 🔥 新增：获取大厅热门推荐 (Trending)
+# ================= 🔥 双通道热门数据 (区分电影/剧集) =================
 @router.get("/api/requests/trending")
 def get_trending(request: Request):
     tmdb_key = cfg.get("tmdb_api_key")
     if not tmdb_key: return {"status": "error", "message": "未配置 TMDB Key"}
     proxy = cfg.get("proxy_url"); proxies = {"http": proxy, "https": proxy} if proxy else None
     try:
-        # 获取本周热门
-        url = f"https://api.themoviedb.org/3/trending/all/week?api_key={tmdb_key}&language=zh-CN"
-        res = requests.get(url, proxies=proxies, timeout=10).json()
-        results = []
-        for item in res.get("results", [])[:15]:
-            if item.get("media_type") not in ["movie", "tv"]: continue
-            title = item.get("title") or item.get("name")
-            year = item.get("release_date") or item.get("first_air_date") or ""
-            poster = f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get("poster_path") else ""
-            backdrop = f"https://image.tmdb.org/t/p/w1280{item.get('backdrop_path')}" if item.get("backdrop_path") else ""
-            results.append({
-                "tmdb_id": item.get("id"), "media_type": item.get("media_type"),
-                "title": title, "year": year[:4] if year else "未知",
-                "poster_path": poster, "backdrop_path": backdrop,
-                "overview": item.get("overview", ""),
-                "vote_average": round(item.get("vote_average", 0), 1)
+        url_m = f"https://api.themoviedb.org/3/trending/movie/week?api_key={tmdb_key}&language=zh-CN"
+        res_m = requests.get(url_m, proxies=proxies, timeout=10).json()
+        
+        url_t = f"https://api.themoviedb.org/3/trending/tv/week?api_key={tmdb_key}&language=zh-CN"
+        res_t = requests.get(url_t, proxies=proxies, timeout=10).json()
+        
+        movies, tvs = [], []
+        for item in res_m.get("results", [])[:20]:
+            movies.append({
+                "tmdb_id": item.get("id"), "media_type": "movie",
+                "title": item.get("title") or item.get("name"), 
+                "year": (item.get("release_date") or item.get("first_air_date") or "")[:4] or "未知",
+                "poster_path": f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get("poster_path") else "",
+                "backdrop_path": f"https://image.tmdb.org/t/p/w1280{item.get('backdrop_path')}" if item.get("backdrop_path") else "",
+                "overview": item.get("overview", ""), "vote_average": round(item.get("vote_average", 0), 1)
             })
-        return {"status": "success", "data": results}
+            
+        for item in res_t.get("results", [])[:20]:
+            tvs.append({
+                "tmdb_id": item.get("id"), "media_type": "tv",
+                "title": item.get("title") or item.get("name"), 
+                "year": (item.get("release_date") or item.get("first_air_date") or "")[:4] or "未知",
+                "poster_path": f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get("poster_path") else "",
+                "backdrop_path": f"https://image.tmdb.org/t/p/w1280{item.get('backdrop_path')}" if item.get("backdrop_path") else "",
+                "overview": item.get("overview", ""), "vote_average": round(item.get("vote_average", 0), 1)
+            })
+            
+        return {"status": "success", "data": {"movies": movies, "tv": tvs}}
     except Exception as e: return {"status": "error", "message": str(e)}
 
-# 🔥 新增：精准查询剧集的本地季数
+# ================= 精准查季数 =================
 @router.get("/api/requests/tv/{tmdb_id}")
 def get_tv_details(tmdb_id: int, request: Request):
     tmdb_key = cfg.get("tmdb_api_key"); proxy = cfg.get("proxy_url"); proxies = {"http": proxy, "https": proxy} if proxy else None
     local_seasons = []
     try:
-        # 1. 穿透查 Emby，看本地有哪些季
         emby_host = cfg.get("emby_host"); emby_key = cfg.get("emby_api_key")
         if emby_host and emby_key:
             search_url = f"{emby_host}/emby/Items?AnyProviderIdEquals=tmdb.{tmdb_id}&IncludeItemTypes=Series&api_key={emby_key}"
@@ -100,12 +114,10 @@ def get_tv_details(tmdb_id: int, request: Request):
                 season_res = requests.get(season_url, timeout=5).json()
                 local_seasons = [s.get("IndexNumber") for s in season_res.get("Items", []) if s.get("IndexNumber") is not None]
 
-        # 2. 查 TMDB 官方季数
         url = f"https://api.themoviedb.org/3/tv/{tmdb_id}?api_key={tmdb_key}&language=zh-CN"
         tmdb_res = requests.get(url, proxies=proxies, timeout=10).json()
         seasons = [{"season_number": s["season_number"], "name": s["name"], "episode_count": s["episode_count"], "exists_locally": s["season_number"] in local_seasons} 
-                   for s in tmdb_res.get("seasons", []) if s["season_number"] > 0] # 过滤掉第0季(特别篇)
-        
+                   for s in tmdb_res.get("seasons", []) if s["season_number"] > 0]
         return {"status": "success", "seasons": seasons}
     except Exception as e: return {"status": "error", "message": str(e)}
 
@@ -156,7 +168,7 @@ def search_tmdb(query: str, request: Request):
         return {"status": "success", "data": results}
     except Exception as e: return {"status": "error", "message": f"网络错误: {str(e)}"}
 
-# 🔥 更新：支持分季求片逻辑
+# ================= 提交 & 审批 =================
 @router.post("/api/requests/submit")
 def submit_media_request(data: MediaRequestSubmitModel, request: Request):
     user = request.session.get("req_user")
@@ -170,7 +182,6 @@ def submit_media_request(data: MediaRequestSubmitModel, request: Request):
         execute_sql("INSERT INTO media_requests (tmdb_id, media_type, title, year, poster_path, status, season) VALUES (?, ?, ?, ?, ?, 0, ?)",
                     (data.tmdb_id, data.media_type, data.title, data.year, data.poster_path, data.season))
     else:
-        # 如果库里有，但用户求的是电视剧的“新的一季”，则允许覆盖状态重新求片
         if existing[0] == 2 and data.media_type == "tv" and data.season > 0:
             execute_sql("UPDATE media_requests SET status = 0, season = ? WHERE tmdb_id = ?", (data.season, data.tmdb_id))
         elif existing[0] == 2:
@@ -191,35 +202,27 @@ def submit_media_request(data: MediaRequestSubmitModel, request: Request):
     
     admin_url = cfg.get("pulse_url") or str(request.base_url).rstrip('/')
     keyboard = {"inline_keyboard": [[{"text": "🍿 一键审批", "url": f"{admin_url}/requests_admin"}]]}
-    
     bot.send_photo("sys_notify", data.poster_path or REPORT_COVER_URL, bot_msg, reply_markup=keyboard, platform="all")
     return {"status": "success", "message": "心愿提交成功！已通知服主处理。"}
 
-# 🔥 更新：将准确的季数传给 MoviePilot
 @router.post("/api/manage/requests/action")
 def manage_request_action(data: MediaRequestActionModel, request: Request):
     if not request.session.get("user"): return {"status": "error", "message": "权限不足"}
-
     new_status = 0
     if data.action == "approve":
         new_status = 1
         mp_url = cfg.get("moviepilot_url"); mp_token = cfg.get("moviepilot_token")
-        
         if mp_url and mp_token:
             conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row; c = conn.cursor()
             c.execute("SELECT * FROM media_requests WHERE tmdb_id = ?", (data.tmdb_id,))
             row = c.fetchone(); conn.close()
-            
             if row:
                 try:
                     clean_token = mp_token.strip().strip("'").strip('"')
                     mp_api = f"{mp_url.rstrip('/')}/api/v1/subscribe/" 
                     mp_type_map = {"movie": "电影", "tv": "电视剧"}
-                    
                     payload = {"name": row["title"], "tmdbid": int(row["tmdb_id"]), "year": str(row["year"]) if row["year"] else "", "type": mp_type_map.get(row["media_type"], "未知")}
-                    # 只有剧集才传 season，且传入数据库中存的用户指定季数 (如果没选默认传 1)
-                    if row["media_type"] == "tv":
-                        payload["season"] = row["season"] if row.get("season") else 1
+                    if row["media_type"] == "tv": payload["season"] = row["season"] if row.get("season") else 1
                     
                     headers = {"X-API-KEY": clean_token, "Content-Type": "application/json"}
                     res = requests.post(mp_api, json=payload, headers=headers, timeout=15)
