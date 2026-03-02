@@ -13,26 +13,19 @@ from app.services.bot_service import bot
 router = APIRouter()
 
 # ==========================================================
-# 🔥 核心：【全自动】数据库架构校验与修复逻辑
+# 🔥 核心：【全自动】数据库架构强制校验与修复 (无感迁移)
 # ==========================================================
 def ensure_db_schema():
-    """
-    静默检测并强制升级数据库架构。
-    将 (tmdb_id) 单一主键升级为 (tmdb_id, season) 复合主键，以支持同剧多季订阅。
-    同时修复投票表的唯一索引。
-    """
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    # 1. 检查 media_requests 表主键结构
+    # 1. 升级 media_requests 表 (处理复合主键：tmdb_id + season)
     c.execute("PRAGMA table_info(media_requests)")
     cols = c.fetchall()
     if cols:
-        # 获取所有标记为主键的列名
         pk_cols = [col[1] for col in cols if col[5] > 0]
-        # 如果主键里没有 season，说明是需要升级的旧结构
         if 'season' not in pk_cols:
-            print("🚨 [映迹] 检测到旧版单主键架构，正在强制迁移 media_requests...")
+            print("🚨 [映迹] 检测到旧版单主键架构，正在升级 media_requests 表结构...")
             c.execute("ALTER TABLE media_requests RENAME TO media_requests_old")
             c.execute("""
                 CREATE TABLE media_requests (
@@ -49,19 +42,17 @@ def ensure_db_schema():
                     PRIMARY KEY (tmdb_id, season)
                 )
             """)
-            # 迁移存量数据
             c.execute("""
                 INSERT OR IGNORE INTO media_requests (tmdb_id, media_type, title, year, poster_path, status, season, reject_reason, created_at)
                 SELECT tmdb_id, media_type, title, year, poster_path, status, 0, reject_reason, created_at FROM media_requests_old
             """)
             c.execute("DROP TABLE media_requests_old")
-            print("✅ [映迹] media_requests 表主键升级完成。")
 
-    # 2. 升级用户投票关联表 request_users
+    # 2. 升级 request_users 表 (确保支持多季投票)
     c.execute("PRAGMA table_info(request_users)")
     u_cols = [col[1] for col in c.fetchall()]
     if u_cols and 'season' not in u_cols:
-        print("🚨 [映迹] 正在升级投票表架构...")
+        print("🚨 [映迹] 正在升级投票表 request_users 架构...")
         c.execute("ALTER TABLE request_users RENAME TO request_users_old")
         c.execute("""
             CREATE TABLE request_users (
@@ -73,13 +64,11 @@ def ensure_db_schema():
                 UNIQUE(tmdb_id, user_id, season)
             )
         """)
-        # 迁移数据并处理空用户名
         c.execute("""
             INSERT OR IGNORE INTO request_users (tmdb_id, user_id, username, season)
             SELECT tmdb_id, user_id, COALESCE(username, '系统用户'), 0 FROM request_users_old
         """)
         c.execute("DROP TABLE request_users_old")
-        print("✅ [映迹] request_users 投票表升级完成。")
 
     conn.commit()
     conn.close()
@@ -218,7 +207,7 @@ def get_tv_details(tmdb_id: int):
     except Exception as e: return {"status": "error", "message": str(e)}
 
 # ==========================================================
-# ✍️ 用户求片提交与个人队列接口
+# ✍️ 求片提交与用户队列 (包含满血版机器人通知)
 # ==========================================================
 @router.post("/api/requests/submit")
 def submit_media_request(data: MediaRequestSubmitModel, request: Request):
@@ -234,8 +223,9 @@ def submit_media_request(data: MediaRequestSubmitModel, request: Request):
     existing = c.fetchone()
     
     if not existing:
+        # 🔥 修复：精准对齐 6 个占位符与 6 个参数
         success, err = execute_sql("INSERT INTO media_requests (tmdb_id, media_type, title, year, poster_path, status, season) VALUES (?, ?, ?, ?, ?, 0, ?)",
-                                   (data.tmdb_id, data.media_type, data.title, data.year, data.poster_path, 0, data.season))
+                                   (data.tmdb_id, data.media_type, data.title, data.year, data.poster_path, data.season))
         if not success: return {"status": "error", "message": f"库表写入失败: {err}"}
     elif existing[0] == 2:
         return {"status": "error", "message": f"第 {data.season} 季已入库"}
@@ -246,12 +236,22 @@ def submit_media_request(data: MediaRequestSubmitModel, request: Request):
     execute_sql("INSERT OR REPLACE INTO request_users (tmdb_id, user_id, username, season) VALUES (?, ?, ?, ?)", 
                 (data.tmdb_id, uid, uname, data.season))
     
-    # 机器人实时通知
-    type_name = "电影" if data.media_type == "movie" else f"剧集 (第 {data.season} 季)"
-    bot_msg = f"🔔 <b>新求片</b>\n👤 <b>用户</b>：{uname}\n📌 <b>片名</b>：{data.title}\n🏷️ <b>类型</b>：{type_name}"
-    bot.send_photo("sys_notify", data.poster_path or REPORT_COVER_URL, bot_msg, platform="all")
+    # 🤖 满血版机器人实时通知 (找回简介与跳转链接)
+    type_name = "🎬 电影" if data.media_type == "movie" else f"📺 剧集 (第 {data.season} 季)"
+    overview_text = data.overview[:115] + "..." if len(data.overview) > 120 else data.overview
     
-    return {"status": "success", "message": "求片成功，请等待审核"}
+    bot_msg = (f"🔔 <b>新求片订单提醒</b>\n\n"
+               f"👤 <b>求片人</b>：{uname}\n"
+               f"📌 <b>片名</b>：{data.title} ({data.year})\n"
+               f"🏷️ <b>类型</b>：{type_name}\n\n"
+               f"📝 <b>资源简介：</b>\n{overview_text}")
+    
+    admin_url = cfg.get("pulse_url") or str(request.base_url).rstrip('/')
+    keyboard = {"inline_keyboard": [[{"text": "🍿 一键审批", "url": f"{admin_url}/requests_admin"}]]}
+    
+    bot.send_photo("sys_notify", data.poster_path or REPORT_COVER_URL, bot_msg, reply_markup=keyboard, platform="all")
+    
+    return {"status": "success", "message": "求片成功，已推送到管理员"}
 
 @router.get("/api/requests/my")
 def get_my_requests(request: Request):
@@ -273,7 +273,7 @@ def get_my_requests(request: Request):
     } for r in rows]}
 
 # ==========================================================
-# 👮 后台管理与审批接口
+# 👮 管理中心接口 (审批、拒绝、删除)
 # ==========================================================
 @router.get("/api/manage/requests")
 def get_all_requests(request: Request):
@@ -301,7 +301,7 @@ def manage_request_action(data: AdminActionModel, request: Request):
     conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row; c = conn.cursor()
     c.execute("SELECT * FROM media_requests WHERE tmdb_id = ? AND season = ?", (data.tmdb_id, data.season))
     row = c.fetchone(); conn.close()
-    if not row: return {"status": "error", "message": "找不到对应请求"}
+    if not row: return {"status": "error", "message": "找不到记录"}
 
     if data.action == "approve":
         mp_url = cfg.get("moviepilot_url"); mp_token = cfg.get("moviepilot_token")
@@ -313,8 +313,8 @@ def manage_request_action(data: AdminActionModel, request: Request):
                 res = requests.post(f"{mp_url.rstrip('/')}/api/v1/subscribe/", json=payload, headers=headers, timeout=15)
                 if res.status_code == 200:
                     execute_sql("UPDATE media_requests SET status = 1 WHERE tmdb_id = ? AND season = ?", (data.tmdb_id, data.season))
-                    return {"status": "success", "message": "已成功推送至 MoviePilot"}
-            except Exception as e: return {"status": "error", "message": f"MP 对接失败: {str(e)}"}
+                    return {"status": "success", "message": "已成功推送至 MP"}
+            except Exception as e: return {"status": "error", "message": f"MP 异常: {str(e)}"}
 
     elif data.action == "reject":
         execute_sql("UPDATE media_requests SET status = 3, reject_reason = ? WHERE tmdb_id = ? AND season = ?", (data.reject_reason, data.tmdb_id, data.season))
@@ -325,4 +325,4 @@ def manage_request_action(data: AdminActionModel, request: Request):
         execute_sql("DELETE FROM request_users WHERE tmdb_id = ? AND season = ?", (data.tmdb_id, data.season))
         return {"status": "success", "message": "已删除"}
 
-    return {"status": "error", "message": "执行失败"}
+    return {"status": "error", "message": "操作失败"}
