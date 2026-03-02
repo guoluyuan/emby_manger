@@ -191,7 +191,7 @@ def manage_request_action(data: MediaRequestActionModel, request: Request):
                 try:
                     mp_api = f"{mp_url.rstrip('/')}/api/v1/subscribe"
                     payload = {"name": req_info[0], "tmdbid": req_info[1], "type": "MOV" if req_info[2]=="movie" else "TV"}
-                    res = requests.post(mp_api, json=payload, headers={"Authorization": f"Bearer {mp_token}"}, timeout=10)
+                    res = requests.post(mp_api, json=payload, headers={"Authorization": mp_token}, timeout=10)
                     if res.status_code != 200:
                         return {"status": "error", "message": f"MoviePilot 拒绝请求: {res.text}"}
                 except Exception as e:
