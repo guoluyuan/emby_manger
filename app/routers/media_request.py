@@ -151,20 +151,30 @@ def manage_request_action(data: MediaRequestActionModel, request: Request):
             
             if req_info:
                 try:
-                    # 去掉多余的空格和换行，确保 token 纯净
-                    clean_token = mp_token.strip().strip("'").strip('"') 
-                    mp_api = f"{mp_url.rstrip('/')}/api/v1/subscribe"
-                    payload = {"name": req_info[0], "tmdbid": req_info[1], "type": "MOV" if req_info[2]=="movie" else "TV"}
+                    # 1. 清理 Token 及其两侧可能存在的单引号/空格
+                    clean_token = mp_token.strip().strip("'").strip('"')
                     
-                    # 🔥 终极双保险认证：同时放入 URL 参数和 Header
+                    # 2. 🔥 核心修复：强制加上末尾斜杠，避免 307 重定向
+                    mp_api = f"{mp_url.rstrip('/')}/api/v1/subscribe/" 
+                    
+                    # 3. 准备数据负载 (类型对齐 MP 标准)
+                    payload = {
+                        "name": req_info[0], 
+                        "tmdbid": int(req_info[1]), 
+                        "type": req_info[2]  # 'movie' 或 'tv'
+                    }
+                    
+                    # 4. 🔥 核心修复：移除 URL 里的 token，只保留标准的 Bearer Header
                     auth_headers = {
                         "Authorization": f"Bearer {clean_token}",
                         "Content-Type": "application/json"
                     }
                     
-                    res = requests.post(f"{mp_api}?token={clean_token}", json=payload, headers=auth_headers, timeout=10)
+                    # 发送请求
+                    res = requests.post(mp_api, json=payload, headers=auth_headers, timeout=10)
                     
                     if res.status_code != 200:
+                        # 如果 MP 返回 401/403，通常是 Token 真的不对
                         return {"status": "error", "message": f"MoviePilot 拒绝请求: {res.text}"}
                 except Exception as e:
                     return {"status": "error", "message": f"连接 MoviePilot 失败: {str(e)}"}
