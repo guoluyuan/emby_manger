@@ -13,34 +13,25 @@ from app.services.bot_service import bot
 router = APIRouter()
 
 # ==========================================================
-# 🔥 核心：【强制】无感架构升级逻辑 (确保多季并存)
+# 🔥 核心：【彻底修复】数据库架构强制升级逻辑
 # ==========================================================
 def ensure_db_schema():
     """
-    静默检测并强制升级数据库架构。
-    将 (tmdb_id) 单一主键升级为 (tmdb_id, season) 复合主键。
+    强制检测并升级数据库。
+    解决 UNIQUE constraint failed: media_requests.tmdb_id 报错。
     """
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    # 1. 检查 media_requests 表的建表 SQL
-    c.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='media_requests'")
-    result = c.fetchone()
+    # 1. 检查 media_requests 表的现有结构
+    c.execute("PRAGMA table_info(media_requests)")
+    columns = c.fetchall()
     
-    need_migrate = False
-    if not result:
-        need_migrate = True
-    else:
-        create_sql = result[0].lower()
-        # 如果主键定义里没有 season，说明是旧架构，必须拆除重建
-        if "primary key" in create_sql and "season" not in create_sql:
-            need_migrate = True
-
-    if need_migrate:
-        print("🚨 [映迹] 检测到旧版数据库主键约束，正在强制升级为 (ID+季度) 复合架构...")
-        # 创建支持复合主键的新影子表
+    if not columns:
+        # 表不存在，直接创建最强架构
+        print("✅ [映迹] 正在初始化 media_requests 数据库表...")
         c.execute("""
-            CREATE TABLE IF NOT EXISTS media_requests_new (
+            CREATE TABLE IF NOT EXISTS media_requests (
                 tmdb_id INTEGER,
                 media_type TEXT,
                 title TEXT,
@@ -54,26 +45,65 @@ def ensure_db_schema():
                 PRIMARY KEY (tmdb_id, season)
             )
         """)
-        # 尝试搬运现有数据，将老数据视为第 0 季或第 1 季
-        try:
+    else:
+        # 表存在，检查主键是否包含 season
+        pk_cols = [col[1] for col in columns if col[5] > 0]
+        if pk_cols == ['tmdb_id']:
+            print("🚨 [映迹] 检测到旧版单主键架构，正在执行强制迁移...")
+            # A. 备份旧数据
+            c.execute("ALTER TABLE media_requests RENAME TO media_requests_old")
+            # B. 创建复合主键新表
             c.execute("""
-                INSERT OR REPLACE INTO media_requests_new (tmdb_id, media_type, title, year, poster_path, status, season, reject_reason, created_at)
-                SELECT tmdb_id, media_type, title, year, poster_path, status, COALESCE(season, 0), reject_reason, created_at FROM media_requests
+                CREATE TABLE media_requests (
+                    tmdb_id INTEGER,
+                    media_type TEXT,
+                    title TEXT,
+                    year TEXT,
+                    poster_path TEXT,
+                    status INTEGER DEFAULT 0,
+                    season INTEGER DEFAULT 0,
+                    reject_reason TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (tmdb_id, season)
+                )
             """)
-        except Exception as e:
-            print(f"⚠️ [映迹] 数据搬运提示: {str(e)}")
+            # C. 迁移数据，老数据默认归为 0 季
+            c.execute("""
+                INSERT OR IGNORE INTO media_requests (tmdb_id, media_type, title, year, poster_path, status, season, reject_reason, created_at)
+                SELECT tmdb_id, media_type, title, year, poster_path, status, 0, reject_reason, created_at FROM media_requests_old
+            """)
+            # D. 删除旧表
+            c.execute("DROP TABLE media_requests_old")
+            print("✅ [映迹] media_requests 架构强制升级完成。")
 
-        c.execute("DROP TABLE IF EXISTS media_requests")
-        c.execute("ALTER TABLE media_requests_new RENAME TO media_requests")
-        print("✅ [映迹] media_requests 架构升级成功。")
-
-    # 2. 升级用户投票关联表 request_users，支持同一用户对不同季度分别投票
-    c.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='request_users'")
-    u_result = c.fetchone()
-    if u_result and "season" not in u_result[0].lower():
-        print("🚨 [映迹] 正在升级投票关联表约束...")
+    # 2. 检查投票关联表 request_users
+    c.execute("PRAGMA table_info(request_users)")
+    u_columns = c.fetchall()
+    if u_columns:
+        u_pk = [col[1] for col in u_columns if col[5] > 0] # 检查是否有 season 参与唯一约束
+        # 简单通过字段是否存在来判定
+        u_cols_names = [col[1] for col in u_columns]
+        if 'season' not in u_cols_names:
+            print("🚨 [映迹] 正在升级投票表架构...")
+            c.execute("ALTER TABLE request_users RENAME TO request_users_old")
+            c.execute("""
+                CREATE TABLE request_users (
+                    tmdb_id INTEGER, 
+                    user_id TEXT, 
+                    username TEXT, 
+                    season INTEGER DEFAULT 0, 
+                    requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
+                    UNIQUE(tmdb_id, user_id, season)
+                )
+            """)
+            c.execute("INSERT OR IGNORE INTO request_users (tmdb_id, user_id, username, season) SELECT tmdb_id, user_id, username, 0 FROM request_users_old")
+            c.execute("DROP TABLE request_users_old")
+            print("✅ [映迹] request_users 架构升级完成。")
+    else:
+        # 初始化投票表
         c.execute("""
-            CREATE TABLE IF NOT EXISTS request_users_new (
+            CREATE TABLE IF NOT EXISTS request_users (
                 tmdb_id INTEGER, 
                 user_id TEXT, 
                 username TEXT, 
@@ -82,17 +112,11 @@ def ensure_db_schema():
                 UNIQUE(tmdb_id, user_id, season)
             )
         """)
-        try:
-            c.execute("INSERT OR REPLACE INTO request_users_new (tmdb_id, user_id, username, season) SELECT tmdb_id, user_id, username, 0 FROM request_users")
-        except: pass
-        c.execute("DROP TABLE IF EXISTS request_users")
-        c.execute("ALTER TABLE request_users_new RENAME TO request_users")
-        print("✅ [映迹] request_users 架构升级成功。")
 
     conn.commit()
     conn.close()
 
-# 系统初始化时强制执行
+# 强制初始化
 ensure_db_schema()
 
 # ==========================================================
@@ -168,7 +192,6 @@ def get_trending():
     try:
         m_url = f"https://api.themoviedb.org/3/trending/movie/week?api_key={tmdb_key}&language=zh-CN"
         t_url = f"https://api.themoviedb.org/3/trending/tv/week?api_key={tmdb_key}&language=zh-CN"
-        
         m_res = requests.get(m_url, proxies=proxies, timeout=10).json()
         t_res = requests.get(t_url, proxies=proxies, timeout=10).json()
         
@@ -190,7 +213,6 @@ def get_tv_details(tmdb_id: int):
     proxy = cfg.get("proxy_url")
     proxies = {"https": proxy} if proxy else None
     try:
-        # 1. 穿透 Emby 检查库内已有哪些季度
         emby_host = cfg.get("emby_host"); emby_key = cfg.get("emby_api_key")
         admin_id = get_emby_admin(emby_host, emby_key)
         local_seasons = []
@@ -201,7 +223,6 @@ def get_tv_details(tmdb_id: int):
                 seasons_res = requests.get(f"{emby_host}/emby/Shows/{sid}/Seasons?UserId={admin_id}&api_key={emby_key}", timeout=5).json()
                 local_seasons = [s.get("IndexNumber") for s in seasons_res.get("Items", []) if s.get("IndexNumber") is not None]
 
-        # 2. 从 TMDB 获取完整季度列表
         tmdb_res = requests.get(f"https://api.themoviedb.org/3/tv/{tmdb_id}?api_key={tmdb_key}&language=zh-CN", proxies=proxies, timeout=10).json()
         seasons = [{
             "season_number": s["season_number"], "name": s["name"], "episode_count": s["episode_count"],
@@ -240,25 +261,25 @@ def submit_media_request(data: MediaRequestSubmitModel, request: Request):
     user = request.session.get("req_user")
     if not user: return {"status": "error", "message": "登录已过期"}
 
-    # 严格按照 (ID + 季度) 校验
+    # 查重逻辑
     conn = sqlite3.connect(DB_PATH); c = conn.cursor()
     c.execute("SELECT status FROM media_requests WHERE tmdb_id = ? AND season = ?", (data.tmdb_id, data.season))
     existing = c.fetchone()
     
     if not existing:
+        # 🔥 这里必须要检查 execute_sql 的结果，不能假装成功
         success, err = execute_sql("INSERT INTO media_requests (tmdb_id, media_type, title, year, poster_path, status, season) VALUES (?, ?, ?, ?, ?, 0, ?)",
                                    (data.tmdb_id, data.media_type, data.title, data.year, data.poster_path, data.season))
-        if not success: return {"status": "error", "message": f"写入失败: {err}"}
+        if not success:
+            return {"status": "error", "message": f"提交失败: {err}"}
     elif existing[0] == 2:
         return {"status": "error", "message": f"第 {data.season} 季已入库"}
-    elif existing[0] == 3: # 重启被拒绝的任务
+    elif existing[0] == 3: 
         execute_sql("UPDATE media_requests SET status = 0, reject_reason = NULL WHERE tmdb_id = ? AND season = ?", (data.tmdb_id, data.season))
 
-    # 记录该用户对该季度的支持
     execute_sql("INSERT OR IGNORE INTO request_users (tmdb_id, user_id, username, season) VALUES (?, ?, ?, ?)", 
                 (data.tmdb_id, user.get("Id"), user.get("Name"), data.season))
     
-    # 异步机器人通知
     type_tag = "电影" if data.media_type == "movie" else f"剧集 (第 {data.season} 季)"
     bot_msg = f"🔔 <b>新求片</b>\n👤 <b>用户</b>：{user.get('Name')}\n📌 <b>片名</b>：{data.title}\n🏷️ <b>类型</b>：{type_tag}"
     bot.send_photo("sys_notify", data.poster_path or REPORT_COVER_URL, bot_msg, platform="all")
@@ -289,7 +310,6 @@ def get_my_requests(request: Request):
 def get_all_requests(request: Request):
     if not request.session.get("user"): return {"status": "error", "message": "无权访问"}
     conn = sqlite3.connect(DB_PATH); c = conn.cursor()
-    # 核心：按 (ID + 季) 分组，确保后台能看到同一部剧的不同季
     query = """
         SELECT m.tmdb_id, m.media_type, m.title, m.year, m.poster_path, m.status, m.season, m.created_at, 
                COUNT(r.user_id) as cnt, GROUP_CONCAT(r.username, ', ') as users, m.reject_reason
@@ -325,7 +345,7 @@ def manage_request_action(data: AdminActionModel, request: Request):
                 res = requests.post(mp_api, json=payload, headers=headers, timeout=15)
                 if res.status_code != 200: return {"status": "error", "message": f"MP 返回错误: {res.text}"}
                 execute_sql("UPDATE media_requests SET status = 1 WHERE tmdb_id = ? AND season = ?", (data.tmdb_id, data.season))
-                return {"status": "success", "message": "已成功推送至 MoviePilot 下载"}
+                return {"status": "success", "message": "已推送至下载流水线"}
             except Exception as e: return {"status": "error", "message": f"连接 MP 失败: {str(e)}"}
 
     elif data.action == "reject":
