@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, Depends
 from pydantic import BaseModel
 import requests
 import sqlite3
+import io
 from app.core.config import cfg, REPORT_COVER_URL
 from app.core.database import DB_PATH
 from app.schemas.models import MediaRequestSubmitModel, MediaRequestActionModel
@@ -40,7 +41,7 @@ def request_system_login(data: RequestLoginModel, request: Request):
         return {"status": "error", "message": "账号或密码错误"}
     except Exception as e: return {"status": "error", "message": f"连接 Emby 失败: {str(e)}"}
 
-# 🔥 优化1：搜索时前置检查数据库状态
+# 🔥 V2.0 搜索：TMDB + 本地数据库查重 + Emby穿透查重
 @router.get("/api/requests/search")
 def search_tmdb(query: str, request: Request):
     if not request.session.get("req_user"): return {"status": "error", "message": "未登录"}
@@ -55,33 +56,49 @@ def search_tmdb(query: str, request: Request):
             data = res.json()
             results = []
             
-            # 批量查询本地数据库状态
             tmdb_ids = [str(item['id']) for item in data.get("results", []) if item.get("media_type") in ["movie", "tv"]]
             local_status_map = {}
+            emby_exists_set = set()
+
             if tmdb_ids:
                 conn = sqlite3.connect(DB_PATH); c = conn.cursor()
                 placeholders = ','.join('?' * len(tmdb_ids))
                 c.execute(f"SELECT tmdb_id, status FROM media_requests WHERE tmdb_id IN ({placeholders})", tuple(tmdb_ids))
-                for row in c.fetchall(): local_status_map[row[0]] = row[1]
+                for row in c.fetchall(): local_status_map[str(row[0])] = row[1]
                 conn.close()
+
+                emby_host = cfg.get("emby_host"); emby_key = cfg.get("emby_api_key")
+                if emby_host and emby_key:
+                    provider_query = ",".join([f"tmdb.{tid}" for tid in tmdb_ids])
+                    emby_search_url = f"{emby_host}/emby/Items?AnyProviderIdEquals={provider_query}&Recursive=true&IncludeItemTypes=Movie,Series&Fields=ProviderIds&api_key={emby_key}"
+                    try:
+                        emby_res = requests.get(emby_search_url, timeout=5)
+                        if emby_res.status_code == 200:
+                            for e_item in emby_res.json().get("Items", []):
+                                tid = e_item.get("ProviderIds", {}).get("Tmdb")
+                                if tid: emby_exists_set.add(str(tid))
+                    except: pass
 
             for item in data.get("results", []):
                 if item.get("media_type") not in ["movie", "tv"]: continue
+                tid_str = str(item.get("id"))
                 title = item.get("title") or item.get("name")
                 year_str = item.get("release_date") or item.get("first_air_date") or ""
                 poster = f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get("poster_path") else ""
                 
+                final_status = 2 if tid_str in emby_exists_set else local_status_map.get(tid_str, -1)
+
                 results.append({
                     "tmdb_id": item.get("id"), "media_type": item.get("media_type"),
                     "title": title, "year": year_str[:4] if year_str else "未知",
                     "poster_path": poster, "overview": item.get("overview", ""),
-                    "local_status": local_status_map.get(item.get("id"), -1) # -1代表全新未求过
+                    "vote_average": round(item.get("vote_average", 0), 1),
+                    "local_status": final_status 
                 })
             return {"status": "success", "data": results}
         return {"status": "error", "message": "TMDB API 响应异常"}
     except Exception as e: return {"status": "error", "message": f"网络代理或请求错误: {str(e)}"}
 
-# 🔥 优化2：提交求片时带上后台跳转按钮
 @router.post("/api/requests/submit")
 def submit_media_request(data: MediaRequestSubmitModel, request: Request):
     user = request.session.get("req_user")
@@ -94,7 +111,7 @@ def submit_media_request(data: MediaRequestSubmitModel, request: Request):
         execute_sql("INSERT INTO media_requests (tmdb_id, media_type, title, year, poster_path, status) VALUES (?, ?, ?, ?, ?, 0)",
                     (data.tmdb_id, data.media_type, data.title, data.year, data.poster_path))
     else:
-        if existing[0] == 2: conn.close(); return {"status": "error", "message": "这部片子已经入库啦！"}
+        if existing[0] == 2: conn.close(); return {"status": "error", "message": "这部片子已经入库啦！不用重复求片。"}
 
     success, err_msg = execute_sql("INSERT INTO request_users (tmdb_id, user_id, username) VALUES (?, ?, ?)",
                                    (data.tmdb_id, user.get("Id"), user.get("Name")))
@@ -104,15 +121,28 @@ def submit_media_request(data: MediaRequestSubmitModel, request: Request):
         if "UNIQUE" in err_msg: return {"status": "error", "message": "你已经提交过啦，不用重复点 +1"}
         return {"status": "error", "message": f"写入失败: {err_msg}"}
 
-    # 构造带按钮的机器人通知
     type_cn = "🎬 电影" if data.media_type == "movie" else "📺 剧集"
-    bot_msg = f"🔔 <b>新求片订单提醒</b>\n\n👤 <b>求片人</b>：{user.get('Name')}\n📌 <b>片名</b>：{data.title} ({data.year})\n🏷️ <b>类型</b>：{type_cn}"
+    overview_text = data.overview if data.overview else "暂无剧情简介"
+    if len(overview_text) > 120: overview_text = overview_text[:115] + "..."
+
+    bot_msg = (f"🔔 <b>新求片订单提醒</b>\n\n"
+               f"👤 <b>求片人</b>：{user.get('Name')}\n"
+               f"📌 <b>片名</b>：{data.title} ({data.year})\n"
+               f"🏷️ <b>类型</b>：{type_cn}\n\n"
+               f"📝 <b>剧情简介：</b>\n{overview_text}")
     
-    admin_url = cfg.get("emby_public_url") or cfg.get("emby_host")
-    if admin_url.endswith('/'): admin_url = admin_url[:-1]
-    keyboard = {"inline_keyboard": [[{"text": "🍿 前往后台审批", "url": f"{admin_url}/requests_admin"}]]}
+    admin_url = cfg.get("pulse_url") or str(request.base_url).rstrip('/')
+    keyboard = {"inline_keyboard": [[{"text": "🍿 前往后台一键审批", "url": f"{admin_url}/requests_admin"}]]}
     
-    bot.send_photo("sys_notify", data.poster_path if data.poster_path else REPORT_COVER_URL, bot_msg, reply_markup=keyboard, platform="all")
+    photo_data = REPORT_COVER_URL
+    if data.poster_path:
+        try:
+            proxy = cfg.get("proxy_url"); proxies = {"http": proxy, "https": proxy} if proxy else None
+            img_res = requests.get(data.poster_path, proxies=proxies, timeout=15)
+            if img_res.status_code == 200: photo_data = io.BytesIO(img_res.content)
+        except: pass
+
+    bot.send_photo("sys_notify", photo_data, bot_msg, reply_markup=keyboard, platform="all")
     return {"status": "success", "message": "心愿提交成功！已通知服主处理。"}
 
 @router.get("/api/requests/my")
@@ -132,7 +162,7 @@ def get_all_requests(request: Request):
     c.execute(query); rows = c.fetchall(); conn.close()
     return {"status": "success", "data": [{"tmdb_id": r[0], "media_type": r[1], "title": r[2], "year": r[3], "poster_path": r[4], "status": r[5], "created_at": r[6], "request_count": r[7], "requested_by": r[8] or "未知"} for r in rows]}
 
-# 🔥 V2.0 操作：支持完整版 MoviePilot 推送
+# 🔥 V2.0 操作修复：强制补齐斜杠 + 清洗 Token + 类型对齐
 @router.post("/api/manage/requests/action")
 def manage_request_action(data: MediaRequestActionModel, request: Request):
     if not request.session.get("user"): return {"status": "error", "message": "权限不足"}
@@ -143,7 +173,6 @@ def manage_request_action(data: MediaRequestActionModel, request: Request):
         mp_url = cfg.get("moviepilot_url")
         mp_token = cfg.get("moviepilot_token")
         
-# 如果配置了 MP，调用自动订阅
         if mp_url and mp_token:
             conn = sqlite3.connect(DB_PATH); c = conn.cursor()
             c.execute("SELECT title, tmdb_id, media_type, year FROM media_requests WHERE tmdb_id=?", (data.tmdb_id,))
@@ -151,34 +180,30 @@ def manage_request_action(data: MediaRequestActionModel, request: Request):
             
             if req_info:
                 try:
-                    # 1. 强制加上末尾斜杠，避免 307 重定向导致 Header 丢失
+                    # 1. 强力清洗 Token：去除空格、首尾单双引号
+                    clean_token = mp_token.strip().strip("'").strip('"')
+                    
+                    # 2. 补齐末尾斜杠，绕过重定向，直达目的地
                     mp_api = f"{mp_url.rstrip('/')}/api/v1/subscribe/" 
                     
-                    # 2. 构造 payload，确保数据类型 100% 匹配 MP 后端模型
+                    # 3. Payload 严格对齐 MP V2 规范
                     payload = {
-                        "name": req_info[0],
-                        "type": "movie" if req_info[2] == "movie" else "tv",
+                        "name": req_info[0], 
+                        "tmdbid": int(req_info[1]), 
                         "year": str(req_info[3]) if req_info[3] else "",
-                        "tmdbid": int(req_info[1])
+                        "type": "movie" if req_info[2] == "movie" else "tv"
                     }
                     
-                    # 3. 构造请求头
-                    # 注意：如果设置里的 token 已经带了 'Bearer '，则不再重复加
-                    final_token = mp_token.strip()
-                    auth_header = f"Bearer {final_token}" if not final_token.startswith("Bearer ") else final_token
-                    
+                    # 4. 规范认证头
                     headers = {
-                        "Authorization": auth_header,
+                        "Authorization": f"Bearer {clean_token}",
                         "Content-Type": "application/json"
                     }
                     
-                    # 4. 执行请求
-                    res = requests.post(mp_api, json=payload, headers=headers, timeout=15)
+                    res = requests.post(mp_api, json=payload, headers=headers, timeout=10)
                     
                     if res.status_code != 200:
-                        # 打印详细错误方便排查
-                        error_detail = res.text
-                        return {"status": "error", "message": f"MoviePilot 拒绝请求: {error_detail}"}
+                        return {"status": "error", "message": f"MoviePilot 拒绝请求: {res.text}"}
                 except Exception as e:
                     return {"status": "error", "message": f"连接 MoviePilot 失败: {str(e)}"}
 
@@ -190,5 +215,5 @@ def manage_request_action(data: MediaRequestActionModel, request: Request):
         return {"status": "success", "message": "记录已彻底删除"}
 
     success, err_msg = execute_sql("UPDATE media_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE tmdb_id = ?", (new_status, data.tmdb_id))
-    action_name = {"approve": "已送入 MoviePilot 下载队列" if cfg.get("moviepilot_url") else "已批准（手动模式）", "reject": "已残忍拒绝", "finish": "已标记入库"}.get(data.action, "操作成功")
+    action_name = {"approve": "已送入 MoviePilot 下载队列" if cfg.get("moviepilot_url") else "已批准", "reject": "已残忍拒绝", "finish": "已标记入库"}.get(data.action, "操作成功")
     return {"status": "success", "message": action_name} if success else {"status": "error", "message": err_msg}
