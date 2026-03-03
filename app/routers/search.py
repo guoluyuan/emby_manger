@@ -7,32 +7,45 @@ from app.core.config import cfg
 router = APIRouter()
 
 # ==========================================
-# 🌟 智能嗅探：Emby 版本检测与缓存
+# 🌟 智能嗅探：Emby 版本与定制版检测
 # ==========================================
-_emby_version_cache = None
+_emby_sys_cache = None
 
-def get_emby_version(host, key):
-    global _emby_version_cache
-    if _emby_version_cache:
-        return _emby_version_cache
+def get_emby_sys_info(host, key):
+    global _emby_sys_cache
+    if _emby_sys_cache:
+        return _emby_sys_cache
     try:
-        res = requests.get(f"{host}/emby/System/Info?api_key={key}", timeout=3).json()
-        _emby_version_cache = res.get("Version", "4.8.0.0")
-        return _emby_version_cache
+        # 使用 Public 接口更稳定，不强制校验高权限 Token
+        res = requests.get(f"{host}/emby/System/Info/Public", timeout=3).json()
+        _emby_sys_cache = {
+            "Version": res.get("Version", "4.10.0.0"),
+            "ServerName": res.get("ServerName", "")
+        }
+        return _emby_sys_cache
     except:
-        return "4.8.0.0" # 抓取失败时默认按新版处理
+        return {"Version": "4.10.0.0", "ServerName": ""}
 
-def is_new_emby_router(version_str):
+def is_new_emby_router(sys_info):
+    server_name = sys_info.get("ServerName", "").lower()
+    
+    # 🔥 特判：小鱼影视等定制版，默认全部使用新路由
+    if "xiaoyu" in server_name or "小鱼" in server_name:
+        return True
+        
+    version_str = sys_info.get("Version", "4.10.0.0")
     try:
         parts = version_str.split('.')
         major = int(parts[0])
         minor = int(parts[1])
-        # Emby 4.8 及以上版本使用了精简的新路由
-        if major > 4 or (major == 4 and minor >= 8):
-            return True
-        return False
-    except:
+        
+        # 🔥 终极防漏逻辑：只要不是明确的 4.7 及以下老古董版本，全部用新路由
+        if major < 4 or (major == 4 and minor <= 7):
+            return False
+            
         return True
+    except:
+        return True # 解析失败时，默认信任新版本
 
 def get_emby_admin(host, key):
     try:
@@ -103,6 +116,7 @@ def global_library_search(query: str, request: Request):
     if not host or not key:
         return {"status": "error", "message": "未配置 Emby 服务器"}
 
+    # 🔥 获取公网链接并去除末尾斜杠
     public_host = cfg.get("emby_public_url") or cfg.get("emby_external_url") or cfg.get("emby_public_host") or host
     public_host = public_host.rstrip('/')
 
@@ -110,9 +124,9 @@ def global_library_search(query: str, request: Request):
     if not admin_id:
         return {"status": "error", "message": "找不到管理员账号"}
 
-    # 🔥 获取并判断 Emby 版本
-    emby_version = get_emby_version(host, key)
-    use_new_route = is_new_emby_router(emby_version)
+    # 🔥 获取系统信息，包含版本号和服务器名称
+    sys_info = get_emby_sys_info(host, key)
+    use_new_route = is_new_emby_router(sys_info)
 
     try:
         search_url = f"{host}/emby/Users/{admin_id}/Items"
@@ -143,7 +157,7 @@ def global_library_search(query: str, request: Request):
                 else:
                     poster_url = "/static/img/logo-dark.png" 
 
-            # 🔥 根据版本号，动态下发对应的跳转路由
+            # 🔥 路由分发：强制分发给对应的 Emby 版本
             if use_new_route:
                 emby_url = f"{public_host}/web/index.html#!/item?id={item['Id']}&serverId={item.get('ServerId', '')}"
             else:
