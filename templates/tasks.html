@@ -53,7 +53,6 @@
     let pollInterval = null;
     let isDropdownOpen = false;
 
-    // 点击空白处关闭悬浮窗
     document.addEventListener('click', (e) => {
         const container = document.getElementById('running-tasks-dropdown-container');
         if (isDropdownOpen && container && !container.contains(e.target)) {
@@ -61,16 +60,13 @@
         }
     });
 
-    function toggleRunningDropdown() {
-        isDropdownOpen ? closeRunningDropdown() : openRunningDropdown();
-    }
+    function toggleRunningDropdown() { isDropdownOpen ? closeRunningDropdown() : openRunningDropdown(); }
 
     function openRunningDropdown() {
         isDropdownOpen = true;
         const panel = document.getElementById('running-tasks-panel');
         const icon = document.getElementById('running-tasks-icon');
         panel.classList.remove('hidden');
-        
         setTimeout(() => {
             panel.classList.remove('scale-95', 'opacity-0');
             panel.classList.add('scale-100', 'opacity-100');
@@ -85,15 +81,10 @@
         panel.classList.remove('scale-100', 'opacity-100');
         panel.classList.add('scale-95', 'opacity-0');
         icon.classList.remove('-rotate-180');
-        
-        setTimeout(() => {
-            if(!isDropdownOpen) panel.classList.add('hidden');
-        }, 200);
+        setTimeout(() => { if(!isDropdownOpen) panel.classList.add('hidden'); }, 200);
     }
 
-    async function init() {
-        loadTasks();
-    }
+    async function init() { loadTasks(); }
 
     async function loadTasks() {
         try {
@@ -103,20 +94,10 @@
             if(json.status === 'success') {
                 renderGroupedTasks(json.data);
                 
-                // 提取所有正在运行的任务
                 let runningTasks = [];
-                json.data.forEach(group => {
-                    group.tasks.forEach(t => {
-                        if (t.State === 'Running') {
-                            runningTasks.push(t);
-                        }
-                    });
-                });
-
-                // 更新右上角悬浮组件状态
+                json.data.forEach(group => { group.tasks.forEach(t => { if (t.State === 'Running') runningTasks.push(t); }); });
                 updateRunningTasksUI(runningTasks);
 
-                // 轮询逻辑：如果有任务在跑，每2秒刷一次进度
                 if (runningTasks.length > 0 && !pollInterval) {
                     pollInterval = setInterval(loadTasks, 2000);
                 } else if (runningTasks.length === 0 && pollInterval) {
@@ -127,7 +108,6 @@
         } catch(e) { console.error(e); }
     }
 
-    // 动态渲染右上角下拉列表
     function updateRunningTasksUI(tasks) {
         const btn = document.getElementById('running-tasks-btn');
         const countText = document.getElementById('running-tasks-count');
@@ -136,8 +116,7 @@
         const list = document.getElementById('running-tasks-list');
 
         if (tasks.length > 0) {
-            btn.classList.remove('hidden');
-            btn.classList.add('flex');
+            btn.classList.remove('hidden'); btn.classList.add('flex');
             countText.textContent = `${tasks.length} 项运行中`;
             countTextMobile.textContent = tasks.length;
             badge.textContent = tasks.length;
@@ -158,28 +137,23 @@
                         <div class="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1 flex-1 pr-2" title="${t.Description || ''}">${t.Description || '正在执行后台任务...'}</div>
                         <div class="text-blue-600 dark:text-blue-400 font-mono text-[11px] font-black shrink-0 tabular-nums">${progress.toFixed(1)}%</div>
                     </div>
-                </div>
-                `;
+                </div>`;
             });
             list.innerHTML = html;
         } else {
-            // 没有运行中任务，隐藏按钮并自动关闭面板
-            btn.classList.add('hidden');
-            btn.classList.remove('flex');
+            btn.classList.add('hidden'); btn.classList.remove('flex');
             if (isDropdownOpen) closeRunningDropdown();
         }
     }
 
     function renderGroupedTasks(groups) {
         const container = document.getElementById('task-container');
-        
         if(!groups || groups.length === 0) {
             container.innerHTML = '<div class="text-center text-gray-400 py-20 font-bold">暂无任务数据</div>';
             return;
         }
 
         let html = '';
-        
         groups.forEach(group => {
             html += `
             <div class="animate-fade-in">
@@ -187,7 +161,6 @@
                     <h3 class="font-black text-gray-700 dark:text-gray-200 text-sm md:text-base">${group.title}</h3>
                     <span class="ml-2 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px] px-2 py-0.5 rounded-full font-bold">${group.tasks.length}</span>
                 </div>
-                
                 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
             `;
 
@@ -202,7 +175,6 @@
                 if (t.LastExecutionResult) {
                     const end = new Date(t.LastExecutionResult.EndTimeUtc);
                     lastRunTime = end.toLocaleString('zh-CN', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'});
-                    
                     if (t.LastExecutionResult.Status === 'Completed') {
                         statusIcon = '<span class="w-2 h-2 rounded-full bg-green-500 inline-block mr-1 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>';
                         statusText = '成功';
@@ -219,19 +191,28 @@
                     ? 'border-blue-400 dark:border-blue-500 ring-2 ring-blue-100 dark:ring-blue-900/50 shadow-lg scale-[1.02] z-10' 
                     : 'border-gray-100 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-500 hover:shadow-md';
 
+                // 防止引号中断 HTML
+                const safeOrig = t.OriginalName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const safeCurr = t.Name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
                 html += `
                 <div class="relative bg-white dark:bg-gray-800 rounded-xl border ${borderClass} p-4 transition-all duration-300 group overflow-hidden flex flex-col justify-between min-h-[110px]">
                     
                     ${isRunning ? `<div class="absolute bottom-0 left-0 h-1.5 bg-blue-500 transition-all duration-1000 ease-linear z-10" style="width: ${progress}%"></div>` : ''}
                     
                     <div class="flex justify-between items-start mb-2">
-                        <div class="pr-2 overflow-hidden">
-                            <div class="font-bold text-gray-800 dark:text-gray-100 text-sm truncate" title="${t.OriginalName}">${t.Name}</div>
+                        <div class="pr-2 overflow-hidden flex-1">
+                            <div class="flex items-center gap-2 group/title">
+                                <div class="font-bold text-gray-800 dark:text-gray-100 text-sm truncate" title="${t.OriginalName}">${t.Name}</div>
+                                <button onclick="renameTask('${safeOrig}', '${safeCurr}')" class="text-gray-300 hover:text-indigo-500 dark:text-gray-600 dark:hover:text-indigo-400 opacity-0 group-hover/title:opacity-100 transition-all cursor-pointer" title="设置中文别名">
+                                    <i class="fa-solid fa-pen-to-square text-[10px]"></i>
+                                </button>
+                            </div>
                             <div class="text-[11px] text-gray-400 dark:text-gray-500 mt-1 line-clamp-2 leading-relaxed" title="${t.Description || ''}">
                                 ${t.Description || '暂无说明'}
                             </div>
                         </div>
-                        <div class="shrink-0">
+                        <div class="shrink-0 ml-2">
                             ${isRunning ? 
                                 `<button onclick="stopTask('${t.Id}')" class="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 dark:bg-red-900/30 text-red-500 hover:bg-red-600 hover:bg-red-100 dark:hover:bg-red-900/50 transition active:scale-90 shadow-sm">
                                     <i class="fa-solid fa-stop text-xs"></i>
@@ -259,6 +240,30 @@
         });
 
         container.innerHTML = html;
+    }
+
+    // 🔥 核心重命名函数
+    async function renameTask(originalName, currentName) {
+        const newName = prompt(`给任务 "${originalName}" 设置中文别名：\n(留空并保存将恢复为默认英文名)`, currentName === originalName ? '' : currentName);
+        
+        // 用户点击了取消，什么也不做
+        if (newName === null) return; 
+        
+        try {
+            const res = await fetch('/api/tasks/translate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ original_name: originalName, translated_name: newName.trim() })
+            });
+            const json = await res.json();
+            if(json.status === 'success') {
+                loadTasks(); // 刷新大厅查看效果
+            } else {
+                alert(json.message);
+            }
+        } catch(e) {
+            alert('网络请求失败');
+        }
     }
 
     async function startTask(id) {

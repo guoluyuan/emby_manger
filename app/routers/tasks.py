@@ -1,151 +1,207 @@
-from fastapi import APIRouter, Request
-from app.core.config import cfg
+import sqlite3
 import requests
+from fastapi import APIRouter, Request
+from pydantic import BaseModel
+from app.core.config import cfg
+from app.core.database import DB_PATH, query_db
 
 router = APIRouter()
 
-def get_emby_auth():
-    return cfg.get("emby_host"), cfg.get("emby_api_key")
-
-# 🔥 任务名称汉化字典 (仅作为标题美化，描述使用 Emby 原生的)
-TRANS_MAP = {
-    # 核心/系统
-    "Scan Media Library": "扫描媒体库",
-    "Refresh People": "刷新人物信息",
-    "Rotate Log File": "日志轮转与归档",
-    "Check for application updates": "检查主程序更新",
+# ==========================================
+# 1. 基础字典 (涵盖常见官方任务与百大主流插件)
+# ==========================================
+COMMON_TASK_DICT = {
+    # --- Emby 官方核心维护任务 ---
+    "Scan media library": "扫描媒体库",
+    "Refresh Guide": "刷新电视指南",
+    "Refresh channels": "刷新直播频道",
+    "Clean up collections and playlists": "清理合集与播放列表",
+    "Refresh people": "刷新演员与人物信息",
+    "Refresh network shows": "刷新网络剧集",
+    "Clean up image cache": "清理图像缓存",
+    "Download missing subtitles": "下载缺失的字幕",
+    "Extract chapter images": "提取视频章节图片",
+    "Refresh local IP addresses": "刷新本地 IP 地址",
+    "Check for application updates": "检查系统更新",
     "Check for plugin updates": "检查插件更新",
-    "Cache file cleanup": "清理系统缓存",
-    "Clean Transcode Directory": "清理转码临时文件",
-    "Hardware Detection": "硬件转码能力检测",
-    "Emby Server Backup": "服务器配置备份",
+    "Optimize database": "优化数据库结构",
+    "Vacuum database": "压缩与清理数据库 (Vacuum)",
+    "Remove old watch history": "移除陈旧的播放历史",
+    "Sync Playstate": "同步播放状态",
+    "Update Plugins": "自动更新插件",
+    "Update server": "自动更新服务器",
+    "Cache images": "缓存图像",
+    "Backup database": "备份服务器数据库",
+    "Auto Organize": "自动整理媒体",
+    "Generate Intro Video": "生成片头视频",
+    "Rotate log file": "轮转并清理日志文件",
+    "Clean up sync directories": "清理同步目录",
+    "Convert media": "转换媒体格式",
+    "Refresh library metadata": "刷新媒体库元数据",
+    "Scan local network": "扫描本地局域网设备",
+    "Download missing plugin updates": "下载缺失的插件更新",
+    "Remove old sync jobs": "移除陈旧的同步任务",
     
-    # 媒体处理
-    "Convert media": "媒体格式转换",
-    "Create Playlists": "生成智能播放列表",
-    "Extract Chapter Images": "提取章节预览图",
-    "Chapter image extraction": "提取章节预览图",
-    "Thumbnail image extraction": "提取视频缩略图",
-    "Download subtitles": "自动下载字幕",
-    "Organize new media files": "自动整理新文件",
+    # --- 影视搜刮器类插件 (Jav / MetaTube / Douban / TMDB / Bangumi) ---
+    "Scrape Jav": "JavScraper 搜刮器同步",
+    "Update JavScraper Index": "更新 JavScraper 索引",
+    "MetaTube: Update Subscriptions": "MetaTube: 更新订阅",
+    "MetaTube: Auto Update Metadata": "MetaTube: 自动更新元数据",
+    "TMDb: Refresh metadata": "TMDb: 刷新元数据",
+    "TheMovieDb: Refresh metadata": "TheMovieDb: 刷新元数据",
+    "OMDb: Refresh metadata": "OMDb: 刷新元数据",
+    "TVDb: Refresh metadata": "TVDb: 刷新元数据",
+    "Douban: Refresh metadata": "豆瓣(Douban): 刷新元数据",
+    "Bgm.tv: Refresh metadata": "Bgm.tv: 刷新动漫元数据",
+    "Bangumi: Refresh metadata": "Bangumi: 刷新动漫元数据",
+    "AniDB: Refresh metadata": "AniDB: 刷新动漫元数据",
+    "Kitsu: Refresh metadata": "Kitsu: 刷新动漫元数据",
     
-    # 常见插件
-    "Build Douban Cache": "构建豆瓣缓存",
-    "Download OCR Data": "下载 OCR 数据",
-    "Detect Episode Intros": "检测跳过片头",
-    "Extract Intro Fingerprint": "提取片头指纹",
-    "Extract MediaInfo": "提取媒体编码信息",
-    "Extract Video Thumbnail": "提取视频缩略图",
-    "Delete Persons": "清理无效人物",
-    "Trakt Sync": "Trakt 同步",
-    "Export Library to Trakt": "同步库到 Trakt",
-    "Import playstates from Trakt.tv": "从 Trakt 导入播放状态"
+    # --- 字幕与图像获取插件 (Open Subtitles / Fanart / Shooter / Thunder) ---
+    "Open Subtitles: Download missing subtitles": "Open Subtitles: 下载缺失字幕",
+    "Subscene: Download missing subtitles": "Subscene: 下载缺失字幕",
+    "Shooter: Download missing subtitles": "伪射手(Shooter): 下载缺失字幕",
+    "Thunder: Download missing subtitles": "迅雷(Thunder): 下载缺失字幕",
+    "Fanart.tv: Download missing images": "Fanart.tv: 下载缺失的海报与艺术图",
+    "Screen Grabber: Extract chapter images": "截屏器: 提取视频章节预览图",
+    
+    # --- 高级工具与扩展插件 (Trakt / Intro Skipper / Auto Box Sets) ---
+    "Trakt.tv: Sync Library": "Trakt.tv: 同步媒体库",
+    "Trakt.tv: Import Playstates": "Trakt.tv: 导入播放状态",
+    "Trakt: Sync Library": "Trakt: 同步媒体库",
+    "Trakt: Import Playstates": "Trakt: 导入播放状态",
+    "Auto Box Sets: Create Collections": "Auto Box Sets: 自动创建电影合集",
+    "Intro Skipper: Analyze Audio": "跳过片头(Intro Skipper): 分析音频指纹",
+    "Intro Skipper: Analyze Video": "跳过片头(Intro Skipper): 分析视频画面",
+    "Theme Songs: Download theme songs": "主题曲: 下载剧集主题曲",
+    "Theme Videos: Download theme videos": "主题视频: 下载剧集主题背景视频",
+    
+    # --- 统计与通知类插件 (Playback Reporting / Webhooks / Statistics) ---
+    "Playback Reporting: Backup database": "播放统计: 备份统计数据库",
+    "Playback Reporting: Aggregate Data": "播放统计: 聚合计算历史数据",
+    "EmbyStat: Refresh data": "EmbyStat: 刷新统计数据",
+    "Statistics: Calculate statistics": "数据看板: 计算全站数据",
+    "Statistics: Clean up old data": "数据看板: 清理过期数据",
+    "Webhooks: Send test webhook": "Webhooks: 发送测试通知",
+    "Slack: Send test notification": "Slack: 发送测试通知",
+    "Telegram: Send test notification": "Telegram: 发送测试通知",
+    "Discord: Send test notification": "Discord: 发送测试通知",
+    
+    # --- IPTV 与直播电视源 ---
+    "M3U: Refresh guide": "M3U: 刷新直播节目单",
+    "XmlTV: Refresh guide": "XmlTV: 刷新直播节目单",
+    "HDHomeRun: Refresh guide": "HDHomeRun: 刷新直播节目单"
 }
 
-# 🔥 核心类别排序与汉化 (不在这个列表里的，会自动显示原名)
-CAT_MAP = {
-    "Library": {"name": "📚 媒体库", "order": 1},
-    "System": {"name": "⚡ 系统核心", "order": 2},
-    "Maintenance": {"name": "🧹 维护保养", "order": 3},
-    "Application": {"name": "📱 应用程序", "order": 4},
-    "Metadata": {"name": "📝 元数据", "order": 5},
-    "Downloads": {"name": "📥 下载管理", "order": 6},
-    "Sync": {"name": "🔄 同步与备份", "order": 7},
-    "Live TV": {"name": "📺 电视直播", "order": 8},
-    "Transcoding": {"name": "🎞️ 转码", "order": 9}
-}
-
-@router.get("/api/tasks")
-def get_scheduled_tasks(request: Request):
-    """获取所有计划任务列表"""
-    if not request.session.get("user"): return {"status": "error", "message": "Unauthorized"}
-    
-    host, key = get_emby_auth()
-    if not host or not key: return {"status": "error", "message": "Emby 未配置"}
-
+# ==========================================
+# 2. 初始化自定义别名表
+# ==========================================
+def ensure_task_translation_schema():
     try:
-        url = f"{host}/emby/ScheduledTasks?api_key={key}"
-        res = requests.get(url, timeout=10)
-        if res.status_code == 200:
-            raw_tasks = res.json()
-            grouped = {}
-            
-            for t in raw_tasks:
-                # 1. 汉化名称 (保留原名)
-                origin_name = t.get('Name', '')
-                display_name = TRANS_MAP.get(origin_name, origin_name)
-                
-                # 2. 处理描述
-                desc = t.get('Description', '')
-                
-                # 3. 识别类别 (核心逻辑修改点)
-                cat_raw = t.get('Category', 'Other')
-                
-                if cat_raw in CAT_MAP:
-                    # 命中核心预设分类
-                    cat_display = CAT_MAP[cat_raw]["name"]
-                    sort_order = CAT_MAP[cat_raw]["order"]
-                else:
-                    # 🔥 没命中的（插件），直接用原名！
-                    # 例如: Category="Trakt" -> 显示 "🧩 Trakt"
-                    cat_display = f"🧩 {cat_raw}"
-                    sort_order = 99 # 排在核心分类后面
-                
-                # 4. 构建数据对象
-                task_obj = {
-                    "Id": t.get("Id"),
-                    "Name": display_name,
-                    "OriginalName": origin_name,
-                    "Description": desc,
-                    "State": t.get("State"),
-                    "CurrentProgressPercentage": t.get("CurrentProgressPercentage"),
-                    "LastExecutionResult": t.get("LastExecutionResult"),
-                    "Triggers": t.get("Triggers")
-                }
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS task_translations (
+                        original_name TEXT PRIMARY KEY,
+                        translated_name TEXT
+                    )''')
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        pass
 
-                # 5. 归类 (使用分类名称作为 Key，防止不同插件合并)
-                if cat_display not in grouped:
-                    grouped[cat_display] = {
-                        "title": cat_display, 
-                        "order": sort_order, # 记录排序权重
-                        "tasks": []
-                    }
-                grouped[cat_display]["tasks"].append(task_obj)
-            
-            # 6. 转列表并排序
-            final_list = list(grouped.values())
-            
-            # 排序逻辑：
-            # 第一优先级: order (核心分类 1-9 先排，插件 99 后排)
-            # 第二优先级: title (插件之间按字母顺序排)
-            final_list.sort(key=lambda x: (x['order'], x['title']))
-            
-            # 组内任务排序 (按名称)
-            for group in final_list:
-                group["tasks"].sort(key=lambda x: x['Name'])
+ensure_task_translation_schema()
 
-            return {"status": "success", "data": final_list}
+class TranslationModel(BaseModel):
+    original_name: str
+    translated_name: str
+
+@router.post("/api/tasks/translate")
+async def translate_task(data: TranslationModel, request: Request):
+    if not request.session.get("user"): return {"status": "error"}
+    
+    orig = data.original_name.strip()
+    trans = data.translated_name.strip()
+    if not orig: return {"status": "error", "message": "原名不能为空"}
+    
+    try:
+        # 如果填写了翻译，就存入或更新；如果留空，就删除该自定义翻译，恢复默认
+        if trans:
+            query_db("INSERT OR REPLACE INTO task_translations (original_name, translated_name) VALUES (?, ?)", (orig, trans))
+        else:
+            query_db("DELETE FROM task_translations WHERE original_name = ?", (orig,))
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# ==========================================
+# 3. 核心 API：获取并应用混合翻译
+# ==========================================
+@router.get("/api/tasks")
+async def get_tasks(request: Request):
+    if not request.session.get("user"): return {"status": "error"}
+    host = cfg.get("emby_host")
+    key = cfg.get("emby_api_key")
+    
+    try:
+        res = requests.get(f"{host}/emby/ScheduledTasks?api_key={key}", timeout=5)
+        tasks = res.json()
+        
+        # 拉取用户自己设置的别名
+        custom_trans_rows = query_db("SELECT original_name, translated_name FROM task_translations")
+        custom_dict = {r['original_name']: r['translated_name'] for r in custom_trans_rows} if custom_trans_rows else {}
+        
+        groups = {}
+        for t in tasks:
+            cat = t.get('Category', '未分类')
+            orig_name = t.get('Name', '')
             
-        return {"status": "error", "message": f"Emby Error: {res.status_code}"}
+            t['OriginalName'] = orig_name # 保留英文原名供后续查重
+            
+            # 🔥 优先级：数据库别名 > 基础字典 > 英文原名
+            if orig_name in custom_dict:
+                t['Name'] = custom_dict[orig_name]
+            elif orig_name in COMMON_TASK_DICT:
+                t['Name'] = COMMON_TASK_DICT[orig_name]
+                
+            if cat not in groups: groups[cat] = []
+            groups[cat].append(t)
+            
+        result = [{"title": k, "tasks": v} for k, v in groups.items()]
+        
+        # 顺手把官方的大分类也汉化一下
+        cat_trans = {
+            "Library": "媒体库扫描",
+            "Application": "系统与应用",
+            "Maintenance": "日常维护",
+            "Live TV": "电视直播",
+            "Sync": "状态同步",
+            "Plugins": "插件自动化"
+        }
+        for r in result:
+            if r["title"] in cat_trans: r["title"] = cat_trans[r["title"]]
+            
+        return {"status": "success", "data": result}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 @router.post("/api/tasks/{task_id}/start")
-def start_task(task_id: str, request: Request):
+async def start_task(task_id: str, request: Request):
     if not request.session.get("user"): return {"status": "error"}
-    host, key = get_emby_auth()
+    host = cfg.get("emby_host")
+    key = cfg.get("emby_api_key")
     try:
-        url = f"{host}/emby/ScheduledTasks/Running/{task_id}?api_key={key}"
-        requests.post(url, timeout=5)
+        requests.post(f"{host}/emby/ScheduledTasks/Running/{task_id}?api_key={key}", timeout=5)
         return {"status": "success"}
-    except Exception as e: return {"status": "error", "message": str(e)}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @router.post("/api/tasks/{task_id}/stop")
-def stop_task(task_id: str, request: Request):
+async def stop_task(task_id: str, request: Request):
     if not request.session.get("user"): return {"status": "error"}
-    host, key = get_emby_auth()
+    host = cfg.get("emby_host")
+    key = cfg.get("emby_api_key")
     try:
-        url = f"{host}/emby/ScheduledTasks/Running/{task_id}/Delete?api_key={key}"
-        requests.post(url, timeout=5)
+        requests.delete(f"{host}/emby/ScheduledTasks/Running/{task_id}?api_key={key}", timeout=5)
         return {"status": "success"}
-    except Exception as e: return {"status": "error", "message": str(e)}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
