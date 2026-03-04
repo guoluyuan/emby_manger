@@ -93,6 +93,7 @@ class TelegramBot:
 
     def _get_location(self, ip):
         if not ip: return "未知"
+        
         is_ipv6 = False
         try:
             ip_obj = ipaddress.ip_address(ip)
@@ -104,8 +105,35 @@ class TelegramBot:
         if ip in self.ip_cache: return self.ip_cache[ip]
         loc = ""
         
-        # 🔥 修复 1：拦截 IPv6 导致的免费 API 乱报错（如江西上饶移通）
-        if not is_ipv6:
+        # --- 如果是 IPv6，直接走高精度国际接口，跳过国内垃圾 API ---
+        if is_ipv6:
+            try:
+                # 方案 1: ipapi.co (对 IPv6 支持最好)
+                headers = {"User-Agent": "Mozilla/5.0"}
+                res = requests.get(f"https://ipapi.co/{ip}/json/", headers=headers, timeout=4)
+                if res.status_code == 200:
+                    d = res.json()
+                    if not d.get("error"):
+                        country = d.get('country_name', '')
+                        region = d.get('region', '')
+                        city = d.get('city', '')
+                        # 翻译中国地区名称
+                        if country == "China": country = "中国"
+                        if city: loc = f"{country} {region} {city}".strip()
+            except: pass
+            
+            if not loc:
+                try:
+                    # 方案 2: ipwhois.app (备用通道)
+                    res = requests.get(f"https://ipwhois.app/json/{ip}?lang=zh-CN", timeout=4)
+                    if res.status_code == 200:
+                        d = res.json()
+                        if d.get('success'):
+                            loc = f"{d.get('country', '')} {d.get('region', '')} {d.get('city', '')}".strip()
+                except: pass
+                
+        # --- 如果是 IPv4，保留国内快速接口 + ip-api 兜底 ---
+        else:
             try:
                 res = requests.get(f"https://api.vvhan.com/api/ipInfo?ip={ip}", timeout=3)
                 if res.status_code == 200:
@@ -126,29 +154,31 @@ class TelegramBot:
                         addr = res.json().get('addr', '')
                         if addr and "本机地址" not in addr: loc = addr.strip()
                 except: pass
+                
+            if not loc or "江西上饶" in loc: 
+                try:
+                    res = requests.get(f"http://ip-api.com/json/{ip}?lang=zh-CN", timeout=3)
+                    if res.status_code == 200:
+                        d = res.json()
+                        if d.get('status') == 'success':
+                            country = d.get('country', '')
+                            region = d.get('regionName', '')
+                            city = d.get('city', '')
+                            loc = f"{country} {region} {city}".strip()
+                except: pass
 
-        # 针对 IPv6 或前面没查到的，使用支持度更好的 ip-api
-        if not loc or "江西上饶" in loc: 
-            try:
-                res = requests.get(f"http://ip-api.com/json/{ip}?lang=zh-CN", timeout=3)
-                if res.status_code == 200:
-                    d = res.json()
-                    if d.get('status') == 'success':
-                        country = d.get('country', '')
-                        region = d.get('regionName', '')
-                        city = d.get('city', '')
-                        loc = f"{country} {region} {city}".strip()
-            except: pass
-            
-        if not loc: loc = "IPv6 节点" if is_ipv6 else "未知地区"
+        # --- 最终清理与格式化 ---
+        if not loc: 
+            loc = "IPv6 节点" if is_ipv6 else "未知地区"
         else:
             loc = loc.replace("省", "").replace("市", "").replace("中国 中国", "中国").strip()
             loc = re.sub(r'\s+', ' ', loc)
             
-        # 绝不缓存错误的江西上饶代理地址
+        # 绝不缓存错误的代理解析地址
         if loc != "未知地区" and "江西上饶" not in loc:
             if len(self.ip_cache) > 1000: self.ip_cache.clear()
             self.ip_cache[ip] = loc
+            
         return loc
 
     def _download_emby_image(self, item_id, img_type='Primary', image_tag=None):
