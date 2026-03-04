@@ -73,36 +73,36 @@
 
 <div id="detail-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeDetails()"></div>
-    <div id="modal-container" class="relative w-[92%] sm:w-full max-w-md md:max-w-3xl overflow-hidden transition-all duration-300 ease-out bg-white dark:bg-gray-900 shadow-2xl rounded-2xl md:rounded-3xl scale-95 opacity-0">
+    
+    <div id="modal-container" class="relative w-[92%] sm:w-full max-w-md md:max-w-4xl bg-white dark:bg-gray-900 shadow-2xl rounded-2xl md:rounded-3xl overflow-hidden transition-all duration-300 ease-out scale-95 opacity-0 flex flex-row h-[60vh] md:h-[65vh]">
         
-        <button onclick="closeDetails()" class="absolute top-3 right-3 md:top-4 md:right-4 w-7 h-7 md:w-8 md:h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-indigo-500 transition-all z-20">
+        <button onclick="closeDetails()" class="absolute top-3 right-3 md:top-4 md:right-4 w-7 h-7 md:w-8 md:h-8 flex items-center justify-center rounded-full bg-black/20 dark:bg-white/10 text-white hover:bg-indigo-500 transition-all z-50 backdrop-blur-md">
             <i class="fa-solid fa-xmark text-sm"></i>
         </button>
         
-        <div class="flex flex-row items-center p-4 md:p-6 max-h-[85vh] overflow-y-auto custom-scroll">
+        <div class="w-[40%] md:w-[40%] h-full relative shrink-0 bg-gray-900 z-10">
+            <img id="m-poster" src="" class="absolute inset-0 w-full h-full object-cover shadow-[5px_0_15px_rgba(0,0,0,0.1)]">
+            <div class="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent"></div>
+        </div>
+        
+        <div class="w-[60%] md:w-[60%] h-full p-4 md:p-8 flex flex-col justify-start relative overflow-y-auto custom-scroll z-20 bg-white/50 dark:bg-gray-900/50">
             
-            <div class="w-1/3 md:w-2/5 aspect-[2/3] relative shrink-0 bg-gray-100 dark:bg-gray-800 rounded-xl md:rounded-2xl overflow-hidden shadow-md md:shadow-lg">
-                <img id="m-poster" src="" class="absolute inset-0 w-full h-full object-cover">
+            <h3 id="m-title" class="text-lg md:text-3xl font-black text-gray-900 dark:text-white leading-tight pr-6 md:pr-0"></h3>
+            
+            <div class="flex flex-wrap items-center gap-2 mt-2 md:mt-3">
+                <span id="m-episode-label" class="text-indigo-600 dark:text-indigo-400 font-mono font-bold bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-500/30 text-[10px] md:text-sm"></span>
+                <span id="m-status-badge" class="px-1.5 py-0.5 rounded text-[9px] md:text-[10px] font-black uppercase tracking-widest text-white"></span>
             </div>
             
-            <div class="pl-4 md:pl-8 flex-1 flex flex-col justify-center z-10 w-2/3 md:w-3/5">
-                <h3 id="m-title" class="text-lg md:text-3xl font-black text-gray-900 dark:text-white leading-tight pr-6 md:pr-0 line-clamp-2 md:line-clamp-none"></h3>
-                
-                <div class="flex flex-wrap items-center gap-2 mt-2 md:mt-3">
-                    <span id="m-episode-label" class="text-indigo-600 dark:text-indigo-400 font-mono font-bold bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-500/30 text-[10px] md:text-sm"></span>
-                    <span id="m-status-badge" class="px-1.5 py-0.5 rounded text-[9px] md:text-[10px] font-black uppercase tracking-widest text-white"></span>
-                </div>
-                
-                <p class="text-[10px] md:text-xs text-gray-500 dark:text-gray-400 mt-3 md:mt-4 font-mono flex items-center gap-1.5">
-                    <i class="fa-regular fa-clock"></i> <span id="m-date-val"></span>
-                </p>
-                
-                <div class="mt-3 md:mt-5 text-[11px] md:text-sm text-gray-600 dark:text-gray-300 leading-relaxed overflow-y-auto custom-scroll pr-1 md:pr-2 max-h-[120px] md:max-h-[220px]">
-                    <p id="m-description"></p>
-                </div>
-                
-                <div id="m-actions" class="mt-4 md:mt-8 flex gap-2 md:gap-3"></div>
+            <p class="text-[10px] md:text-xs text-gray-500 dark:text-gray-400 mt-3 md:mt-4 font-mono flex items-center gap-1.5 border-b border-gray-100 dark:border-gray-800 pb-3">
+                <i class="fa-regular fa-clock"></i> <span id="m-date-val"></span>
+            </p>
+            
+            <div class="mt-3 md:mt-4 text-[11px] md:text-sm text-gray-600 dark:text-gray-300 leading-relaxed pr-1 md:pr-2 pb-4">
+                <p id="m-description"></p>
             </div>
+            
+            <div id="m-actions" class="mt-auto pt-4 flex gap-2 md:gap-3"></div>
         </div>
     </div>
 </div>
@@ -194,10 +194,8 @@ function renderCalendar(days) {
             : day.items.map(item => generateCardHtml(item)).join('');
 
         return `
-            <div id="day-section-${index}" class="day-section flex flex-col gap-3 md:gap-4 relative">
+            <div id="day-section-${index}" class="day-section flex flex-col gap-3 md:gap-4 relative" style="scroll-margin-top: 140px;">
                 
-                <div id="scroll-anchor-${index}" class="absolute -top-[140px] pointer-events-none"></div>
-
                 <div class="hidden md:flex justify-between items-end pb-2 pt-3 mb-1 border-b-2 ${isToday ? 'border-indigo-500' : 'border-gray-100 dark:border-gray-800'} sticky top-[72px] z-30 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md">
                     <span class="font-black text-base ${isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-800 dark:text-gray-200'}">${day.weekday_cn}</span>
                     <span class="text-[10px] font-mono font-bold text-gray-400">${day.date.slice(5)}</span>
@@ -309,12 +307,18 @@ function highlightNavBtn(activeIndex) {
     }
 }
 
-// 🔥 调用隐形锚点执行跳转，兼容任何魔改的滚动容器
+// 🔥 核心修复 1: 绝对确保滚动生效的方法，使用 setTimeout 破除事件阻塞
 function scrollToDay(index) {
-    const anchor = document.getElementById(`scroll-anchor-${index}`);
-    if (anchor) {
-        anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        if(window.innerWidth < 768) { highlightNavBtn(index); }
+    const section = document.getElementById(`day-section-${index}`);
+    if (section) {
+        // 利用 setTimeout 将滚动任务推迟到渲染周期末尾执行，防止在移动端 Safari/Chrome 被忽略
+        setTimeout(() => {
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
+        
+        if (window.innerWidth < 768) { 
+            highlightNavBtn(index); 
+        }
     }
 }
 
@@ -340,13 +344,13 @@ function showDetails(item) {
 
     if (isReady) {
         actions.innerHTML = `
-            <button onclick="playItem('${item.series_id}')" class="flex-1 py-2.5 md:py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg md:rounded-xl text-xs md:text-sm font-black shadow-lg shadow-indigo-500/30 active:scale-95 transition-all flex justify-center gap-2">
+            <button onclick="playItem('${item.series_id}')" class="flex-1 py-2 md:py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg md:rounded-xl text-[10px] md:text-sm font-black shadow-lg shadow-indigo-500/30 active:scale-95 transition-all flex justify-center gap-1.5">
                 <i class="fa-solid fa-play mt-0.5"></i> 立即播放
             </button>`;
     } else {
         const copyTxt = `${item.series_name} S${String(item.season).padStart(2,'0')}E${String(item.episode).padStart(2,'0')}`;
         actions.innerHTML = `
-            <button onclick="copyToClipboard('${copyTxt}')" class="flex-1 py-2.5 md:py-3 bg-gray-800 dark:bg-gray-700 text-white rounded-lg md:rounded-xl text-xs md:text-sm font-black active:scale-95 transition-all flex justify-center gap-2">
+            <button onclick="copyToClipboard('${copyTxt}')" class="flex-1 py-2 md:py-3 bg-gray-800 dark:bg-gray-700 text-white rounded-lg md:rounded-xl text-[10px] md:text-sm font-black active:scale-95 transition-all flex justify-center gap-1.5">
                 <i class="fa-solid fa-copy mt-0.5"></i> 复制排期
             </button>`;
     }
