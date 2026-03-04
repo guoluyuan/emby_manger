@@ -1,6 +1,7 @@
 import sqlite3
 import requests
 import json
+import time
 from fastapi import APIRouter, Request, Depends
 from pydantic import BaseModel
 from typing import Optional, List
@@ -13,19 +14,17 @@ from app.services.bot_service import bot
 router = APIRouter()
 
 # ==========================================================
-# 🔥 核心：数据库架构强制校验与修复 (修复互相覆盖的Bug)
+# 🔥 核心：数据库架构强制校验与修复
 # ==========================================================
 def ensure_db_schema():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    # 1. 升级主表
     c.execute("PRAGMA table_info(media_requests)")
     cols = c.fetchall()
     if cols:
         pk_cols = [col[1] for col in cols if col[5] > 0]
         if 'season' not in pk_cols:
-            print("🚨 [映迹] 检测到旧版单主键架构，正在升级 media_requests 主表...")
             c.execute("ALTER TABLE media_requests RENAME TO media_requests_old")
             c.execute("""
                 CREATE TABLE media_requests (
@@ -48,13 +47,11 @@ def ensure_db_schema():
             """)
             c.execute("DROP TABLE media_requests_old")
 
-    # 2. 升级投票表 (核心：修复多选时互相覆盖和变成"系统用户"的问题)
     c.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='request_users'")
     u_sql = c.fetchone()
     if u_sql:
         sql_str = u_sql[0].lower().replace(" ", "")
         if "unique(tmdb_id,user_id,season)" not in sql_str:
-            print("🚨 [映迹] 修复投票表唯一约束 (解决多季互相覆盖Bug)...")
             c.execute("ALTER TABLE request_users RENAME TO request_users_old")
             c.execute("""
                 CREATE TABLE request_users (
@@ -77,9 +74,6 @@ def ensure_db_schema():
 
 ensure_db_schema()
 
-# ==========================================================
-# 🛠️ 工具函数与数据模型
-# ==========================================================
 def execute_sql(query, params=()):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -89,7 +83,6 @@ def execute_sql(query, params=()):
         return True, ""
     except Exception as e:
         conn.rollback()
-        print(f"❌ [映迹 SQL 报错] {str(e)}")
         return False, str(e)
     finally: 
         conn.close()
@@ -107,23 +100,18 @@ def get_emby_admin(host, key):
 def check_emby_exists(tmdb_id, media_type, season=0):
     host = cfg.get("emby_host")
     key = cfg.get("emby_api_key")
-    if not host or not key: 
-        return False
+    if not host or not key: return False
         
     try:
         admin_id = get_emby_admin(host, key)
-        if not admin_id: 
-            return False
+        if not admin_id: return False
             
         type_filter = "Movie" if media_type == "movie" else "Series"
         url = f"{host}/emby/Users/{admin_id}/Items?AnyProviderIdEquals=tmdb.{tmdb_id}&IncludeItemTypes={type_filter}&Recursive=true&api_key={key}"
         res = requests.get(url, timeout=5).json()
         
-        if not res.get("Items"): 
-            return False
-        
-        if media_type == "movie": 
-            return True
+        if not res.get("Items"): return False
+        if media_type == "movie": return True
         
         sid = res["Items"][0]["Id"]
         season_url = f"{host}/emby/Shows/{sid}/Seasons?api_key={key}&UserId={admin_id}"
@@ -152,19 +140,12 @@ class RequestLoginModel(BaseModel):
     username: str
     password: str
 
-# ==========================================================
-# 📡 权限认证 (独立登出与 DeviceId 修复)
-# ==========================================================
 @router.post("/api/requests/auth")
 def request_system_login(data: RequestLoginModel, request: Request):
     host = cfg.get("emby_host")
-    if not host: 
-        return {"status": "error", "message": "未配置 Emby 服务器"}
+    if not host: return {"status": "error", "message": "未配置 Emby 服务器"}
         
-    headers = {
-        "X-Emby-Authorization": 'MediaBrowser Client="EmbyPulse", Device="Web", DeviceId="PulseRequestApp", Version="2.0"'
-    }
-    
+    headers = {"X-Emby-Authorization": 'MediaBrowser Client="EmbyPulse", Device="Web", DeviceId="PulseRequestApp", Version="2.0"'}
     try:
         res = requests.post(f"{host}/emby/Users/AuthenticateByName", json={"Username": data.username, "Pw": data.password}, headers=headers, timeout=8)
         if res.status_code == 200:
@@ -173,13 +154,12 @@ def request_system_login(data: RequestLoginModel, request: Request):
             return {"status": "success"}
         return {"status": "error", "message": "账号或密码错误"}
     except Exception as e: 
-        return {"status": "error", "message": f"连接 Emby 服务失败: {str(e)}"}
+        return {"status": "error", "message": f"连接失败: {str(e)}"}
 
 @router.get("/api/requests/check")
 def check_auth(request: Request):
     user = request.session.get("req_user")
-    if user:
-        return {"status": "success", "user": user}
+    if user: return {"status": "success", "user": user}
     return {"status": "error"}
 
 @router.post("/api/requests/logout")
@@ -188,10 +168,19 @@ def request_system_logout(request: Request):
     return {"status": "success"}
 
 # ==========================================================
-# 🧭 TMDB 发现与搜索
+# 🧭 TMDB 榜单大厅 (增加内存缓存机制与多元榜单)
 # ==========================================================
+_trending_cache = {}
+_trending_cache_time = 0
+
 @router.get("/api/requests/trending")
 def get_trending():
+    global _trending_cache, _trending_cache_time
+    
+    # 🔥 1小时内存缓存：告别 TMDB 网络卡顿，前端秒开！
+    if time.time() - _trending_cache_time < 3600 and _trending_cache:
+        return {"status": "success", "data": _trending_cache}
+        
     tmdb_key = cfg.get("tmdb_api_key")
     proxy = cfg.get("proxy_url")
     proxies = {"https": proxy} if proxy else None
@@ -199,10 +188,13 @@ def get_trending():
     try:
         m_res = requests.get(f"https://api.themoviedb.org/3/trending/movie/week?api_key={tmdb_key}&language=zh-CN", proxies=proxies, timeout=10).json()
         t_res = requests.get(f"https://api.themoviedb.org/3/trending/tv/week?api_key={tmdb_key}&language=zh-CN", proxies=proxies, timeout=10).json()
+        # 新增榜单：高分神作
+        top_m_res = requests.get(f"https://api.themoviedb.org/3/movie/top_rated?api_key={tmdb_key}&language=zh-CN&region=CN&page=1", proxies=proxies, timeout=10).json()
+        top_t_res = requests.get(f"https://api.themoviedb.org/3/tv/top_rated?api_key={tmdb_key}&language=zh-CN&page=1", proxies=proxies, timeout=10).json()
         
         def fmt(items, t): 
             results = []
-            for i in items[:20]:
+            for i in items[:15]:
                 results.append({
                     "tmdb_id": i['id'], 
                     "media_type": t, 
@@ -215,21 +207,26 @@ def get_trending():
                 })
             return results
             
-        return {
-            "status": "success", 
-            "data": {
-                "movies": fmt(m_res.get('results', []), 'movie'), 
-                "tv": fmt(t_res.get('results', []), 'tv')
-            }
+        data = {
+            "movies": fmt(m_res.get('results', []), 'movie'), 
+            "tv": fmt(t_res.get('results', []), 'tv'),
+            "top_movies": fmt(top_m_res.get('results', []), 'movie'),
+            "top_tv": fmt(top_t_res.get('results', []), 'tv')
         }
+        
+        # 写入缓存
+        _trending_cache = data
+        _trending_cache_time = time.time()
+        
+        return {"status": "success", "data": data}
     except Exception as e: 
+        if _trending_cache: 
+            return {"status": "success", "data": _trending_cache}
         return {"status": "error", "message": str(e)}
 
 @router.get("/api/requests/search")
 def search_tmdb(query: str, request: Request):
-    if not request.session.get("req_user"): 
-        return {"status": "error", "message": "未登录"}
-        
+    if not request.session.get("req_user"): return {"status": "error", "message": "未登录"}
     tmdb_key = cfg.get("tmdb_api_key")
     proxy = cfg.get("proxy_url")
     proxies = {"https": proxy} if proxy else None
@@ -260,8 +257,7 @@ def get_tv_details(tmdb_id: int):
     proxies = {"https": proxy} if proxy else None
     
     try:
-        emby_host = cfg.get("emby_host")
-        emby_key = cfg.get("emby_api_key")
+        emby_host = cfg.get("emby_host"); emby_key = cfg.get("emby_api_key")
         local_seasons = []
         admin_id = get_emby_admin(emby_host, emby_key)
         
@@ -286,28 +282,22 @@ def get_tv_details(tmdb_id: int):
     except Exception as e: 
         return {"status": "error", "message": str(e)}
 
-# 🔥 极速查重接口 (前端电影点击时调用)
 @router.get("/api/requests/check/{media_type}/{tmdb_id}")
 def check_local_status(media_type: str, tmdb_id: int):
     exists = check_emby_exists(tmdb_id, media_type)
     return {"status": "success", "exists": exists}
 
-# ==========================================================
-# ✍️ 用户求片与后台管理
-# ==========================================================
 @router.post("/api/requests/submit")
 def submit_media_request(data: MediaRequestSubmitModel, request: Request):
     user = request.session.get("req_user")
-    if not user: 
-        return {"status": "error", "message": "请重新登录"}
+    if not user: return {"status": "error", "message": "请重新登录"}
     
     uid = str(user.get("Id", ""))
     uname = user.get("Name") or "未知用户"
     results = []
 
     for sn in data.seasons:
-        if check_emby_exists(data.tmdb_id, data.media_type, sn): 
-            continue
+        if check_emby_exists(data.tmdb_id, data.media_type, sn): continue
             
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
@@ -320,34 +310,25 @@ def submit_media_request(data: MediaRequestSubmitModel, request: Request):
         elif existing[0] == 3: 
             execute_sql("UPDATE media_requests SET status = 0, reject_reason = NULL WHERE tmdb_id = ? AND season = ?", (data.tmdb_id, sn))
         elif existing[0] == 2: 
-            conn.close()
-            continue
+            conn.close(); continue
             
         execute_sql("INSERT OR REPLACE INTO request_users (tmdb_id, user_id, username, season) VALUES (?, ?, ?, ?)", 
                    (data.tmdb_id, uid, uname, sn))
         results.append(sn)
         conn.close()
 
-    if not results: 
-        return {"status": "error", "message": "所选资源均已入库或排队中"}
+    if not results: return {"status": "error", "message": "所选资源均已入库或排队中"}
 
-    # 🔥 修复机器人通知的分类显示逻辑
     if data.media_type == 'tv':
-        type_name = "剧集"
-        season_info = f"\n📦 <b>季数</b>：第 {', '.join(map(str, results))} 季"
+        type_name = "剧集"; season_info = f"\n📦 <b>季数</b>：第 {', '.join(map(str, results))} 季"
     else:
-        type_name = "电影"
-        season_info = ""
+        type_name = "电影"; season_info = ""
 
     overview_text = data.overview[:110] + "..." if data.overview and len(data.overview) > 110 else (data.overview or "无")
-    
     bot_msg = (f"🔔 <b>新求片提醒</b>\n\n"
                f"👤 <b>用户</b>：{uname}\n"
                f"📌 <b>片名</b>：{data.title} ({data.year})\n"
-               f"🏷️ <b>类型</b>：{type_name}"
-               f"{season_info}\n\n"
-               f"📝 <b>简介：</b>\n{overview_text}")
-    
+               f"🏷️ <b>类型</b>：{type_name}{season_info}\n\n📝 <b>简介：</b>\n{overview_text}")
     admin_url = cfg.get("pulse_url") or str(request.base_url).rstrip('/')
     bot.send_photo("sys_notify", data.poster_path or REPORT_COVER_URL, bot_msg, reply_markup={"inline_keyboard": [[{"text": "🍿 立即审批", "url": f"{admin_url}/requests_admin"}]]}, platform="all")
     
@@ -356,8 +337,7 @@ def submit_media_request(data: MediaRequestSubmitModel, request: Request):
 @router.get("/api/requests/my")
 def get_my_requests(request: Request):
     user = request.session.get("req_user")
-    if not user: 
-        return {"status": "error", "message": "未登录"}
+    if not user: return {"status": "error", "message": "未登录"}
         
     uid = str(user.get("Id", ""))
     conn = sqlite3.connect(DB_PATH)
@@ -375,21 +355,15 @@ def get_my_requests(request: Request):
     results = []
     for r in rows:
         results.append({
-            "tmdb_id": r[0], 
-            "title": r[1] + (f" (S{r[5]})" if r[6]=='tv' else ""), 
-            "year": r[2], 
-            "poster_path": r[3], 
-            "status": r[4], 
-            "season": r[5], 
-            "requested_at": r[7], 
-            "reject_reason": r[8]
+            "tmdb_id": r[0], "title": r[1] + (f" (S{r[5]})" if r[6]=='tv' else ""), 
+            "year": r[2], "poster_path": r[3], "status": r[4], 
+            "season": r[5], "requested_at": r[7], "reject_reason": r[8]
         })
     return {"status": "success", "data": results}
 
 @router.get("/api/manage/requests")
 def get_all_requests(request: Request):
-    if not request.session.get("user"): 
-        return {"status": "error", "message": "无权访问"}
+    if not request.session.get("user"): return {"status": "error", "message": "无权访问"}
         
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -408,29 +382,19 @@ def get_all_requests(request: Request):
     results = []
     for r in rows:
         results.append({
-            "tmdb_id": r[0], 
-            "media_type": r[1], 
-            "title": r[2] + (f" 第 {r[6]} 季" if r[1]=='tv' else ""), 
-            "year": r[3], 
-            "poster_path": r[4], 
-            "status": r[5], 
-            "season": r[6], 
-            "created_at": r[7], 
-            "request_count": r[8], 
-            "requested_by": r[9], 
-            "reject_reason": r[10]
+            "tmdb_id": r[0], "media_type": r[1], "title": r[2] + (f" 第 {r[6]} 季" if r[1]=='tv' else ""), 
+            "year": r[3], "poster_path": r[4], "status": r[5], 
+            "season": r[6], "created_at": r[7], "request_count": r[8], 
+            "requested_by": r[9], "reject_reason": r[10]
         })
     return {"status": "success", "data": results}
 
 @router.post("/api/manage/requests/batch")
 def batch_manage_action(data: BulkAdminActionModel, request: Request):
-    if not request.session.get("user"): 
-        return {"status": "error", "message": "权限不足"}
+    if not request.session.get("user"): return {"status": "error", "message": "权限不足"}
         
     for item in data.items:
-        tid = item['tmdb_id']
-        sn = item['season']
-        
+        tid = item['tmdb_id']; sn = item['season']
         if data.action == "approve":
             conn = sqlite3.connect(DB_PATH)
             conn.row_factory = sqlite3.Row
@@ -439,38 +403,22 @@ def batch_manage_action(data: BulkAdminActionModel, request: Request):
             row = c.fetchone()
             conn.close()
             
-            mp_url = cfg.get("moviepilot_url")
-            mp_token = cfg.get("moviepilot_token")
+            mp_url = cfg.get("moviepilot_url"); mp_token = cfg.get("moviepilot_token")
             if mp_url and mp_token and row:
-                payload = {
-                    "name": row["title"], 
-                    "tmdbid": int(tid), 
-                    "year": str(row["year"]), 
-                    "type": "电影" if row["media_type"]=="movie" else "电视剧"
-                }
-                if row["media_type"] == "tv": 
-                    payload["season"] = sn
+                payload = { "name": row["title"], "tmdbid": int(tid), "year": str(row["year"]), "type": "电影" if row["media_type"]=="movie" else "电视剧" }
+                if row["media_type"] == "tv": payload["season"] = sn
                 requests.post(f"{mp_url.rstrip('/')}/api/v1/subscribe/", json=payload, headers={"X-API-KEY": mp_token.strip().strip("'\"")}, timeout=10)
-            
             execute_sql("UPDATE media_requests SET status = 1 WHERE tmdb_id = ? AND season = ?", (tid, sn))
             
         elif data.action == "reject":
             execute_sql("UPDATE media_requests SET status = 3, reject_reason = ? WHERE tmdb_id = ? AND season = ?", (data.reject_reason, tid, sn))
-            
         elif data.action == "finish":
             execute_sql("UPDATE media_requests SET status = 2 WHERE tmdb_id = ? AND season = ?", (tid, sn))
-            
         elif data.action == "delete":
-            execute_sql("DELETE FROM media_requests WHERE tmdb_id = ? AND season = ?", (tid, sn))
-            execute_sql("DELETE FROM request_users WHERE tmdb_id = ? AND season = ?", (tid, sn))
+            execute_sql("DELETE FROM media_requests WHERE tmdb_id = ? AND season = ?; DELETE FROM request_users WHERE tmdb_id = ? AND season = ?", (tid, sn, tid, sn))
             
     return {"status": "success", "message": f"操作已执行"}
 
 @router.post("/api/manage/requests/action")
 def manage_request_action(data: AdminActionModel, request: Request):
-    batch_data = BulkAdminActionModel(
-        items=[{"tmdb_id": data.tmdb_id, "season": data.season}], 
-        action=data.action, 
-        reject_reason=data.reject_reason
-    )
-    return batch_manage_action(batch_data, request)
+    return batch_manage_action(BulkAdminActionModel(items=[{"tmdb_id": data.tmdb_id, "season": data.season}], action=data.action, reject_reason=data.reject_reason), request)
