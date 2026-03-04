@@ -19,7 +19,7 @@ def ensure_blacklist_schema():
         conn.commit()
         conn.close()
     except Exception as e:
-        print(f"Upgrade blacklist table error: {e}")
+        pass
 
 ensure_blacklist_schema()
 
@@ -68,18 +68,17 @@ async def get_clients_data(request: Request):
     app_counts = {}
     top_devices = {}
     
-    # 🔥 修复 1：拦截 SQLite 的 null 脏数据，将其转化为优雅的“未知客户端”
+    # 🔥 核心修复：使用 COALESCE(ClientName, Client) 挖掘真实数据，过滤空值
     try:
-        pie_rows = query_db("SELECT Client, COUNT(*) as cnt FROM PlaybackActivity GROUP BY Client")
+        pie_rows = query_db("SELECT COALESCE(ClientName, Client, '未知客户端') as c_name, COUNT(*) as cnt FROM PlaybackActivity WHERE c_name IS NOT NULL AND c_name != '' GROUP BY c_name")
         if pie_rows:
-            app_counts = { (r['Client'] if r['Client'] else "未知客户端"): r['cnt'] for r in pie_rows }
+            app_counts = {r['c_name']: r['cnt'] for r in pie_rows}
             
-        bar_rows = query_db("SELECT DeviceName, COUNT(*) as cnt FROM PlaybackActivity GROUP BY DeviceName ORDER BY cnt DESC LIMIT 5")
+        bar_rows = query_db("SELECT DeviceName, COUNT(*) as cnt FROM PlaybackActivity WHERE DeviceName IS NOT NULL AND DeviceName != '' GROUP BY DeviceName ORDER BY cnt DESC LIMIT 5")
         if bar_rows:
-            top_devices = { (r['DeviceName'] if r['DeviceName'] else "未知设备"): r['cnt'] for r in bar_rows }
+            top_devices = {r['DeviceName']: r['cnt'] for r in bar_rows}
     except: pass
 
-    # 保底机制也加入防护
     if not app_counts:
         for d in devices:
             an = d.get("AppName") or "未知客户端"

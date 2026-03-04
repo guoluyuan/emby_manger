@@ -93,13 +93,25 @@
             </ul>
         </div>
         
-        <div class="px-5 md:px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800">
-            <button id="execute-btn" onclick="executeBlock()" class="w-full py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-black shadow-md shadow-red-500/20 active:scale-95 transition-all flex justify-center items-center gap-2">
-                <i class="fa-solid fa-bolt"></i> 立即扫描并阻断线上设备
+        <div class="p-5 md:p-6 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800">
+            <div class="mb-4 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 rounded-r-lg p-4 shadow-sm">
+                <div class="flex items-start">
+                    <div class="shrink-0 mt-0.5">
+                        <i class="fa-solid fa-triangle-exclamation text-red-500 text-lg"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-black text-red-800 dark:text-red-400 uppercase tracking-widest">高危操作警告</h3>
+                        <p class="mt-1 text-xs text-red-700 dark:text-red-300 leading-relaxed">
+                            执行阻断将<strong class="font-black text-red-600 dark:text-red-400">永久注销</strong>名单内所有客户端在 Emby 端的登录凭证。<br>
+                            即使将来移出黑名单，对方仍需<strong class="underline decoration-red-500">重新输入账号密码</strong>方可恢复使用！
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <button id="execute-btn" onclick="executeBlock()" class="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-black shadow-lg shadow-red-500/30 active:scale-95 transition-all flex justify-center items-center gap-2">
+                <i class="fa-solid fa-bolt"></i> 我已了解风险，立即全服扫荡
             </button>
-            <p class="text-[10px] text-gray-500 text-center mt-3 leading-tight">
-                ⚠️ 注意：此操作将彻底吊销对方在 Emby 端的登录凭证。<br>后续若将其移出黑名单，对方仍需在客户端上<b>重新输入账号密码</b>方可恢复使用。
-            </p>
         </div>
     </div>
 </div>
