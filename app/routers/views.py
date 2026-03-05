@@ -194,3 +194,52 @@ async def clients_page(request: Request):
 async def about_page(request: Request):
     if not check_login(request): return RedirectResponse("/login")
     return templates.TemplateResponse("about.html", {"request": request, "active_page": "about", "version": APP_VERSION})
+
+import random
+
+# ==========================================================
+# 🖼️ 登录页动态壁纸引擎
+# ==========================================================
+@router.get("/api/wallpaper")
+async def get_wallpaper():
+    """ 
+    获取登录页的动态壁纸
+    优先尝试获取 TMDB 今日热门剧集/电影的高清背景图，
+    若失败则返回内置的电影质感保底海报。
+    """
+    # 高清保底海报库 (电影/极客氛围)
+    fallback_wallpapers = [
+        {"url": "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1925&auto=format&fit=crop", "title": "电影之夜 - Unsplash"},
+        {"url": "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=2070&auto=format&fit=crop", "title": "家庭影院 - Unsplash"},
+        {"url": "https://images.unsplash.com/photo-1505686994434-e3cc5abf1330?q=80&w=2073&auto=format&fit=crop", "title": "放映机 - Unsplash"}
+    ]
+    
+    tmdb_key = cfg.get("tmdb_api_key")
+    proxy = cfg.get("proxy_url")
+    proxies = {"https": proxy, "http": proxy} if proxy else None
+    
+    # 1. 尝试从 TMDB 抓取最新热门背景图
+    if tmdb_key:
+        try:
+            res = requests.get(
+                f"https://api.themoviedb.org/3/trending/all/day?api_key={tmdb_key}&language=zh-CN", 
+                proxies=proxies, 
+                timeout=3
+            )
+            if res.status_code == 200:
+                results = res.json().get("results", [])
+                # 过滤出有背景大图的数据
+                valid_items = [item for item in results if item.get("backdrop_path")]
+                
+                if valid_items:
+                    # 随机抽取一张，增加新鲜感
+                    item = random.choice(valid_items)
+                    title = item.get("title") or item.get("name") or "TMDB 热门"
+                    url = f"https://image.tmdb.org/t/p/original{item['backdrop_path']}"
+                    return {"status": "success", "url": url, "title": f"今日热门: {title}"}
+        except Exception as e:
+            logger.warning(f"获取 TMDB 壁纸失败，使用备用图: {e}")
+
+    # 2. 如果 TMDB 没配、网络不通，返回内置保底海报
+    item = random.choice(fallback_wallpapers)
+    return {"status": "success", "url": item["url"], "title": item["title"]}
