@@ -3,20 +3,19 @@
 
 {% block head %}
 <style>
-    /* Bento 卡片呼吸交互 */
     .bento-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
-    .bento-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); }
+    .bento-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
     .bento-card:active { transform: scale(0.97); }
     .bento-active { border-color: #6366f1 !important; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important; background-color: rgba(99, 102, 241, 0.05) !important; }
     .dark .bento-active { border-color: #818cf8 !important; background-color: rgba(99, 102, 241, 0.1) !important; }
-
-    /* 迷你能量进度条 */
     .energy-bar { height: 4px; border-radius: 2px; transition: width 1s ease-out; }
     
-    /* 抽屉浮窗动画 */
-    #ignore-drawer { transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-    .drawer-open { transform: translateX(0); }
-    .drawer-closed { transform: translateX(100%); }
+    /* 居中浮窗入场动画 */
+    .modal-enter { animation: modalEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    @keyframes modalEnter {
+        0% { opacity: 0; transform: scale(0.95) translateY(10px); }
+        100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
 </style>
 {% endblock %}
 
@@ -29,12 +28,15 @@
                 <i class="fa-solid fa-microchip text-indigo-500 text-xl"></i>
             </div>
             <div>
-                <h1 class="text-xl font-black text-gray-900 dark:text-white">全景画质盘点</h1>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-xl font-black text-gray-900 dark:text-white">全景画质盘点</h1>
+                    <span class="text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-md" id="total-count-badge">总计: 0 部</span>
+                </div>
                 <p class="text-xs text-gray-500 mt-0.5" id="scan-time">点击卡片切换视图，探索媒体库质量</p>
             </div>
         </div>
         <div class="flex items-center gap-3">
-            <button onclick="toggleIgnoreDrawer()" class="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-xl transition shadow-sm flex items-center gap-2">
+            <button onclick="openIgnoreModal()" class="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-xl transition shadow-sm flex items-center gap-2">
                 <i class="fa-solid fa-trash-can-arrow-up"></i> <span class="hidden sm:inline">回收站</span>
             </button>
             <button onclick="loadQualityData(true)" id="refresh-btn" class="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition active:scale-95 flex items-center gap-2">
@@ -43,7 +45,7 @@
         </div>
     </div>
 
-    <div id="loading" class="text-center py-20 text-gray-400">
+    <div id="loading" class="text-center py-32 text-gray-400">
         <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-indigo-500"></i>
         <p class="text-sm font-bold">正在提取并解析媒体流元数据...</p>
     </div>
@@ -77,7 +79,7 @@
                 
                 <div class="bento-card border border-rose-200 dark:border-rose-900/50 bg-rose-50/30 dark:bg-rose-900/10 rounded-2xl p-4 relative overflow-hidden" onclick="switchView('sd', this)">
                     <div class="text-rose-500 dark:text-rose-400 text-xs font-bold mb-1 flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation"></i> 标清/远古画质</div>
-                    <div class="text-2xl font-black text-rose-600 dark:text-rose-400 flex items-end gap-1" id="stat-sd">0 <span class="text-xs text-rose-400/60 font-normal pb-1.5">建议洗版</span></div>
+                    <div class="text-2xl font-black text-rose-600 dark:text-rose-400 flex items-end gap-1" id="stat-sd">0 <span class="text-xs text-rose-400/60 font-normal pb-1.5">需洗版</span></div>
                     <div class="w-full bg-rose-100 dark:bg-rose-900 mt-3 rounded-full overflow-hidden"><div class="energy-bar bg-rose-500 w-0" id="bar-sd"></div></div>
                 </div>
             </div>
@@ -121,35 +123,49 @@
     </div>
 
     <div id="list-container" class="hidden animate-fade-in bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700/50 bg-gray-50/80 dark:bg-gray-800/80 flex justify-between items-center">
-            <h3 class="font-bold text-indigo-600 dark:text-indigo-400 text-sm flex items-center gap-2" id="list-title">
-                <i class="fa-solid fa-list-ul"></i> 当前视图: 4K Ultra HD
-            </h3>
-            <span class="text-xs font-mono font-bold text-gray-500 bg-white dark:bg-gray-900 px-3 py-1 rounded-md shadow-sm border border-gray-200 dark:border-gray-700" id="list-count">0 部</span>
+        <div class="px-4 md:px-6 py-4 border-b border-gray-100 dark:border-gray-700/50 bg-gray-50/80 dark:bg-gray-800/80 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <label id="batch-ignore-checkbox" class="hidden flex items-center gap-1.5 text-xs font-bold text-gray-600 cursor-pointer pl-1">
+                    <input type="checkbox" onchange="toggleAllListView(this)" class="w-4 h-4 text-rose-500 rounded border-gray-300 focus:ring-rose-500"> 全选
+                </label>
+                <h3 class="font-bold text-indigo-600 dark:text-indigo-400 text-sm flex items-center gap-2 border-l-2 border-indigo-500 pl-3 ml-1" id="list-title">
+                    当前视图: 4K Ultra HD
+                </h3>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <button id="batch-ignore-btn" onclick="batchIgnore()" class="hidden px-3 py-1.5 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 hover:bg-rose-200 rounded-lg text-xs font-bold transition shadow-sm">
+                    批量忽略
+                </button>
+                <span class="text-xs font-mono font-bold text-gray-500 bg-white dark:bg-gray-900 px-3 py-1 rounded-md shadow-sm border border-gray-200 dark:border-gray-700" id="list-count">0 部</span>
+            </div>
         </div>
         <div id="movie-list" class="divide-y divide-gray-100 dark:divide-gray-700/50 max-h-[600px] overflow-y-auto custom-scrollbar p-2">
-            </div>
+        </div>
     </div>
 </div>
 
-<div id="ignore-overlay" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden transition-opacity" onclick="toggleIgnoreDrawer()"></div>
-<div id="ignore-drawer" class="fixed top-0 right-0 h-full w-full sm:w-96 bg-white dark:bg-gray-900 shadow-2xl z-[60] drawer-closed flex flex-col border-l border-gray-200 dark:border-gray-800">
-    <div class="p-5 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 shrink-0">
-        <h3 class="font-black text-gray-900 dark:text-white flex items-center gap-2"><i class="fa-solid fa-trash-can-arrow-up text-gray-400"></i> 回收站 (已忽略)</h3>
-        <button onclick="toggleIgnoreDrawer()" class="text-gray-400 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
-    </div>
-    
-    <div class="p-3 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center shrink-0">
-        <label class="flex items-center gap-2 text-sm font-bold text-gray-600 dark:text-gray-300 cursor-pointer pl-2">
-            <input type="checkbox" id="select-all-ignores" onchange="toggleAllIgnores(this)" class="w-4 h-4 text-indigo-600 rounded cursor-pointer"> 全选
-        </label>
-        <button onclick="batchRestore()" id="btn-restore" disabled class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition disabled:opacity-50 disabled:cursor-not-allowed">
-            批量移出回收站
-        </button>
-    </div>
-    
-    <div class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1" id="ignore-list-content">
-        <div class="text-center py-20 text-gray-400 text-sm">回收站是空的</div>
+<div id="ignore-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] modal-enter">
+        <div class="p-5 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50 rounded-t-2xl shrink-0">
+            <h3 class="font-black text-gray-900 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-trash-can-arrow-up text-indigo-500"></i> 回收站 (已忽略的影片)
+            </h3>
+            <button onclick="closeIgnoreModal()" class="text-gray-400 hover:text-red-500 transition w-8 h-8 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center justify-center"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        
+        <div class="p-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center shrink-0 bg-white dark:bg-gray-800">
+            <label class="flex items-center gap-2 text-sm font-bold text-gray-600 dark:text-gray-300 cursor-pointer pl-2">
+                <input type="checkbox" id="select-all-ignores" onchange="toggleAllIgnores(this)" class="w-4 h-4 text-indigo-600 rounded cursor-pointer focus:ring-indigo-500"> 全选
+            </label>
+            <button onclick="batchRestore()" id="btn-restore" disabled class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed active:scale-95">
+                批量恢复所选
+            </button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-2" id="ignore-list-content">
+            <div class="text-center py-20 text-gray-400 text-sm">回收站是空的</div>
+        </div>
     </div>
 </div>
 
@@ -160,6 +176,7 @@
     let globalMoviesData = {};
     let currentView = '4k';
     let selectedIgnores = new Set();
+    let selectedListView = new Set(); // 列表界面的多选集合
     
     const viewNames = {
         '4k': 'Ultra HD (4K)', '1080p': 'Full HD (1080P)', '720p': 'HD (720P)', 'sd': '标清/远古画质 (需洗版)',
@@ -173,9 +190,10 @@
         const dash = document.getElementById('dashboard');
         const listC = document.getElementById('list-container');
         const btn = document.getElementById('refresh-btn');
+        const icon = document.getElementById('refresh-icon');
         
         loading.classList.remove('hidden'); dash.classList.add('hidden'); listC.classList.add('hidden');
-        if(force) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 扫描中...'; }
+        if(force) { btn.disabled = true; icon.classList.add('fa-spin'); }
 
         try {
             const res = await fetch(`/api/insight/quality${force ? '?force_refresh=true' : ''}`);
@@ -185,17 +203,17 @@
                 const d = json.data;
                 globalMoviesData = d.movies;
                 
-                // 渲染数据
+                document.getElementById('total-count-badge').innerText = `总计: ${d.total_count} 部`;
+                
                 document.getElementById('stat-4k').innerHTML = `${d.movies['4k'].length} <span class="text-xs text-gray-400 font-normal pb-1.5">部</span>`;
                 document.getElementById('stat-1080p').innerHTML = `${d.movies['1080p'].length} <span class="text-xs text-gray-400 font-normal pb-1.5">部</span>`;
                 document.getElementById('stat-720p').innerHTML = `${d.movies['720p'].length} <span class="text-xs text-gray-400 font-normal pb-1.5">部</span>`;
-                document.getElementById('stat-sd').innerHTML = `${d.movies['sd'].length} <span class="text-xs text-rose-400/60 font-normal pb-1.5">建议洗版</span>`;
+                document.getElementById('stat-sd').innerHTML = `${d.movies['sd'].length} <span class="text-xs text-rose-400/60 font-normal pb-1.5">需洗版</span>`;
                 
                 document.getElementById('stat-dv').innerText = d.movies['dolby_vision'].length;
                 document.getElementById('stat-hdr').innerText = d.movies['hdr10'].length;
                 document.getElementById('stat-sdr').innerText = d.movies['sdr'].length;
 
-                // 计算横条比例
                 const totalRes = Math.max(d.movies['4k'].length + d.movies['1080p'].length + d.movies['720p'].length + d.movies['sd'].length, 1);
                 setTimeout(() => {
                     document.getElementById('bar-4k').style.width = `${(d.movies['4k'].length/totalRes)*100}%`;
@@ -208,96 +226,157 @@
 
                 loading.classList.add('hidden'); dash.classList.remove('hidden'); listC.classList.remove('hidden');
                 
-                // 默认渲染 4K 视图
-                renderListView('4k');
-            } else {
-                loading.innerHTML = `<div class="text-red-500 font-bold"><i class="fa-solid fa-triangle-exclamation mb-2 text-2xl"></i><br>扫描失败: ${json.message}</div>`;
+                renderListView(currentView);
             }
-        } catch(e) {
-            loading.innerHTML = `<div class="text-red-500 font-bold">网络异常，请重试</div>`;
-        } finally {
-            if(force) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate"></i> 深度扫描'; }
+        } catch(e) {} finally {
+            if(force) { btn.disabled = false; icon.classList.remove('fa-spin'); }
         }
     }
 
     function switchView(viewKey, cardElement) {
-        // 清除所有卡片的高亮状态
         document.querySelectorAll('.bento-card').forEach(el => el.classList.remove('bento-active'));
-        // 为当前卡片加上高亮框
         cardElement.classList.add('bento-active');
         renderListView(viewKey);
     }
 
     function renderListView(viewKey) {
         currentView = viewKey;
-        document.getElementById('list-title').innerHTML = `<i class="fa-solid fa-list-ul"></i> 当前视图: ${viewNames[viewKey]}`;
+        selectedListView.clear(); // 切换视图时清空多选
         
-        const movies = globalMoviesData[viewKey] || [];
+        document.getElementById('list-title').innerHTML = viewNames[viewKey];
+        
+        // 只有 SD (标清) 视图才显示批量忽略工具
+        const batchCheckbox = document.getElementById('batch-ignore-checkbox');
+        const batchBtn = document.getElementById('batch-ignore-btn');
+        if (viewKey === 'sd') {
+            batchCheckbox.classList.remove('hidden');
+            batchBtn.classList.remove('hidden');
+            batchCheckbox.querySelector('input').checked = false;
+        } else {
+            batchCheckbox.classList.add('hidden');
+            batchBtn.classList.add('hidden');
+        }
+        updateBatchIgnoreBtn();
+
+        // 🔥 核心过滤：剔除没有分辨率数据的幽灵影片
+        let rawMovies = globalMoviesData[viewKey] || [];
+        if (['4k', '1080p', '720p', 'sd'].includes(viewKey)) {
+            rawMovies = rawMovies.filter(m => m.Resolution && m.Resolution !== '0x0' && m.Resolution !== 'x');
+        }
+        const movies = rawMovies;
+        
         document.getElementById('list-count').innerText = `${movies.length} 部`;
-        
         const container = document.getElementById('movie-list');
+        
         if (movies.length === 0) {
-            container.innerHTML = '<div class="py-12 text-center text-gray-400 font-medium">当前分类下暂无数据 ☕</div>';
+            container.innerHTML = '<div class="py-16 text-center text-gray-400 font-medium">当前分类下暂无数据 ☕</div>';
             return;
         }
 
         let html = '';
         movies.forEach(m => {
             const imgUrl = `/api/proxy/smart_image?item_id=${m.Id}&name=${encodeURIComponent(m.Name)}&type=Primary`;
-            // 如果是在 SD (建议洗版) 视图，显示垃圾桶忽略按钮
-            const actionBtn = viewKey === 'sd' 
-                ? `<button onclick="ignoreItem('${m.Id}', '${m.Name.replace(/'/g, "\\'")}')" class="px-3 py-1.5 bg-gray-100 hover:bg-rose-100 dark:bg-gray-700 dark:hover:bg-rose-900/30 text-gray-500 hover:text-rose-500 rounded-lg text-xs font-bold transition shadow-sm border border-transparent hover:border-rose-200 dark:hover:border-rose-800"><i class="fa-solid fa-eye-slash mr-1"></i>忽略此片</button>`
-                : `<a href="${imgUrl}" target="_blank" class="text-xs text-indigo-500 hover:text-indigo-600 font-bold">查看封面</a>`;
+            
+            // 列表复选框
+            const checkHtml = viewKey === 'sd' 
+                ? `<input type="checkbox" value="${m.Id}" data-name="${m.Name.replace(/"/g, '&quot;')}" class="list-checkbox w-4 h-4 text-rose-500 rounded focus:ring-rose-500 cursor-pointer mr-3" onchange="toggleSelectList(this)">`
+                : ``;
 
             html += `
-            <div class="flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition rounded-xl group">
-                <img src="${imgUrl}" class="w-10 h-14 rounded shadow-sm object-cover bg-gray-200 dark:bg-gray-800 mr-4" loading="lazy">
+            <label class="flex items-center p-2.5 md:p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition rounded-xl group cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-600">
+                ${checkHtml}
+                <img src="${imgUrl}" class="w-10 h-14 rounded shadow-sm object-cover bg-gray-200 dark:bg-gray-800 mr-4 shrink-0" loading="lazy">
                 <div class="flex-1 min-w-0 pr-4">
                     <h4 class="text-sm font-bold text-gray-800 dark:text-gray-200 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">${m.Name}</h4>
                     <div class="flex items-center gap-3 text-[10px] md:text-xs text-gray-500 dark:text-gray-400 font-mono mt-1">
-                        <span class="bg-gray-200/50 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 shadow-sm">${m.Resolution}</span>
+                        <span class="bg-white dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 shadow-sm font-bold">${m.Resolution}</span>
                         <span class="truncate opacity-60"><i class="fa-solid fa-folder-open mr-1"></i>${m.Path}</span>
                     </div>
                 </div>
-                <div class="shrink-0 pl-2">
-                    ${actionBtn}
-                </div>
-            </div>`;
+            </label>`;
         });
         container.innerHTML = html;
     }
 
-    // --- 忽略与回收站逻辑 ---
-    async function ignoreItem(id, name) {
-        try {
-            await fetch('/api/insight/ignore', {
-                method: 'POST', headers:{'Content-Type': 'application/json'},
-                body: JSON.stringify({item_id: id, item_name: name})
-            });
-            // 重新请求并拉取数据 (剔除已忽略的)
-            loadQualityData(true);
-        } catch(e){}
+    // --- 批量忽略逻辑 ---
+    function toggleSelectList(checkbox) {
+        if(checkbox.checked) {
+            selectedListView.add({id: checkbox.value, name: checkbox.dataset.name});
+        } else {
+            // 需要根据ID找到对象并删除
+            for(let item of selectedListView) {
+                if(item.id === checkbox.value) { selectedListView.delete(item); break; }
+            }
+        }
+        updateBatchIgnoreBtn();
     }
 
-    function toggleIgnoreDrawer() {
-        const drawer = document.getElementById('ignore-drawer');
-        const overlay = document.getElementById('ignore-overlay');
-        const isClosed = drawer.classList.contains('drawer-closed');
-        
-        if(isClosed) {
-            drawer.classList.remove('drawer-closed'); drawer.classList.add('drawer-open');
-            overlay.classList.remove('hidden');
-            loadIgnoreList(); // 每次打开加载最新回收站数据
+    function toggleAllListView(checkbox) {
+        document.querySelectorAll('.list-checkbox').forEach(box => {
+            box.checked = checkbox.checked;
+            toggleSelectList(box);
+        });
+    }
+
+    function updateBatchIgnoreBtn() {
+        const btn = document.getElementById('batch-ignore-btn');
+        if(selectedListView.size > 0) {
+            btn.innerText = `批量忽略 (${selectedListView.size})`;
+            btn.classList.add('bg-rose-500', 'text-white', 'shadow-md');
+            btn.classList.remove('bg-rose-100', 'text-rose-600');
         } else {
-            drawer.classList.add('drawer-closed'); drawer.classList.remove('drawer-open');
-            overlay.classList.add('hidden');
-            selectedIgnores.clear();
+            btn.innerText = `批量忽略`;
+            btn.classList.remove('bg-rose-500', 'text-white', 'shadow-md');
+            btn.classList.add('bg-rose-100', 'text-rose-600');
         }
+    }
+
+    async function batchIgnore() {
+        if(selectedListView.size === 0) return;
+        const btn = document.getElementById('batch-ignore-btn');
+        btn.innerText = '执行中...';
+        btn.disabled = true;
+        
+        try {
+            // 串行执行忽略请求（可以优化为后端批量接口，但几十个并发也能接受）
+            const promises = Array.from(selectedListView).map(item => 
+                fetch('/api/insight/ignore', {
+                    method: 'POST', headers:{'Content-Type': 'application/json'},
+                    body: JSON.stringify({item_id: item.id, item_name: item.name})
+                })
+            );
+            await Promise.all(promises);
+            
+            // 执行完毕后重新拉取最新数据（强制刷新一次即可）
+            await loadQualityData(true);
+            selectedListView.clear();
+            document.getElementById('batch-ignore-checkbox').querySelector('input').checked = false;
+            updateBatchIgnoreBtn();
+            
+        } catch(e) {
+            alert('部分忽略操作可能失败');
+            btn.disabled = false;
+        }
+    }
+
+    // --- 居中浮窗：回收站逻辑 ---
+    function openIgnoreModal() {
+        const modal = document.getElementById('ignore-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        loadIgnoreList();
+    }
+
+    function closeIgnoreModal() {
+        const modal = document.getElementById('ignore-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        selectedIgnores.clear();
     }
 
     async function loadIgnoreList() {
         const c = document.getElementById('ignore-list-content');
-        c.innerHTML = '<div class="py-10 text-center"><i class="fa-solid fa-spinner fa-spin text-gray-400 text-2xl"></i></div>';
+        c.innerHTML = '<div class="py-10 text-center"><i class="fa-solid fa-spinner fa-spin text-indigo-500 text-2xl"></i></div>';
         try {
             const res = await fetch('/api/insight/ignores');
             const json = await res.json();
@@ -308,16 +387,16 @@
                     const dStr = new Date(item.ignored_at).toLocaleDateString();
                     html += `
                     <label class="flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-800/80 rounded-xl transition cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
-                        <input type="checkbox" value="${item.item_id}" class="ignore-checkbox w-4 h-4 text-indigo-600 rounded mr-3" onchange="toggleSelectIgnore('${item.item_id}', this.checked)" ${isChecked}>
+                        <input type="checkbox" value="${item.item_id}" class="ignore-checkbox w-4 h-4 text-indigo-600 rounded mr-3 focus:ring-indigo-500" onchange="toggleSelectIgnore('${item.item_id}', this.checked)" ${isChecked}>
                         <div class="flex-1 min-w-0">
-                            <div class="text-sm font-bold text-gray-700 dark:text-gray-300 truncate">${item.item_name}</div>
-                            <div class="text-[10px] text-gray-400 mt-0.5">忽略于: ${dStr}</div>
+                            <div class="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">${item.item_name}</div>
+                            <div class="text-[10px] font-mono text-gray-400 mt-0.5">归档时间: ${dStr}</div>
                         </div>
                     </label>`;
                 });
                 c.innerHTML = html;
             } else {
-                c.innerHTML = '<div class="text-center py-20 text-gray-400 text-sm"><i class="fa-solid fa-box-open text-3xl opacity-50 mb-3 block"></i>回收站是空的</div>';
+                c.innerHTML = '<div class="text-center py-20 text-gray-400 text-sm"><i class="fa-solid fa-box-open text-4xl opacity-20 mb-3 block"></i>回收站是空的</div>';
             }
             updateRestoreBtn();
         } catch(e){}
@@ -339,9 +418,9 @@
     function updateRestoreBtn() {
         const btn = document.getElementById('btn-restore');
         if(selectedIgnores.size > 0) {
-            btn.disabled = false; btn.innerText = `移出回收站 (${selectedIgnores.size})`;
+            btn.disabled = false; btn.innerText = `恢复所选 (${selectedIgnores.size})`;
         } else {
-            btn.disabled = true; btn.innerText = `批量移出回收站`;
+            btn.disabled = true; btn.innerText = `批量恢复所选`;
         }
     }
 
@@ -356,8 +435,8 @@
             });
             selectedIgnores.clear();
             document.getElementById('select-all-ignores').checked = false;
-            loadIgnoreList();
-            loadQualityData(true); // 恢复后触发扫描，把它们接回来
+            await loadIgnoreList(); // 刷新回收站内的列表
+            loadQualityData(true);  // 后台静默刷新主盘点数据，将其接回来
         } catch(e){}
     }
 </script>
