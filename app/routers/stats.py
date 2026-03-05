@@ -202,7 +202,7 @@ def api_live_sessions_legacy():
 @router.get("/api/stats/top_movies")
 def api_top_movies(user_id: Optional[str] = None, category: str = 'all', sort_by: str = 'count'):
     """
-    🔥 优化版：支持按【剧集+季】维度进行排行统计
+    🔥 优化版：按【剧名 - 季】聚合，严禁分集展示
     """
     try:
         where, params = get_base_filter(user_id)
@@ -214,20 +214,21 @@ def api_top_movies(user_id: Optional[str] = None, category: str = 'all', sort_by
         
         aggregated = {}
         for row in rows:
-            # 🔥 智能切分逻辑：如果是剧集 (Series - Season - Episode)，保留前两段
+            # 核心清洗：只要前两段（剧名和季名），扔掉第三段（集名）
             parts = row['ItemName'].split(' - ')
             if len(parts) >= 2:
+                # 结果如： "唐朝诡事录 - 第 2 季"
                 clean = f"{parts[0]} - {parts[1]}"
             else:
+                # 电影或命名不规范的剧集
                 clean = parts[0]
                 
+            # 聚合统计：只要 clean 名称相同，就累加到同一个 key 里
             if clean not in aggregated: 
                 aggregated[clean] = {'ItemName': clean, 'ItemId': row['ItemId'], 'PlayCount': 0, 'TotalTime': 0}
             
             aggregated[clean]['PlayCount'] += 1
             aggregated[clean]['TotalTime'] += (row['PlayDuration'] or 0)
-            # 使用该分类下最后一条记录的 ItemId，确保能拉取到海报
-            aggregated[clean]['ItemId'] = row['ItemId']
             
         res = list(aggregated.values())
         res.sort(key=lambda x: x['TotalTime'] if sort_by == 'time' else x['PlayCount'], reverse=True)
@@ -237,31 +238,12 @@ def api_top_movies(user_id: Optional[str] = None, category: str = 'all', sort_by
 @router.get("/api/stats/user_details")
 def api_user_details(user_id: Optional[str] = None):
     """
-    🔥 用户画像：最爱影片统计支持按季聚合
+    🔥 用户画像：最爱影片聚合修复
     """
     try:
         where, params = get_base_filter(user_id)
         
-        # ... (此处省略中间重复的图表查询逻辑，直接聚焦 Fav 统计部分) ...
-        # (实际覆盖时，请参考下方代码块或保留之前的图表查询，只修改最爱影片统计的 SQL/逻辑)
-
-        # 重新获取完整数据进行 Python 端的按季聚合排行
-        raw_fav = query_db(f"SELECT ItemName, ItemId, PlayDuration FROM PlaybackActivity {where}", params)
-        agg_fav = {}
-        for r in raw_fav:
-            parts = r['ItemName'].split(' - ')
-            clean = f"{parts[0]} - {parts[1]}" if len(parts) >= 2 else parts[0]
-            if clean not in agg_fav: agg_fav[clean] = {"ItemName": clean, "ItemId": r["ItemId"], "c": 0, "d": 0}
-            agg_fav[clean]["c"] += 1
-            agg_fav[clean]["d"] += (r["PlayDuration"] or 0)
-        
-        top_fav = None
-        if agg_fav:
-            top_fav = max(agg_fav.values(), key=lambda x: x['d'])
-            
-        # (此函数由于内容较多，建议你在本地编辑器里将 aggregation 逻辑替换即可，或者使用下面的简化版重构整个函数)
-        # 为方便你直接覆盖，下面提供该函数的完整重构版：
-        
+        # 1. 小时、设备、日志查询 (保持不变)
         h_res = query_db(f"SELECT strftime('%H', DateCreated) as Hour, COUNT(*) as Plays FROM PlaybackActivity {where} GROUP BY Hour", params)
         h_data = {str(i).zfill(2): 0 for i in range(24)}
         if h_res:
@@ -274,8 +256,11 @@ def api_user_details(user_id: Optional[str] = None):
             for r in l_res: 
                 l = dict(r); l['UserName'] = u_map.get(l['UserId'], "User"); logs.append(l)
 
+        # 2. 核心画像数据统计
         overview = {"total_plays": 0, "total_duration": 0, "avg_duration": 0, "account_age_days": 1}
         pref = {"movie_plays": 0, "episode_plays": 0}
+        
+        # 统计总览
         ov_res = query_db(f"SELECT COUNT(*) as Plays, SUM(PlayDuration) as Dur, MIN(DateCreated) as FirstDate FROM PlaybackActivity {where}", params)
         if ov_res and ov_res[0]['Plays']:
             overview['total_plays'] = ov_res[0]['Plays']
@@ -287,6 +272,20 @@ def api_user_details(user_id: Optional[str] = None):
                     fd = datetime.datetime.fromisoformat(ov_res[0]['FirstDate'].split('.')[0].replace('Z',''))
                     overview['account_age_days'] = max(1, (datetime.datetime.now() - fd).days)
                 except: pass
+
+        # 3. 🔥 精准聚合最爱影片 (按季合并)
+        raw_fav = query_db(f"SELECT ItemName, ItemId, PlayDuration FROM PlaybackActivity {where}", params)
+        agg_fav = {}
+        for r in raw_fav:
+            parts = r['ItemName'].split(' - ')
+            clean = f"{parts[0]} - {parts[1]}" if len(parts) >= 2 else parts[0]
+            if clean not in agg_fav: agg_fav[clean] = {"ItemName": clean, "ItemId": r["ItemId"], "c": 0, "d": 0}
+            agg_fav[clean]["c"] += 1
+            agg_fav[clean]["d"] += (r["PlayDuration"] or 0)
+        
+        top_fav = max(agg_fav.values(), key=lambda x: x['d']) if agg_fav else None
+        
+        # 偏好统计
         m_res = query_db(f"SELECT ItemType, COUNT(*) as c FROM PlaybackActivity {where} GROUP BY ItemType", params)
         if m_res:
             for m in m_res:
@@ -324,7 +323,7 @@ def api_chart_stats(user_id: Optional[str] = None, dimension: str = 'day'):
 @router.get("/api/stats/poster_data")
 def api_poster_data(user_id: Optional[str] = None, period: str = 'all'):
     """
-    🔥 年度报告/海报数据：同样支持分季统计
+    🔥 年度报告数据：同步分季聚合逻辑
     """
     try:
         where_base, params = get_base_filter(user_id)
@@ -332,10 +331,7 @@ def api_poster_data(user_id: Optional[str] = None, period: str = 'all'):
         if period == 'week': date_filter = " AND DateCreated > date('now', '-7 days')"
         elif period == 'month': date_filter = " AND DateCreated > date('now', '-30 days')"
         
-        server_res = query_db(f"SELECT COUNT(*) as Plays FROM PlaybackActivity {get_base_filter('all')[0]} {date_filter}", get_base_filter('all')[1])
-        server_plays = server_res[0]['Plays'] if server_res else 0
-        
-        raw_sql = f"SELECT ItemName, ItemId, ItemType, PlayDuration FROM PlaybackActivity {where_base + date_filter}"
+        raw_sql = f"SELECT ItemName, ItemId, PlayDuration FROM PlaybackActivity {where_base + date_filter}"
         rows = query_db(raw_sql, params)
         
         total_plays = 0; total_duration = 0; aggregated = {} 
@@ -343,14 +339,17 @@ def api_poster_data(user_id: Optional[str] = None, period: str = 'all'):
             for row in rows:
                 total_plays += 1; dur = row['PlayDuration'] or 0; total_duration += dur
                 
+                # 同样的清洗逻辑
                 parts = row['ItemName'].split(' - ')
                 clean = f"{parts[0]} - {parts[1]}" if len(parts) >= 2 else parts[0]
                 
-                if clean not in aggregated: aggregated[clean] = {'ItemName': clean, 'ItemId': row['ItemId'], 'Count': 0, 'Duration': 0}
-                aggregated[clean]['Count'] += 1; aggregated[clean]['Duration'] += dur; aggregated[clean]['ItemId'] = row['ItemId'] 
+                if clean not in aggregated: 
+                    aggregated[clean] = {'ItemName': clean, 'ItemId': row['ItemId'], 'Count': 0, 'Duration': 0}
+                aggregated[clean]['Count'] += 1
+                aggregated[clean]['Duration'] += dur
                 
         top_list = list(aggregated.values()); top_list.sort(key=lambda x: x['Count'], reverse=True)
-        return {"status": "success", "data": {"plays": total_plays, "hours": round(total_duration / 3600), "server_plays": server_plays, "top_list": top_list[:10], "tags": ["观影达人"]}}
+        return {"status": "success", "data": {"plays": total_plays, "hours": round(total_duration / 3600), "top_list": top_list[:10]}}
     except: return {"status": "error", "data": {"plays": 0, "hours": 0}}
 
 @router.get("/api/stats/top_users_list")
