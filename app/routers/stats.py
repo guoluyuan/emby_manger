@@ -334,23 +334,44 @@ def api_poster_data(user_id: Optional[str] = None, period: str = 'all'):
     except: return {"status": "error", "data": {"plays": 0, "hours": 0}}
 
 @router.get("/api/stats/top_users_list")
-def api_top_users_list():
+def api_top_users_list(period: str = 'all'):
+    """
+    🔥 升级版白金观影榜：支持按 日/周/月/年/总榜 动态过滤
+    """
     try:
-        res = query_db("SELECT UserId, COUNT(*) as Plays, SUM(PlayDuration) as TotalTime FROM PlaybackActivity GROUP BY UserId ORDER BY TotalTime DESC LIMIT 10")
+        where_base, params = get_base_filter('all')
+        
+        # 动态拼装时间沙漏过滤条件
+        date_filter = ""
+        if period == 'day':
+            date_filter = " AND DateCreated >= date('now', 'start of day')"
+        elif period == 'week':
+            date_filter = " AND DateCreated >= date('now', '-7 days')"
+        elif period == 'month':
+            date_filter = " AND DateCreated >= date('now', 'start of month')"
+        elif period == 'year':
+            date_filter = " AND DateCreated >= date('now', 'start of year')"
+            
+        sql = f"SELECT UserId, COUNT(*) as Plays, SUM(PlayDuration) as TotalTime FROM PlaybackActivity {where_base} {date_filter} GROUP BY UserId ORDER BY TotalTime DESC LIMIT 10"
+        
+        res = query_db(sql, params)
         if not res: return {"status": "success", "data": []}
+        
         user_map = get_user_map_local()
         hidden = cfg.get("hidden_users") or []
         data = []
         for row in res:
+            # 过滤隐藏用户
             if row['UserId'] in hidden: continue
             u = dict(row)
             u['UserName'] = user_map.get(u['UserId'], f"User {str(u['UserId'])[:5]}")
             data.append(u)
-            if len(data) >= 5: break
+            if len(data) >= 5: break # 首页榜单只展示前 5 名
+            
         return {"status": "success", "data": data}
     except Exception as e: 
-        return {"status": "success", "data": []}
-
+        print(f"Top Users API Error: {e}")
+        return {"status": "error", "data": []}
 @router.get("/api/stats/badges")
 def api_badges(user_id: Optional[str] = None):
     try:

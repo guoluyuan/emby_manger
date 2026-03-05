@@ -8,7 +8,7 @@
     .bento-card:active { transform: scale(0.97); }
     .bento-active { border-color: #6366f1 !important; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important; background-color: rgba(99, 102, 241, 0.05) !important; }
     .dark .bento-active { border-color: #818cf8 !important; background-color: rgba(99, 102, 241, 0.1) !important; }
-    .energy-bar { height: 4px; border-radius: 2px; transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+    .energy-bar { height: 4px; border-radius: 2px; transition: width 1s ease-out; }
     
     .modal-enter { animation: modalEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     @keyframes modalEnter {
@@ -29,7 +29,7 @@
             <div>
                 <div class="flex items-center gap-2">
                     <h1 class="text-xl font-black text-gray-900 dark:text-white">全景画质盘点</h1>
-                    <span class="text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800 shadow-sm" id="total-count-badge">总计: 0 部</span>
+                    <span class="text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800/50 shadow-sm" id="total-count-badge">总计: 0 部</span>
                 </div>
                 <p class="text-xs text-gray-500 mt-0.5" id="scan-time">点击卡片切换视图，探索媒体库质量</p>
             </div>
@@ -55,6 +55,7 @@
             <h3 class="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2 uppercase tracking-wide">
                 <i class="fa-solid fa-expand text-blue-500"></i> 分辨率矩阵
             </h3>
+            
             <div class="grid grid-cols-2 gap-3 md:gap-4">
                 <div class="bento-card bento-active border border-gray-200 dark:border-gray-700 rounded-2xl p-4 relative overflow-hidden" onclick="switchView('4k', this)">
                     <div class="absolute -right-4 -top-4 opacity-[0.03] dark:opacity-10 pointer-events-none"><i class="fa-solid fa-tv text-8xl"></i></div>
@@ -87,6 +88,7 @@
             <h3 class="text-sm font-black text-gray-800 dark:text-gray-100 mb-4 flex items-center gap-2 uppercase tracking-wide">
                 <i class="fa-solid fa-eye text-purple-500"></i> 光影与动态范围
             </h3>
+            
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 h-[calc(100%-2rem)] pb-1.5">
                 <div class="bento-card border border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50/50 to-fuchsia-50/50 dark:from-purple-900/20 dark:to-fuchsia-900/20 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between" onclick="switchView('dolby_vision', this)">
                     <div class="absolute -right-2 top-2 opacity-10 pointer-events-none"><i class="fa-solid fa-certificate text-6xl text-purple-500"></i></div>
@@ -137,7 +139,8 @@
                 <span class="text-xs font-mono font-bold text-gray-500 bg-white dark:bg-gray-900 px-3 py-1 rounded-md shadow-sm border border-gray-200 dark:border-gray-700" id="list-count">0 部</span>
             </div>
         </div>
-        <div id="movie-list" class="divide-y divide-gray-100 dark:divide-gray-700/50 max-h-[600px] overflow-y-auto custom-scrollbar p-2"></div>
+        <div id="movie-list" class="divide-y divide-gray-100 dark:divide-gray-700/50 max-h-[600px] overflow-y-auto custom-scrollbar p-2">
+        </div>
     </div>
 </div>
 
@@ -159,7 +162,9 @@
             </button>
         </div>
         
-        <div class="flex-1 overflow-y-auto custom-scrollbar p-2" id="ignore-list-content"></div>
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-2" id="ignore-list-content">
+            <div class="text-center py-20 text-gray-400 text-sm">回收站是空的</div>
+        </div>
     </div>
 </div>
 
@@ -212,7 +217,6 @@
         }
     }
 
-    // 🏆 局部刷新重算计数核心逻辑 (毫秒级 UI 变化，不再重新请求 Emby)
     function updateStatCounts() {
         const d = globalMoviesData;
         document.getElementById('stat-4k').innerHTML = `${d['4k'].length} <span class="text-xs text-gray-400 font-normal pb-1.5">部</span>`;
@@ -233,7 +237,6 @@
         }, 50);
     }
 
-    // 🚀 在前端直接抹除忽略掉的元素
     function removeLocalItem(id) {
         for (let key in globalMoviesData) {
             globalMoviesData[key] = globalMoviesData[key].filter(m => m.Id !== id);
@@ -329,23 +332,25 @@
         }
     }
 
-    // 💥 批量忽略：秒级响应，本地剔除！
+    // 🔥 真正的原子级极速批量发送
     async function batchIgnore() {
         if(selectedListView.size === 0) return;
         const btn = document.getElementById('batch-ignore-btn');
-        btn.innerText = '执行中...';
+        btn.innerText = '写入数据库中...';
         btn.disabled = true;
         
         try {
-            const promises = Array.from(selectedListView).map(item => 
-                fetch('/api/insight/ignore', {
-                    method: 'POST', headers:{'Content-Type': 'application/json'},
-                    body: JSON.stringify({item_id: item.id, item_name: item.name})
-                })
-            );
-            await Promise.all(promises);
+            // 将 Set 转为后端需要的数组格式
+            const payload = Array.from(selectedListView).map(i => ({item_id: i.id, item_name: i.name}));
             
-            // 🔥 后端写完数据库后，前端直接本地抹除，无需长达几十秒的重扫
+            // 一次性发给后端，告别并发锁死
+            await fetch('/api/insight/ignore_batch', {
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ items: payload })
+            });
+            
+            // 写入完成后，前端瞬间抹除本地数据
             selectedListView.forEach(item => removeLocalItem(item.id));
             
             selectedListView.clear();
@@ -418,7 +423,6 @@
         }
     }
 
-    // ⚡ 批量恢复：也是瞬间完成
     async function batchRestore() {
         if(selectedIgnores.size === 0) return;
         const btn = document.getElementById('btn-restore');
@@ -430,8 +434,6 @@
             });
             selectedIgnores.clear();
             document.getElementById('select-all-ignores').checked = false;
-            
-            // 这里传 false 代表读取后端缓存重新比对，毫秒级完成，不用扫描 Emby！
             await loadQualityData(false);  
             closeIgnoreModal();
         } catch(e){}

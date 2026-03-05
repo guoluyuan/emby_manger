@@ -17,14 +17,19 @@ CACHE_EXPIRE_SECONDS = 86400
 
 def get_emby_auth(): return cfg.get("emby_host"), cfg.get("emby_api_key")
 
+# 数据模型定义
 class IgnoreModel(BaseModel):
     item_id: str
     item_name: str
 
+class BatchIgnoreModel(BaseModel):
+    items: list[IgnoreModel]
+
 class BatchUnignoreModel(BaseModel):
     item_ids: list[str]
 
-# --- 忽略操作 (不再粗暴清理缓存，前端负责局部刷新) ---
+
+# --- 单条忽略 ---
 @router.post("/api/insight/ignore")
 def ignore_item(data: IgnoreModel, request: Request):
     if not request.session.get("user"): return {"status": "error"}
@@ -37,6 +42,22 @@ def ignore_item(data: IgnoreModel, request: Request):
         return {"status": "success"}
     except Exception as e: return {"status": "error", "message": str(e)}
 
+# --- 🔥 新增：批量原子忽略 (彻底解决并发锁死问题) ---
+@router.post("/api/insight/ignore_batch")
+def ignore_items_batch(data: BatchIgnoreModel, request: Request):
+    if not request.session.get("user"): return {"status": "error"}
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        # 组装数据，使用 executemany 极速写入
+        records = [(item.item_id, item.item_name) for item in data.items]
+        c.executemany("INSERT OR REPLACE INTO insight_ignores (item_id, item_name) VALUES (?, ?)", records)
+        conn.commit()
+        conn.close()
+        return {"status": "success"}
+    except Exception as e: return {"status": "error", "message": str(e)}
+
+# --- 批量恢复 ---
 @router.post("/api/insight/unignore_batch")
 def unignore_items_batch(data: BatchUnignoreModel, request: Request):
     if not request.session.get("user"): return {"status": "error"}
@@ -65,7 +86,7 @@ def scan_library_quality(request: Request):
     force_refresh = request.query_params.get("force_refresh") == "true"
     current_time = time.time()
     
-    # 🔥 核心提速逻辑：动态剔除忽略名单，不改变“全服真实总数”
+    # 核心提速逻辑：动态剔除忽略名单
     def get_filtered_stats(stats):
         ignore_rows = query_db("SELECT item_id FROM insight_ignores")
         ignore_set = {r['item_id'] for r in ignore_rows} if ignore_rows else set()
@@ -73,7 +94,7 @@ def scan_library_quality(request: Request):
         if not ignore_set: return stats
         
         new_stats = {
-            "total_count": stats["total_count"], # 真实总数不受忽略影响
+            "total_count": stats["total_count"], 
             "scan_time_str": stats["scan_time_str"],
             "movies": {}
         }
@@ -81,7 +102,7 @@ def scan_library_quality(request: Request):
             new_stats["movies"][k] = [m for m in v if m["Id"] not in ignore_set]
         return new_stats
 
-    # 🚀 命中缓存，毫秒级返回
+    # 命中缓存
     if not force_refresh and GLOBAL_CACHE["quality_stats"] and (current_time - GLOBAL_CACHE["last_scan_time"] < CACHE_EXPIRE_SECONDS):
         return {"status": "success", "data": get_filtered_stats(GLOBAL_CACHE["quality_stats"])}
 
@@ -119,7 +140,7 @@ def scan_library_quality(request: Request):
             width = video_stream.get('Width', 0)
             height = video_stream.get('Height', 0)
             
-            # 🔥 自动过滤没有分辨率的幽灵影片
+            # 自动过滤没有分辨率的幽灵影片
             if width == 0 or height == 0: continue
 
             movie_obj = {
@@ -148,11 +169,9 @@ def scan_library_quality(request: Request):
             elif "hdr" in video_range or "hdr" in display_title or "pq" in video_range: stats["movies"]["hdr10"].append(movie_obj)
             else: stats["movies"]["sdr"].append(movie_obj)
 
-        # 全量存入缓存，不包含忽略信息
         GLOBAL_CACHE["quality_stats"] = stats
         GLOBAL_CACHE["last_scan_time"] = current_time
         
-        # 返回前过滤掉已经被忽略的项
         return {"status": "success", "data": get_filtered_stats(stats)}
 
     except Exception as e:
