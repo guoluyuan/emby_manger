@@ -60,6 +60,14 @@ def ensure_db_schema():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    
+    # 🔥 自动升级数据库：为报错表增加封面存储字段
+    c.execute("PRAGMA table_info(media_feedback)")
+    feed_cols = [col[1] for col in c.fetchall()]
+    if 'poster_path' not in feed_cols:
+        try: c.execute("ALTER TABLE media_feedback ADD COLUMN poster_path TEXT")
+        except: pass
+
     conn.commit()
     conn.close()
 
@@ -121,10 +129,12 @@ class BulkAdminActionModel(BaseModel):
 class RequestLoginModel(BaseModel):
     username: str; password: str
 
+# 🔥 报错接口接收模型增加封面字段
 class FeedbackSubmitModel(BaseModel):
     item_name: str
     issue_type: str
     description: Optional[str] = ""
+    poster_path: Optional[str] = ""
 
 class FeedbackActionModel(BaseModel):
     id: int
@@ -335,30 +345,23 @@ def manage_request_action(data: AdminActionModel, request: Request):
     return batch_manage_action(BulkAdminActionModel(items=[{"tmdb_id": data.tmdb_id, "season": data.season}], action=data.action, reject_reason=data.reject_reason), request)
 
 
-# ================= 🔥 完美修复：后台铃铛与悬浮通知核心引擎 =================
+# ================= 🔥 铃铛通知引擎 =================
 @router.get("/api/requests/pending_notify")
 def get_pending_notify(request: Request):
     if not request.session.get("user"): return {"status": "error"}
     try:
         conn = sqlite3.connect(DB_PATH); conn.row_factory = sqlite3.Row; c = conn.cursor()
         
-        # 1. 获取新求片
         c.execute("SELECT COUNT(*) as cnt FROM media_requests WHERE status = 0")
         req_count = (c.fetchone() or {'cnt': 0})['cnt']
-        
         c.execute("SELECT m.tmdb_id, m.media_type, m.title, m.poster_path, m.season, m.created_at, GROUP_CONCAT(COALESCE(r.username, '未知用户'), ', ') as users FROM media_requests m LEFT JOIN request_users r ON m.tmdb_id = r.tmdb_id AND m.season = r.season WHERE m.status = 0 GROUP BY m.tmdb_id, m.season ORDER BY m.created_at DESC LIMIT 5")
         req_rows = c.fetchall()
 
-        # 2. 获取新报错反馈 (智能提取海报)
         c.execute("SELECT COUNT(*) as cnt FROM media_feedback WHERE status = 0")
         feed_count = (c.fetchone() or {'cnt': 0})['cnt']
         
-        c.execute("""
-            SELECT f.id, f.item_name, f.username, f.issue_type, f.created_at,
-                   (SELECT poster_path FROM media_requests m WHERE m.title = f.item_name LIMIT 1) as poster
-            FROM media_feedback f 
-            WHERE f.status = 0 ORDER BY f.created_at DESC LIMIT 5
-        """)
+        # 🔥 现在直接取反馈表里的 poster_path
+        c.execute("SELECT id, item_name, username, issue_type, created_at, poster_path FROM media_feedback WHERE status = 0 ORDER BY created_at DESC LIMIT 5")
         feed_rows = c.fetchall()
         
         conn.close()
@@ -378,7 +381,7 @@ def get_pending_notify(request: Request):
             items.append({
                 "id": f"feed_{f['id']}",
                 "title": f"⚠️ 报错: {f['item_name']}",
-                "poster": f['poster'] or "", # 如果没找到海报则留空
+                "poster": f['poster_path'] or "", # 带有图片
                 "users": f"{f['username']} - {f['issue_type']}",
                 "time": f['created_at'],
                 "type": "feedback"
@@ -397,8 +400,9 @@ def submit_feedback(data: FeedbackSubmitModel, request: Request):
     uid = str(user.get("Id", "")); uname = user.get("Name") or "未知用户"
     
     conn = sqlite3.connect(DB_PATH); c = conn.cursor()
-    c.execute("INSERT INTO media_feedback (item_name, user_id, username, issue_type, description) VALUES (?, ?, ?, ?, ?)",
-              (data.item_name, uid, uname, data.issue_type, data.description))
+    # 🔥 保存海报到数据库
+    c.execute("INSERT INTO media_feedback (item_name, user_id, username, issue_type, description, poster_path) VALUES (?, ?, ?, ?, ?, ?)",
+              (data.item_name, uid, uname, data.issue_type, data.description, data.poster_path))
     feed_id = c.lastrowid
     conn.commit(); conn.close()
     
@@ -415,7 +419,10 @@ def submit_feedback(data: FeedbackSubmitModel, request: Request):
         [{"text": "❌ 暂不处理(忽略)", "callback_data": f"feed_reject_{feed_id}"},
          {"text": "💻 网页处理", "url": f"{admin_url}/requests_admin"}]
     ]}
-    bot.send_message("sys_notify", msg, reply_markup=keyboard, platform="all")
+    
+    # 用机器人推送反馈时顺带带上图
+    img_url = data.poster_path or REPORT_COVER_URL
+    bot.send_photo("sys_notify", img_url, msg, reply_markup=keyboard, platform="all")
     return {"status": "success", "message": "反馈已提交，感谢您的协助！"}
 
 @router.get("/api/requests/feedback/my")

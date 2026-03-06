@@ -31,7 +31,6 @@
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;500;700;900&display=swap');
         body { font-family: 'Noto Sans SC', sans-serif; }
         
-        /* 侧边栏高亮样式 - 绿色风格 */
         .nav-item.active { background-color: #f0fdf4; color: #15803d; border-right: 3px solid #15803d; font-weight: 700; }
         html.dark .nav-item.active { background-color: rgba(21, 128, 61, 0.2); color: #4ade80; border-right-color: #4ade80; }
         
@@ -45,7 +44,7 @@
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-        /* 通知中心下拉面板动画 */
+        /* 通知中心动画 */
         #notify-panel {
             transform-origin: top right;
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -100,7 +99,7 @@
                 <i class="fa-solid fa-chart-pie w-6"></i> <span class="ml-2">质量盘点</span>
             </a>
             <a href="/requests_admin" class="nav-item flex items-center px-4 py-3 rounded-lg transition hover:bg-gray-50 dark:hover:bg-gray-800 {% if active_page == 'requests_admin' %}active{% else %}text-gray-500 dark:text-gray-400{% endif %}">
-                <i class="fa-solid fa-clapperboard w-6"></i> <span class="ml-2">资源工单</span>
+                <i class="fa-solid fa-clapperboard w-6"></i> <span class="ml-2">工单大厅</span>
             </a>
             <a href="/calendar" class="nav-item flex items-center px-4 py-3 rounded-lg transition hover:bg-gray-50 dark:hover:bg-gray-800 {% if active_page == 'calendar' %}active{% else %}text-gray-500 dark:text-gray-400{% endif %}">
                 <i class="fa-solid fa-calendar-days w-6"></i> <span class="ml-2">追剧日历</span>
@@ -134,7 +133,7 @@
                 <div class="flex gap-2 relative">
                     <button onclick="toggleNotifyDropdown()" class="notify-bell-btn relative text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800" title="工单中心">
                         <i class="fa-regular fa-bell"></i>
-                        <span id="notify-badge-desktop" class="hidden absolute top-[2px] right-[2px] h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-900 shadow-sm animate-pulse"></span>
+                        <span id="notify-badge-desktop" class="hidden absolute top-[2px] right-[2px] h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-800 shadow-sm animate-pulse"></span>
                     </button>
 
                     <div id="notify-panel" class="notify-closed absolute bottom-full left-full md:bottom-12 md:left-full mb-2 ml-2 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.5)] border border-gray-100 dark:border-gray-700 overflow-hidden z-[100]">
@@ -181,7 +180,7 @@
             <a href="/bot" class="nav-item flex items-center px-4 py-3 rounded-lg transition hover:bg-gray-50 dark:hover:bg-gray-800 {% if active_page == 'bot' %}active{% else %}text-gray-500 dark:text-gray-400{% endif %}"><i class="fa-solid fa-robot w-6"></i> <span class="ml-2">机器人助手</span></a>
             <a href="/users_manage" class="nav-item flex items-center px-4 py-3 rounded-lg transition hover:bg-gray-50 dark:hover:bg-gray-800 {% if active_page == 'users' %}active{% else %}text-gray-500 dark:text-gray-400{% endif %}"><i class="fa-solid fa-users-gear w-6"></i> <span class="ml-2">用户管理</span></a>
             <a href="/clients" class="nav-item flex items-center px-4 py-3 rounded-lg transition hover:bg-gray-50 dark:hover:bg-gray-800 {% if active_page == 'clients' %}active{% else %}text-gray-500 dark:text-gray-400{% endif %}"><i class="fa-solid fa-desktop w-6"></i> <span class="ml-2">客户端管控</span></a>
-            <a href="/requests_admin" class="nav-item flex items-center px-4 py-3 rounded-lg transition hover:bg-gray-50 dark:hover:bg-gray-800 {% if active_page == 'requests_admin' %}active{% else %}text-gray-500 dark:text-gray-400{% endif %}"><i class="fa-solid fa-clapperboard w-6"></i> <span class="ml-2">资源工单</span></a>
+            <a href="/requests_admin" class="nav-item flex items-center px-4 py-3 rounded-lg transition hover:bg-gray-50 dark:hover:bg-gray-800 {% if active_page == 'requests_admin' %}active{% else %}text-gray-500 dark:text-gray-400{% endif %}"><i class="fa-solid fa-clapperboard w-6"></i> <span class="ml-2">工单大厅</span></a>
             <a href="/insight" class="nav-item flex items-center px-4 py-3 rounded-lg transition hover:bg-gray-50 dark:hover:bg-gray-800 {% if active_page == 'insight' %}active{% else %}text-gray-500 dark:text-gray-400{% endif %}"><i class="fa-solid fa-chart-pie w-6"></i> <span class="ml-2">质量盘点</span></a>
             <a href="/calendar" class="nav-item flex items-center px-4 py-3 rounded-lg transition hover:bg-gray-50 dark:hover:bg-gray-800 {% if active_page == 'calendar' %}active{% else %}text-gray-500 dark:text-gray-400{% endif %}"><i class="fa-solid fa-calendar-days w-6"></i> <span class="ml-2">追剧日历</span></a>
             <a href="/history" class="nav-item flex items-center px-4 py-3 rounded-lg transition hover:bg-gray-50 dark:hover:bg-gray-800 {% if active_page == 'history' %}active{% else %}text-gray-500 dark:text-gray-400{% endif %}"><i class="fa-solid fa-clock-rotate-left w-6"></i> <span class="ml-2">播放历史</span></a>
@@ -202,7 +201,7 @@
     </aside>
 
     <main class="flex-1 flex flex-col h-full overflow-hidden relative w-full">
-    <header class="h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center px-4 md:hidden shrink-0 justify-between z-30 sticky top-0 transition-colors duration-300">
+        <header class="h-14 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center px-4 md:hidden shrink-0 justify-between z-30 sticky top-0 transition-colors duration-300">
             <button onclick="toggleSidebar()" class="text-gray-600 dark:text-gray-300 p-2 -ml-2"><i class="fa-solid fa-bars text-xl"></i></button>
             <span class="font-bold text-gray-800 dark:text-white">EmbyPulse</span>
             <div class="flex items-center gap-1">
@@ -214,7 +213,7 @@
             </div>
         </header>
 
-        <div id="notify-panel-mobile" class="notify-closed fixed top-14 left-0 w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-xl z-[100] md:hidden">
+        <div id="notify-panel-mobile" class="fixed top-14 left-0 w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-xl z-[100] md:hidden hidden opacity-0 transition-opacity duration-200">
             <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/50">
                 <h3 class="font-bold text-sm text-gray-800 dark:text-gray-200">待处理工单</h3>
                 <span id="notify-count-text-mobile" class="text-[10px] font-bold bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 px-2 py-0.5 rounded-full">0 条</span>
@@ -287,7 +286,7 @@
         }
 
         // ==========================================
-        // 🌟 通知铃铛引擎 (合并了求片与反馈)
+        // 🌟 通知铃铛引擎 (完美修复版)
         // ==========================================
         let lastNotifyIds = [];
         let isNotifyPanelOpen = false;
@@ -306,13 +305,19 @@
             }
         }
         
+        // 修复手机端点击无反应的问题 (用 opacity 搭配 hidden 彻底解决)
         function toggleNotifyDropdownMobile() {
             const panel = document.getElementById('notify-panel-mobile');
             if (isNotifyPanelOpen) {
-                panel.classList.add('hidden');
+                panel.classList.remove('opacity-100');
+                panel.classList.add('opacity-0');
+                setTimeout(() => panel.classList.add('hidden'), 200);
                 isNotifyPanelOpen = false;
             } else {
                 panel.classList.remove('hidden');
+                void panel.offsetWidth; // trigger reflow
+                panel.classList.remove('opacity-0');
+                panel.classList.add('opacity-100');
                 isNotifyPanelOpen = true;
                 fetchPendingNotify(); 
             }
@@ -323,12 +328,17 @@
             const panelMob = document.getElementById('notify-panel-mobile');
             const bells = document.querySelectorAll('.notify-bell-btn');
             
-            if (isNotifyPanelOpen && !panelDesk.contains(e.target) && !panelMob.contains(e.target)) {
+            if (isNotifyPanelOpen && panelDesk && panelMob && !panelDesk.contains(e.target) && !panelMob.contains(e.target)) {
                 let clickedBell = false;
                 bells.forEach(b => { if (b.contains(e.target)) clickedBell = true; });
                 if (!clickedBell) {
-                    panelDesk.classList.add('notify-closed'); panelDesk.classList.remove('notify-open');
-                    panelMob.classList.add('hidden');
+                    panelDesk.classList.add('notify-closed'); 
+                    panelDesk.classList.remove('notify-open');
+                    
+                    panelMob.classList.remove('opacity-100');
+                    panelMob.classList.add('opacity-0');
+                    setTimeout(() => panelMob.classList.add('hidden'), 200);
+                    
                     isNotifyPanelOpen = false;
                 }
             }
@@ -388,7 +398,6 @@
             document.getElementById('notify-list').innerHTML = html;
             document.getElementById('notify-list-mobile').innerHTML = html;
             
-            // 触发全局气泡
             if (lastNotifyIds.length > 0) {
                 items.forEach(item => {
                     if (!lastNotifyIds.includes(item.id)) showGlobalToast(item);
@@ -403,8 +412,8 @@
             toast.className = "flex items-center gap-3 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl border border-gray-100 dark:border-gray-700 p-3 rounded-2xl shadow-2xl transform translate-x-full opacity-0 transition-all duration-500 pointer-events-auto w-[280px] md:w-80 cursor-pointer hover:scale-105";
             toast.onclick = () => { window.location.href = item.type === 'feedback' ? '/requests_admin?tab=feedback' : '/requests_admin'; };
             toast.innerHTML = `
-                <div class="w-10 h-10 rounded-full ${item.type === 'feedback' ? 'bg-rose-100 dark:bg-rose-900/50 text-rose-500' : 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-500'} flex items-center justify-center shrink-0 shadow-inner">
-                    <i class="fa-solid ${item.type === 'feedback' ? 'fa-triangle-exclamation' : 'fa-clapperboard'}"></i>
+                <div class="w-10 h-10 rounded-full ${item.type === 'feedback' ? 'bg-rose-100 dark:bg-rose-900/50 text-rose-500' : 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-500'} flex items-center justify-center shrink-0 shadow-inner overflow-hidden">
+                    ${item.poster ? `<img src="${item.poster}" class="w-full h-full object-cover">` : `<i class="fa-solid ${item.type === 'feedback' ? 'fa-triangle-exclamation' : 'fa-clapperboard'}"></i>`}
                 </div>
                 <div class="flex-1 min-w-0">
                     <div class="text-[10px] font-bold ${item.type === 'feedback' ? 'text-rose-500' : 'text-indigo-500'} mb-0.5">🔔 收到新的工单</div>
@@ -423,7 +432,6 @@
             }, 8000);
         }
 
-        // 初始化加载红点状态
         document.addEventListener('DOMContentLoaded', () => {
             setTimeout(fetchPendingNotify, 1000);
             setInterval(fetchPendingNotify, 30000);

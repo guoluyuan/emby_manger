@@ -410,7 +410,7 @@
                                         </div>
                                         <div class="flex items-center gap-2 shrink-0 ml-3">
                                             <div class="text-xs font-black text-brand-500 bg-brand-50 dark:bg-brand-500/10 px-2 py-1 rounded-lg border border-brand-100 dark:border-brand-500/20" x-text="Math.round(log.PlayDuration/60) + 'm'"></div>
-                                            <button @click="openFeedbackModal(log.ItemName)" class="w-8 h-8 rounded-full bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white dark:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500 dark:hover:text-white transition-colors flex items-center justify-center border border-rose-100 dark:border-rose-500/20 opacity-0 group-hover:opacity-100 sm:opacity-100" title="资源有问题？点此报错">
+                                            <button @click="openFeedbackModal(log.ItemName, `/api/proxy/smart_image?item_id=${log.ItemId}&type=Primary`)" class="w-8 h-8 rounded-full bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white dark:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500 dark:hover:text-white transition-colors flex items-center justify-center border border-rose-100 dark:border-rose-500/20 opacity-0 group-hover:opacity-100 sm:opacity-100" title="资源有问题？点此报错">
                                                 <i class="fa-solid fa-triangle-exclamation text-xs"></i>
                                             </button>
                                         </div>
@@ -426,7 +426,7 @@
             </div>
         </main>
 
-        <div class="fixed bottom-6 w-[90%] left-[5%] z-50 sm:hidden transition-all duration-300" :class="scrolled ? 'translate-y-2 scale-[0.98] shadow-2xl' : 'translate-y-0 scale-100'">
+        <div class="fixed bottom-6 w-[90%] left-[5%] z-50 sm:hidden transition-transform duration-300" :class="scrolled ? 'opacity-90 scale-95 shadow-2xl' : 'opacity-100 scale-100'">
             <div class="glass-panel rounded-full shadow-[0_15px_40px_rgba(0,0,0,0.15)] dark:shadow-[0_15px_40px_rgba(0,0,0,0.5)] border border-slate-200/80 dark:border-white/10 backdrop-blur-2xl px-2 py-2 flex justify-around items-center">
                 <button @click="switchTab('explore'); window.scrollTo({top:0, behavior:'smooth'})" class="flex flex-col items-center justify-center w-full space-y-1 transition-all relative" :class="currentTab === 'explore' ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400 dark:text-zinc-500'">
                     <div class="absolute inset-0 bg-brand-50 dark:bg-brand-500/20 rounded-full scale-0 transition-transform duration-300" :class="currentTab === 'explore' ? 'scale-100' : ''"></div>
@@ -521,7 +521,7 @@
                         <span x-show="!isSubmitting && !isCheckingLocal && !(activeItem?.local_status === 2 && activeItem?.media_type !== 'tv')">🚀 发送求片心愿</span>
                     </button>
                     <button x-show="!isCheckingLocal && activeItem?.local_status === 2 && activeItem?.media_type === 'movie'" 
-                            @click="openFeedbackModal(activeItem.title)" 
+                            @click="openFeedbackModal(activeItem.title, activeItem.poster_path)" 
                             class="px-6 py-4 rounded-2xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white font-bold transition-all shadow-md flex items-center justify-center">
                         <i class="fa-solid fa-triangle-exclamation text-xl"></i>
                     </button>
@@ -605,7 +605,8 @@
                 isLoadingSeasons: false, isCheckingLocal: false, selectedSeasons: [], isSubmitting: false,
                 toast: { show: false, message: '', type: 'success' },
 
-                feedbackModal: { open: false, itemName: '', issueType: '缺少字幕', desc: '' },
+                // 🔥 新增：海报传递
+                feedbackModal: { open: false, itemName: '', posterPath: '', issueType: '缺少字幕', desc: '' },
                 feedbackIssues: ['缺少字幕', '字幕错位', '视频卡顿/花屏', '清晰度太低', '音轨无声/音画不同步', '其他问题'],
                 isFeedbackSubmitting: false,
 
@@ -810,8 +811,10 @@
                     } catch (e) { this.showToast('提交失败，请重试', 'error'); } finally { this.isSubmitting = false; }
                 },
 
-                openFeedbackModal(itemName) {
+                // 🔥 新增海报传入功能
+                openFeedbackModal(itemName, posterPath = '') {
                     this.feedbackModal.itemName = itemName;
+                    this.feedbackModal.posterPath = posterPath;
                     this.feedbackModal.issueType = '缺少字幕';
                     this.feedbackModal.desc = '';
                     this.feedbackModal.open = true;
@@ -823,7 +826,8 @@
                     try {
                         const res = await fetch('/api/requests/feedback/submit', {
                             method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ item_name: this.feedbackModal.itemName, issue_type: this.feedbackModal.issueType, description: this.feedbackModal.desc })
+                            // 🔥 将海报一并发送给后台
+                            body: JSON.stringify({ item_name: this.feedbackModal.itemName, issue_type: this.feedbackModal.issueType, description: this.feedbackModal.desc, poster_path: this.feedbackModal.posterPath })
                         });
                         const data = await res.json();
                         if (data.status === 'success') {
