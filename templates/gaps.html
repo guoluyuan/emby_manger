@@ -2,7 +2,11 @@
 {% block title %}缺集管理 - EmbyPulse{% endblock %}
 
 {% block head %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <style>
+    /* 🔥 核心修复：在框架加载前，强制隐藏带有 x-cloak 的弹窗元素 */
+    [x-cloak] { display: none !important; }
+
     /* 深空雷达扫描动画 */
     @keyframes radar-spin {
         from { transform: rotate(0deg); }
