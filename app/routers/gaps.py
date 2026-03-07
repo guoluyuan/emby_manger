@@ -166,7 +166,7 @@ def get_progress():
                     if row: scan_state["results"] = json.loads(row[0]['result_json'])
                 except: pass
             
-            # 🔥 强制动态剥离：不管是从快照还是内存取出的数据，返回前统统过滤一遍数据库里的忽略名单
+            # 🔥 强制动态剥离：过滤数据库里的忽略名单
             try:
                 ignores = query_db("SELECT series_id FROM gap_records WHERE status=1 AND season_number=-1")
                 ignore_ids = set([r['series_id'] for r in ignores]) if ignores else set()
@@ -194,7 +194,7 @@ def ignore_gap(payload: dict):
         e_num = int(payload.get("episode_number", 0))
         query_db("INSERT INTO gap_records (series_id, series_name, season_number, episode_number, status) VALUES (?, ?, ?, ?, 1) ON CONFLICT(series_id, season_number, episode_number) DO UPDATE SET status = 1", (s_id, payload.get("series_name", ""), s_num, e_num))
         
-        # 🔥 内存同步：瞬间抹除被忽略的单集
+        # 内存同步：瞬间抹除被忽略的单集
         with state_lock:
             for s in scan_state["results"]:
                 if s.get("series_id") == s_id:
@@ -210,7 +210,7 @@ def ignore_entire_series(payload: dict):
         s_id = payload.get("series_id")
         query_db("INSERT INTO gap_records (series_id, series_name, season_number, episode_number, status) VALUES (?, ?, -1, -1, 1) ON CONFLICT(series_id, season_number, episode_number) DO UPDATE SET status = 1", (s_id, payload.get("series_name", "")))
         
-        # 🔥 内存同步：瞬间抹除整部剧
+        # 内存同步：瞬间抹除整部剧
         with state_lock:
             scan_state["results"] = [s for s in scan_state["results"] if s.get("series_id") != s_id]
             
@@ -243,12 +243,11 @@ def unignore_item(payload: dict):
 
 
 # ==========================================
-# 🔥 拆除 422 安检门：改用万能字典 payload: dict 接收参数
+# 🔥 万能字典接口，规避 422
 # ==========================================
 
 @router.post("/search_mp")
 def search_mp_for_gap(payload: dict):
-    # 手动提取参数
     series_id = payload.get("series_id")
     series_name = payload.get("series_name")
     season = payload.get("season")
@@ -354,7 +353,6 @@ def search_mp_for_gap(payload: dict):
 
 @router.post("/download")
 def download_gap_item(payload: dict):
-    # 手动提取参数，避开 FastAPI 的 422 报错
     series_id = payload.get("series_id")
     series_name = payload.get("series_name")
     tmdbid = payload.get("tmdbid")
@@ -362,13 +360,14 @@ def download_gap_item(payload: dict):
     episodes = payload.get("episodes", [])
     torrent_info = payload.get("torrent_info", {})
 
-    print(f"\n[缺集推送] 收到前端发来的原始请求: {json.dumps(payload, ensure_ascii=False)[:300]}...\n")
+    print(f"\n[缺集推送] 收到前端完好无损的原始请求: {json.dumps(payload, ensure_ascii=False)[:300]}...\n")
 
     mp_url = cfg.get("moviepilot_url")
     mp_token = cfg.get("moviepilot_token")
     clean_token = mp_token.strip().strip("'\"") if mp_token else ""
     headers = {"X-API-KEY": clean_token, "Content-Type": "application/json"}
     
+    # 这一刻 torrent_info 绝对是一个完美的字典，再也不会报 get 错误了
     pure_torrent_in = torrent_info.get("org_payload", torrent_info)
     
     if torrent_info.get("is_pack", False) or len(episodes) > 1:
@@ -380,14 +379,13 @@ def download_gap_item(payload: dict):
         try: mp_payload["tmdbid"] = int(tmdbid)
         except: pass
 
-    print(f"[缺集推送] 即将发往 MP /add 接口的脱水字典: {json.dumps(mp_payload, ensure_ascii=False)}\n")
+    print(f"[缺集推送] 发往 MP 的提纯字典: {json.dumps(mp_payload, ensure_ascii=False)}\n")
 
     try:
         add_url = f"{mp_url.rstrip('/')}/api/v1/download/add"
         res = requests.post(add_url, headers=headers, json=mp_payload, timeout=10)
         
         if res.status_code in [200, 201]:
-            # MP 如果返回 JSON 且带 success=False，说明它底层被拒了
             try:
                 res_data = res.json()
                 if res_data.get("success") == False:
@@ -397,7 +395,6 @@ def download_gap_item(payload: dict):
             for ep in episodes:
                 query_db("INSERT INTO gap_records (series_id, series_name, season_number, episode_number, status) VALUES (?, ?, ?, ?, 2) ON CONFLICT(series_id, season_number, episode_number) DO UPDATE SET status = 2", (series_id, series_name, int(season), int(ep)))
             
-            # 内存同步：将被点蓝的集数状态同步给全局内存
             with state_lock:
                 for s in scan_state["results"]:
                     if s.get("series_id") == series_id:

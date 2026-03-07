@@ -28,7 +28,7 @@
             </div>
             <div>
                 <h2 class="text-lg sm:text-xl font-black text-gray-900 dark:text-white tracking-tight">媒体库光谱扫描</h2>
-                <p class="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5">无感知强校验绕过机制已启动</p>
+                <p class="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5">防卡顿分页引擎与无损载荷传输已激活</p>
             </div>
         </div>
 
@@ -195,15 +195,16 @@
                     <div class="text-[10px] font-black text-gray-400 dark:text-gray-500 tracking-widest uppercase mb-3 flex items-center gap-2">MoviePilot 匹配舱 <i x-show="resolver.isLoading" class="fa-solid fa-circle-notch fa-spin text-indigo-500"></i></div>
                     <div x-show="resolver.isLoading" class="space-y-3"><div class="h-14 w-full bg-gray-50 dark:bg-gray-700/50 rounded-xl animate-pulse"></div></div>
                     <div x-show="!resolver.isLoading && resolver.results.length > 0" class="space-y-2.5">
+                        
                         <template x-for="(res, index) in resolver.results" :key="index">
-                            <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50" :class="resolver.selectedTorrent === res ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-500/10 shadow-sm' : 'border-gray-200 dark:border-gray-700'">
-                                <input type="radio" :value="res" x-model="resolver.selectedTorrent" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 dark:bg-gray-800">
+                            <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50" :class="resolver.selectedIndex === index ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-500/10 shadow-sm' : 'border-gray-200 dark:border-gray-700'">
+                                <input type="radio" :value="index" x-model="resolver.selectedIndex" class="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 dark:bg-gray-800">
                                 <div class="flex-1 min-w-0">
                                     <div class="font-bold text-xs sm:text-sm text-gray-900 dark:text-white truncate" x-text="res.ui_title"></div>
                                     
                                     <template x-if="res.is_pack">
                                         <div class="mt-1 mb-0.5 inline-block text-[9px] px-1.5 py-0.5 rounded font-black border bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/30">
-                                            📦 包含目标集的整季包 (将向 MP 自动注射手术刀提取指令)
+                                            📦 包含目标集的整季包 (将自动向 MP 注射提取指令)
                                         </div>
                                     </template>
 
@@ -216,15 +217,16 @@
                                 </div>
                             </label>
                         </template>
+
                     </div>
-                    <div x-show="!resolver.isLoading && resolver.results.length === 0" class="text-center py-10"><i class="fa-solid fa-ghost text-4xl text-gray-200 dark:text-gray-700 mb-3 block"></i><p class="text-xs font-bold text-gray-400 mt-2">未捕获到符合条件的资源星尘</p></div>
+                    <div x-show="!resolver.isLoading && resolver.results.length === 0" class="text-center py-10"><i class="fa-solid fa-ghost text-4xl text-gray-200 dark:text-gray-700 mb-3 block"></i><p class="text-xs font-bold text-gray-400 mt-2">未捕获到符合该集的资源星尘</p></div>
                 </div>
             </div>
             <div class="p-4 sm:p-5 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 flex gap-3 pb-[env(safe-area-inset-bottom)]">
                 <button x-show="resolver.targetType === 'single'" @click="ignoreGap()" class="px-4 py-2.5 rounded-xl text-sm font-bold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600 transition shadow-sm flex items-center justify-center gap-2"><i class="fa-solid fa-eye-slash"></i> <span class="hidden sm:inline">忽略单集</span></button>
-                <button @click="sendToMP()" :disabled="!resolver.selectedTorrent || resolver.isSubmitting" class="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" :class="resolver.selectedTorrent ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-400 dark:bg-gray-600 shadow-none'">
+                <button @click="sendToMP()" :disabled="resolver.selectedIndex === null || resolver.isSubmitting" class="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" :class="resolver.selectedIndex !== null ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-400 dark:bg-gray-600 shadow-none'">
                     <span x-show="resolver.isSubmitting" class="animate-spin w-4 h-4 border-2 border-white/30 border-t-white dark:border-black/30 dark:border-t-black rounded-full"></span>
-                    <span x-show="!resolver.isSubmitting">提交 MP 下载</span>
+                    <span x-show="!resolver.isSubmitting">提交 MP 免填单</span>
                 </button>
             </div>
         </div>
@@ -251,9 +253,11 @@ document.addEventListener('alpine:init', () => {
         isScanning: false, hasScanned: false, autoScan: false,
         scanProgress: 0, scanTotal: 0, scanItem: '等待启航...',
         pollInterval: null, gapData: [],
-        displayLimit: 24,
+        displayLimit: 24, 
         ignoreModal: { open: false, items: [] },
-        resolver: { open: false, isLoading: false, isSubmitting: false, tmdbId: null, seriesId: '', seriesName: '', season: 0, episodes: [], targetDesc: '', targetType: 'single', genes: [], results: [], selectedTorrent: null, sourceEpObj: null, sourceEpsArray: [] },
+        
+        // 🔥 将 selectedTorrent 替换为安全的 selectedIndex
+        resolver: { open: false, isLoading: false, isSubmitting: false, tmdbId: null, seriesId: '', seriesName: '', season: 0, episodes: [], targetDesc: '', targetType: 'single', genes: [], results: [], selectedIndex: null, sourceEpObj: null, sourceEpsArray: [] },
 
         init() { this.checkStatus(); this.fetchAutoScan(); },
 
@@ -361,14 +365,14 @@ document.addEventListener('alpine:init', () => {
             this.resolver.seriesId = series.series_id; this.resolver.seriesName = series.series_name; this.resolver.season = ep.season; 
             this.resolver.episodes = [ep.episode]; 
             this.resolver.targetDesc = `${series.series_name} S${String(ep.season).padStart(2,'0')}E${String(ep.episode).padStart(2,'0')}`;
-            this.resolver.genes = []; this.resolver.results = []; this.resolver.selectedTorrent = null; this.resolver.sourceEpObj = ep; 
+            this.resolver.genes = []; this.resolver.results = []; this.resolver.selectedIndex = null; this.resolver.sourceEpObj = ep; 
             
             try {
                 const res = await fetch('/api/gaps/search_mp', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ series_id: series.series_id, series_name: series.series_name, season: ep.season, episodes: [ep.episode] }) });
                 const data = await res.json();
                 if (data.status === 'success') {
                     this.resolver.genes = data.data.genes; this.resolver.results = data.data.results;
-                    if(this.resolver.results.length > 0) this.resolver.selectedTorrent = this.resolver.results[0]; 
+                    if(this.resolver.results.length > 0) this.resolver.selectedIndex = 0; // 默认选中第一个索引
                 } else { alert(data.message); }
             } catch(e) { alert('网络请求异常'); }
             this.resolver.isLoading = false;
@@ -383,14 +387,14 @@ document.addEventListener('alpine:init', () => {
             this.resolver.seriesId = series.series_id; this.resolver.seriesName = series.series_name; this.resolver.season = season_num; 
             this.resolver.episodes = missingEps; 
             this.resolver.targetDesc = `${series.series_name} S${String(season_num).padStart(2,'0')} 批量提取 [${missingEps.join(', ')}]`;
-            this.resolver.genes = []; this.resolver.results = []; this.resolver.selectedTorrent = null; this.resolver.sourceEpsArray = epsArray; 
+            this.resolver.genes = []; this.resolver.results = []; this.resolver.selectedIndex = null; this.resolver.sourceEpsArray = epsArray; 
             
             try {
                 const res = await fetch('/api/gaps/search_mp', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ series_id: series.series_id, series_name: series.series_name, season: season_num, episodes: missingEps }) });
                 const data = await res.json();
                 if (data.status === 'success') {
                     this.resolver.genes = data.data.genes; this.resolver.results = data.data.results;
-                    if(this.resolver.results.length > 0) this.resolver.selectedTorrent = this.resolver.results[0]; 
+                    if(this.resolver.results.length > 0) this.resolver.selectedIndex = 0; 
                 } else { alert(data.message); }
             } catch(e) { alert('网络请求异常'); }
             this.resolver.isLoading = false;
@@ -399,7 +403,11 @@ document.addEventListener('alpine:init', () => {
         closeResolver() { this.resolver.open = false; },
 
         async sendToMP() {
-            if(!this.resolver.selectedTorrent) return;
+            if(this.resolver.selectedIndex === null) return;
+            
+            // 🔥 绝杀动作：从数组里安全地把那个完美字典对象取出来，告别 [object Object]！
+            const perfectTorrentObject = this.resolver.results[this.resolver.selectedIndex];
+            
             this.resolver.isSubmitting = true;
             try {
                 const res = await fetch('/api/gaps/download', { 
@@ -411,7 +419,7 @@ document.addEventListener('alpine:init', () => {
                         tmdbid: this.resolver.tmdbId,
                         season: this.resolver.season, 
                         episodes: this.resolver.episodes, 
-                        torrent_info: this.resolver.selectedTorrent 
+                        torrent_info: perfectTorrentObject // 完美的字典流入后端！
                     }) 
                 });
                 const data = await res.json();
