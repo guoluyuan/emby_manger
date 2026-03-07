@@ -28,13 +28,13 @@
             </div>
             <div>
                 <h2 class="text-lg sm:text-xl font-black text-gray-900 dark:text-white tracking-tight">媒体库光谱扫描</h2>
-                <p class="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5">多线程并发引擎 (防卡顿预计算已开启)</p>
+                <p class="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5">防卡顿分页引擎已激活</p>
             </div>
         </div>
 
         <div class="flex flex-wrap md:flex-nowrap items-center gap-2 sm:gap-3 w-full md:w-auto shrink-0">
             <div class="w-full md:w-auto flex items-center gap-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 px-3 py-2 rounded-xl justify-between shadow-sm">
-                <span class="text-xs font-bold text-gray-600 dark:text-gray-400"><i class="fa-solid fa-clock mr-1"></i>自动巡检(3点)</span>
+                <span class="text-xs font-bold text-gray-600 dark:text-gray-400"><i class="fa-solid fa-clock mr-1"></i>自动巡检</span>
                 <label class="relative inline-flex items-center cursor-pointer shrink-0">
                     <input type="checkbox" x-model="autoScan" @change="toggleAutoScan()" class="sr-only peer">
                     <div class="w-8 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-gray-500 peer-checked:bg-indigo-500"></div>
@@ -70,12 +70,11 @@
     </div>
 
     <div x-show="!isScanning && gapData.length > 0" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 xl:gap-5" x-transition x-cloak>
-        <template x-for="series in gapData" :key="series.series_id">
+        <template x-for="series in displayedGaps" :key="series.series_id">
             <div class="relative rounded-2xl p-2.5 sm:p-3 shadow-sm border border-gray-100 dark:border-gray-700 transition-all duration-300 bg-white dark:bg-gray-800 overflow-hidden z-10 group hover:shadow-md hover:-translate-y-1">
                 <div :id="'tint-' + series.series_id" class="absolute inset-0 z-0 opacity-15 dark:opacity-20 pointer-events-none transition-colors duration-1000"></div>
 
                 <div class="relative z-10 flex gap-2.5 sm:gap-4 items-center w-full">
-                    
                     <a :href="series.emby_url" target="_blank" class="shrink-0 relative rounded-lg overflow-hidden shadow-sm aspect-[2/3] w-20 sm:w-24 block group/poster">
                         <img :src="series.poster" crossorigin="anonymous" loading="lazy" :data-color-done="false" :onload="`extractCardColor(this, 'tint-${series.series_id}')`" class="w-full h-full object-cover group-hover/poster:scale-105 transition-transform duration-500 bg-gray-100 dark:bg-gray-900">
                         <div class="absolute inset-0 bg-black/30 opacity-0 group-hover/poster:opacity-100 transition-opacity flex items-center justify-center">
@@ -127,6 +126,12 @@
                 </div>
             </div>
         </template>
+    </div>
+
+    <div x-show="!isScanning && displayLimit < gapData.length" class="text-center mt-8 pb-10" x-cloak>
+        <button @click="loadMore()" class="px-6 py-2.5 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold transition shadow-sm flex items-center justify-center gap-2 mx-auto">
+            <span>继续加载剩余 <span x-text="gapData.length - displayLimit" class="text-indigo-500"></span> 部剧集</span> <i class="fa-solid fa-angle-down"></i>
+        </button>
     </div>
 
     <div x-show="!isScanning && hasScanned && gapData.length === 0" class="text-center py-20 sm:py-32" x-cloak>
@@ -198,7 +203,7 @@
                                     
                                     <template x-if="res.is_pack">
                                         <div class="mt-1 mb-0.5 inline-block text-[9px] px-1.5 py-0.5 rounded font-black border bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/30">
-                                            📦 包含目标集的整季包 (将自动向 MP 注射手术刀提取指令)
+                                            📦 包含目标集的整季包 (将向 MP 注射手术刀提取指令)
                                         </div>
                                     </template>
 
@@ -216,10 +221,10 @@
                 </div>
             </div>
             <div class="p-4 sm:p-5 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/80 flex gap-3 pb-[env(safe-area-inset-bottom)]">
-                <button x-show="resolver.targetType === 'single'" @click="ignoreGap()" class="px-4 py-2.5 rounded-xl text-sm font-bold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600 transition shadow-sm flex items-center justify-center gap-2"><i class="fa-solid fa-eye-slash"></i> <span class="hidden sm:inline">忽略单集</span></button>
+                <button x-show="resolver.targetType === 'single'" @click="ignoreGap()" class="px-4 py-2.5 rounded-xl text-sm font-bold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-600 transition shadow-sm flex items-center justify-center gap-2"><i class="fa-solid fa-eye-slash"></i> <span class="hidden sm:inline">忽略</span></button>
                 <button @click="sendToMP()" :disabled="!resolver.selectedTorrent || resolver.isSubmitting" class="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" :class="resolver.selectedTorrent ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-400 dark:bg-gray-600 shadow-none'">
                     <span x-show="resolver.isSubmitting" class="animate-spin w-4 h-4 border-2 border-white/30 border-t-white dark:border-black/30 dark:border-t-black rounded-full"></span>
-                    <span x-show="!resolver.isSubmitting">提交 MP 引擎</span>
+                    <span x-show="!resolver.isSubmitting">提交 MP 下载</span>
                 </button>
             </div>
         </div>
@@ -227,7 +232,6 @@
 </div>
 
 <script>
-// 全局防抖取色器
 const globalColorThief = new ColorThief();
 window.extractCardColor = function(imgElement, tintId) {
     if (imgElement.complete && imgElement.getAttribute('data-color-done') !== 'true') {
@@ -247,10 +251,20 @@ document.addEventListener('alpine:init', () => {
         isScanning: false, hasScanned: false, autoScan: false,
         scanProgress: 0, scanTotal: 0, scanItem: '等待启航...',
         pollInterval: null, gapData: [],
+        displayLimit: 24, // 🔥 初始只渲染 24 个卡片，保护浏览器 DOM！
         ignoreModal: { open: false, items: [] },
-        resolver: { open: false, isLoading: false, isSubmitting: false, seriesId: '', seriesName: '', season: 0, episode: 0, episodes: [], targetDesc: '', targetType: 'single', genes: [], results: [], selectedTorrent: null, sourceEpObj: null, sourceEpsArray: [] },
+        resolver: { open: false, isLoading: false, isSubmitting: false, seriesId: '', seriesName: '', season: 0, episodes: [], targetDesc: '', targetType: 'single', genes: [], results: [], selectedTorrent: null, sourceEpObj: null, sourceEpsArray: [] },
 
         init() { this.checkStatus(); this.fetchAutoScan(); },
+
+        // 获取当前显示的卡片，配合防卡顿分页
+        get displayedGaps() {
+            return this.gapData.slice(0, this.displayLimit);
+        },
+
+        loadMore() {
+            this.displayLimit += 24;
+        },
 
         async fetchAutoScan() {
             try { const res = await fetch('/api/gaps/scan/auto_status'); const data = await res.json(); if (data.status === 'success') { this.autoScan = data.enabled; } } catch(e) {}
@@ -293,7 +307,7 @@ document.addEventListener('alpine:init', () => {
                         this.scanTotal = state.total; this.scanItem = state.current_item;
 
                         if (!this.isScanning) {
-                            clearInterval(this.pollInterval); this.hasScanned = true;
+                            clearInterval(this.pollInterval);
                             if (state.error) alert("扫描出错: " + state.error);
                             else this.mountData(state.results);
                         }
@@ -302,7 +316,7 @@ document.addEventListener('alpine:init', () => {
             }, 1000);
         },
 
-        // 🔥 核心防卡顿技术：数据加载时直接预计算出 grouped_gaps 数组，彻底摆脱模板函数调用！
+        // 🔥 核心重构：预先分组数据，禁止 HTML 模板循环调用函数，根治缩放死机！
         mountData(rawResults) {
             this.gapData = rawResults.map(series => {
                 const grouped = {};
@@ -312,9 +326,10 @@ document.addEventListener('alpine:init', () => {
                     grouped[s].sort((a,b) => a.episode - b.episode);
                     groupedArr.push({ season_num: s, episodes: grouped[s] });
                 }
-                series.grouped_gaps = groupedArr.sort((a,b) => a.season_num - b.season_num);
+                series.grouped_gaps = groupedArr.sort((a,b) => parseInt(a.season_num) - parseInt(b.season_num));
                 return series;
             });
+            this.displayLimit = 24; 
             this.hasScanned = true;
         },
 
@@ -350,12 +365,12 @@ document.addEventListener('alpine:init', () => {
             if (ep.status === 2) return; 
             this.resolver.open = true; this.resolver.isLoading = true; this.resolver.targetType = 'single';
             this.resolver.seriesId = series.series_id; this.resolver.seriesName = series.series_name; this.resolver.season = ep.season; 
-            this.resolver.episode = ep.episode; this.resolver.episodes = [ep.episode]; 
+            this.resolver.episodes = [ep.episode]; 
             this.resolver.targetDesc = `${series.series_name} S${String(ep.season).padStart(2,'0')}E${String(ep.episode).padStart(2,'0')}`;
             this.resolver.genes = []; this.resolver.results = []; this.resolver.selectedTorrent = null; this.resolver.sourceEpObj = ep; 
             
             try {
-                const res = await fetch('/api/gaps/search_mp', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ series_id: series.series_id, series_name: series.series_name, season: ep.season, episodes: [ep.episode], episode: ep.episode }) });
+                const res = await fetch('/api/gaps/search_mp', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ series_id: series.series_id, series_name: series.series_name, season: ep.season, episodes: [ep.episode] }) });
                 const data = await res.json();
                 if (data.status === 'success') {
                     this.resolver.genes = data.data.genes; this.resolver.results = data.data.results;
@@ -371,12 +386,12 @@ document.addEventListener('alpine:init', () => {
 
             this.resolver.open = true; this.resolver.isLoading = true; this.resolver.targetType = 'multi';
             this.resolver.seriesId = series.series_id; this.resolver.seriesName = series.series_name; this.resolver.season = season_num; 
-            this.resolver.episode = missingEps[0]; this.resolver.episodes = missingEps; 
+            this.resolver.episodes = missingEps; 
             this.resolver.targetDesc = `${series.series_name} S${String(season_num).padStart(2,'0')} 批量提取 [${missingEps.join(', ')}]`;
             this.resolver.genes = []; this.resolver.results = []; this.resolver.selectedTorrent = null; this.resolver.sourceEpsArray = epsArray; 
             
             try {
-                const res = await fetch('/api/gaps/search_mp', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ series_id: series.series_id, series_name: series.series_name, season: season_num, episodes: missingEps, episode: missingEps[0] }) });
+                const res = await fetch('/api/gaps/search_mp', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ series_id: series.series_id, series_name: series.series_name, season: season_num, episodes: missingEps }) });
                 const data = await res.json();
                 if (data.status === 'success') {
                     this.resolver.genes = data.data.genes; this.resolver.results = data.data.results;
@@ -392,7 +407,7 @@ document.addEventListener('alpine:init', () => {
             if(!this.resolver.selectedTorrent) return;
             this.resolver.isSubmitting = true;
             try {
-                const res = await fetch('/api/gaps/download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ series_id: this.resolver.seriesId, series_name: this.resolver.seriesName, season: this.resolver.season, episode: this.resolver.episode, episodes: this.resolver.episodes, torrent_info: this.resolver.selectedTorrent }) });
+                const res = await fetch('/api/gaps/download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ series_id: this.resolver.seriesId, series_name: this.resolver.seriesName, season: this.resolver.season, episodes: this.resolver.episodes, torrent_info: this.resolver.selectedTorrent }) });
                 const data = await res.json();
                 if (data.status === 'success') { 
                     if(this.resolver.targetType === 'single' && this.resolver.sourceEpObj) {
@@ -403,7 +418,7 @@ document.addEventListener('alpine:init', () => {
                         });
                     }
                     this.closeResolver(); 
-                    alert(data.message); // 成功提示
+                    alert(data.message);
                 } else { 
                     alert(data.message); 
                 }
@@ -413,7 +428,7 @@ document.addEventListener('alpine:init', () => {
 
         async ignoreGap() {
             try {
-                const res = await fetch('/api/gaps/ignore', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ series_id: this.resolver.seriesId, series_name: this.resolver.seriesName, season_number: this.resolver.season, episode_number: this.resolver.episode }) });
+                const res = await fetch('/api/gaps/ignore', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ series_id: this.resolver.seriesId, series_name: this.resolver.seriesName, season_number: this.resolver.season, episode_number: this.resolver.episodes[0] }) });
                 const data = await res.json();
                 if (data.status === 'success') { if (this.resolver.sourceEpObj) this.resolver.sourceEpObj.status = 1; this.closeResolver(); }
             } catch(e) {}

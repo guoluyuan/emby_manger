@@ -4,7 +4,7 @@ import threading
 import concurrent.futures
 from datetime import datetime
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Dict, Any, Optional
 import time
 import urllib.parse
 import json
@@ -184,14 +184,14 @@ def ignore_gap(payload: dict):
     try:
         query_db("INSERT INTO gap_records (series_id, series_name, season_number, episode_number, status) VALUES (?, ?, ?, ?, 1) ON CONFLICT(series_id, season_number, episode_number) DO UPDATE SET status = 1", (payload.get("series_id"), payload.get("series_name", ""), int(payload.get("season_number", 0)), int(payload.get("episode_number", 0))))
         return {"status": "success"}
-    except: return {"status": "error"}
+    except Exception as e: return {"status": "error"}
 
 @router.post("/ignore/series")
 def ignore_entire_series(payload: dict):
     try:
         query_db("INSERT INTO gap_records (series_id, series_name, season_number, episode_number, status) VALUES (?, ?, -1, -1, 1) ON CONFLICT(series_id, season_number, episode_number) DO UPDATE SET status = 1", (payload.get("series_id"), payload.get("series_name", "")))
         return {"status": "success"}
-    except: return {"status": "error"}
+    except Exception as e: return {"status": "error"}
 
 @router.get("/ignores")
 def get_ignored_list():
@@ -207,7 +207,7 @@ def get_ignored_list():
             for r in perfects: data.append({"type": "perfect", "id": r['series_id'], "series_name": r['series_name'], "target": "完结免检金牌", "time": r['marked_at']})
         data.sort(key=lambda x: x['time'], reverse=True)
         return {"status": "success", "data": data}
-    except: return {"status": "error"}
+    except Exception as e: return {"status": "error"}
 
 @router.post("/unignore")
 def unignore_item(payload: dict):
@@ -215,21 +215,21 @@ def unignore_item(payload: dict):
         if payload.get("type") == "record": query_db("DELETE FROM gap_records WHERE id = ?", (payload.get("id"),))
         elif payload.get("type") == "perfect": query_db("DELETE FROM gap_perfect_series WHERE series_id = ?", (payload.get("id"),))
         return {"status": "success"}
-    except: return {"status": "error"}
+    except Exception as e: return {"status": "error"}
 
-# 🔥 Pydantic 请求模型强化
+# 🔥 宽松数据模型，拒绝后端 422 报错
 class GapSearchReq(BaseModel): 
     series_id: str
     series_name: str
-    season: int
-    episodes: List[int] 
+    season: Any
+    episodes: Optional[List[Any]] = []
 
 class GapDownloadReq(BaseModel): 
     series_id: str
     series_name: str
-    season: int
-    episodes: List[int] 
-    torrent_info: dict
+    season: Any
+    episodes: Optional[List[Any]] = []
+    torrent_info: Dict[str, Any]
 
 @router.post("/search_mp")
 def search_mp_for_gap(req: GapSearchReq):
@@ -249,7 +249,7 @@ def search_mp_for_gap(req: GapSearchReq):
                     if "HDR" in video.get("VideoRange", "") or "HDR" in d_title: genes.append("HDR")
                     if "DOVI" in d_title or "DOLBY VISION" in d_title: genes.append("DoVi")
         except: pass
-    if not genes: genes = ["默认基因 (无明显特效)"]
+    if not genes: genes = ["无明显特效"]
     
     clean_token = mp_token.strip().strip("'\"")
     headers = {"X-API-KEY": clean_token, "User-Agent": "Mozilla/5.0", "Accept": "application/json"}
@@ -267,15 +267,15 @@ def search_mp_for_gap(req: GapSearchReq):
         results = []
         is_pack = False
         
-        # 1. 如果只查 1 集，先精确匹配
-        if len(req.episodes) == 1:
+        # 1. 精确搜索单集
+        if req.episodes and len(req.episodes) == 1:
             keyword = f"{req.series_name} S{str(req.season).zfill(2)}E{str(req.episodes[0]).zfill(2)}"
             mp_res = requests.get(f"{mp_url.rstrip('/')}/api/v1/search/title?keyword={urllib.parse.quote(keyword)}", headers=headers, timeout=20)
             res_data = mp_res.json() if mp_res.status_code == 200 else []
             if isinstance(res_data, dict): res_data = res_data.get("data") or res_data.get("results") or []
             if isinstance(res_data, list): results = res_data
         
-        # 2. 如果没查到，或者是多集批量查，直接搜季包
+        # 2. 降级搜索季包
         if len(results) == 0:
             fallback_kw = f"{req.series_name} S{str(req.season).zfill(2)}"
             mp_res2 = requests.get(f"{mp_url.rstrip('/')}/api/v1/search/title?keyword={urllib.parse.quote(fallback_kw)}", headers=headers, timeout=20)
@@ -292,6 +292,8 @@ def search_mp_for_gap(req: GapSearchReq):
             desc_str = str(deep_extract(r, ["description", "desc", "detail", "subtitle"]) or "")
             combined_text = title_str.upper() + " " + desc_str.upper()
             size_val = deep_extract(r, ["size", "enclosure_size", "torrent_size"]) or 0
+            enclosure_val = deep_extract(r, ["enclosure", "download_url", "url", "link"]) or ""
+            site_val = deep_extract(r, ["site", "site_name", "indexer"]) or "未知站点"
             
             if "4K" in genes: score += 50 if ("2160P" in combined_text or "4K" in combined_text) else -20
             if "1080P" in genes and "1080P" in combined_text: score += 50
@@ -299,12 +301,15 @@ def search_mp_for_gap(req: GapSearchReq):
             if "HDR" in genes and "HDR" in combined_text: score += 20
             if "WEB" in combined_text: score += 10
             
-            # 🔥 API 脱水机：必须确保字典纯净，只保留 MP 原本认识的字段。
-            # 不要让 Python 传过去一堆乱七八糟的自定义 Key。
+            # 🔥 MP 数据提纯机：丢弃私货，强制拼装 MP 官方所需的核心字段！
             org_payload = {k: v for k, v in r.items() if not k.startswith("ui_") and k not in ["match_score", "is_pack", "extracted_tags", "org_payload"]}
+            org_payload["title"] = title_str
+            org_payload["size"] = size_val
+            if enclosure_val: org_payload["enclosure"] = enclosure_val
+            if site_val: org_payload["site"] = site_val
             
             r["ui_title"] = title_str  
-            r["ui_size"] = float(size_val) 
+            r["ui_size"] = float(size_val) if size_val else 0 
             r["match_score"] = score
             r["is_pack"] = is_pack 
             r["org_payload"] = org_payload 
@@ -327,30 +332,28 @@ def download_gap_item(req: GapDownloadReq):
     mp_url = cfg.get("moviepilot_url"); mp_token = cfg.get("moviepilot_token")
     clean_token = mp_token.strip().strip("'\""); headers = {"X-API-KEY": clean_token, "Content-Type": "application/json"}
     
-    # 提取绝对干净的原生载荷
+    # 提取在 /search_mp 中提纯过的干净载荷
     pure_torrent_info = req.torrent_info.get("org_payload", req.torrent_info)
     
-    # 🔥 核心对齐 MP V2：用 `episode` 传数组，不再用 `episodes`！
-    if req.torrent_info.get("is_pack", False) or len(req.episodes) > 1:
-        pure_torrent_info["season"] = req.season
-        # 这里严格对齐 TorrentInfo 模型：List[int] 传入 `episode` 字段！
-        pure_torrent_info["episode"] = req.episodes 
+    # 🔥 彻底对齐 MP 模型：传入 season 和 episode (注意是 episode 单数，接受数组！)
+    if req.torrent_info.get("is_pack", False) or (req.episodes and len(req.episodes) > 1):
+        pure_torrent_info["season"] = int(req.season)
+        pure_torrent_info["episode"] = [int(e) for e in req.episodes] 
 
     try:
         res = requests.post(f"{mp_url.rstrip('/')}/api/v1/download/", headers=headers, json=pure_torrent_info, timeout=10)
         
-        # 兼容 200 和 201 状态码
         if res.status_code in [200, 201]:
             try:
                 res_data = res.json()
                 if res_data.get("success") == False:
-                    return {"status": "error", "message": res_data.get("message") or "MP 下载器拒绝了此种子，请检查官方日志"}
+                    return {"status": "error", "message": res_data.get("message") or "MP 拒绝下载，请检查官方日志"}
             except: pass
 
             for ep in req.episodes:
-                query_db("INSERT INTO gap_records (series_id, series_name, season_number, episode_number, status) VALUES (?, ?, ?, ?, 2) ON CONFLICT(series_id, season_number, episode_number) DO UPDATE SET status = 2", (req.series_id, req.series_name, req.season, ep))
+                query_db("INSERT INTO gap_records (series_id, series_name, season_number, episode_number, status) VALUES (?, ?, ?, ?, 2) ON CONFLICT(series_id, season_number, episode_number) DO UPDATE SET status = 2", (req.series_id, req.series_name, int(req.season), int(ep)))
             
-            return {"status": "success", "message": f"已成功向 MP 下发 {len(req.episodes)} 集提取指令"}
+            return {"status": "success", "message": f"已向 MP 下发提纯指令，成功接单！"}
             
-        return {"status": "error", "message": f"MP 接口拒绝访问 (HTTP {res.status_code})"}
+        return {"status": "error", "message": f"MP 接口拒绝 (HTTP {res.status_code})"}
     except Exception as e: return {"status": "error", "message": str(e)}
