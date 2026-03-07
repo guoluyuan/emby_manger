@@ -71,7 +71,13 @@ def proxy_emby_image(item_id: str, type: str = "Primary", width: int = 400):
     try:
         res = requests.get(emby_img_url, stream=True, timeout=5)
         if res.status_code == 200:
-            return StreamingResponse(io.BytesIO(res.content), media_type=res.headers.get("content-type", "image/jpeg"))
+            # 🔥 核心修复：注入长达 7 天的强缓存与跨域头，彻底告别重复加载卡顿，并允许前端智能取色
+            headers = {
+                "Cache-Control": "public, max-age=604800",
+                "Access-Control-Allow-Origin": "*",
+                "Content-Type": res.headers.get("content-type", "image/jpeg")
+            }
+            return StreamingResponse(io.BytesIO(res.content), headers=headers)
     except:
         pass
     return {"status": "error"}
@@ -86,7 +92,7 @@ def extract_media_badges(item):
         video_stream = next((s for s in media_streams if s["Type"] == "Video"), None)
         audio_stream = next((s for s in media_streams if s["Type"] == "Audio"), None)
 
-        # 🔥 1. REMUX 识别：通过文件名或路径 (通常在 Path 或 Name 里)
+        # 🔥 1. REMUX 识别
         path_or_name = (source.get("Path", "") + " " + source.get("Name", "")).upper()
         if "REMUX" in path_or_name:
             badges.append({"type": "quality", "text": "REMUX", "color": "bg-blue-600 text-white border-blue-500"})
@@ -99,15 +105,13 @@ def extract_media_badges(item):
             elif width >= 1900:
                 badges.append({"type": "res", "text": "1080P", "color": "bg-blue-500 text-blue-100 border-blue-400"})
             
-            # 🔥 3. 打破互斥：分别判断杜比视界和 HDR
+            # 🔥 3. 动态范围
             video_range = video_stream.get("VideoRange", "").upper()
             video_range_type = video_stream.get("VideoRangeType", "").upper()
             
-            # 判断杜比视界 (Dolby Vision)
             if "DOVI" in video_range or "DOVI" in video_range_type:
                 badges.append({"type": "fx", "text": "Dolby Vision", "color": "bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-400"})
             
-            # 判断 HDR (独立判断，不再用 elif，允许共存)
             if "HDR" in video_range or "HDR10" in video_range_type:
                 badges.append({"type": "fx", "text": "HDR", "color": "bg-yellow-500 text-yellow-900 border-yellow-400"})
                 
@@ -129,7 +133,6 @@ def global_library_search(query: str, request: Request):
     if not host or not key:
         return {"status": "error", "message": "未配置 Emby 服务器"}
 
-    # 🔥 获取公网链接并去除末尾斜杠
     public_host = cfg.get("emby_public_url") or cfg.get("emby_external_url") or cfg.get("emby_public_host") or host
     public_host = public_host.rstrip('/')
 
@@ -137,7 +140,6 @@ def global_library_search(query: str, request: Request):
     if not admin_id:
         return {"status": "error", "message": "找不到管理员账号"}
 
-    # 🔥 获取系统信息，包含版本号和服务器名称
     sys_info = get_emby_sys_info(host, key)
     use_new_route = is_new_emby_router(sys_info)
 
@@ -170,7 +172,6 @@ def global_library_search(query: str, request: Request):
                 else:
                     poster_url = "/static/img/logo-dark.png" 
 
-            # 🔥 路由分发：强制分发给对应的 Emby 版本
             if use_new_route:
                 emby_url = f"{public_host}/web/index.html#!/item?id={item['Id']}&serverId={item.get('ServerId', '')}"
             else:
