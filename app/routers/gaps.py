@@ -70,7 +70,8 @@ def process_single_series(series, lock_map, host, key, tmdb_key, proxies, today,
     if series_gaps:
         public_host = (cfg.get("emby_public_url") or cfg.get("emby_external_url") or cfg.get("emby_public_host") or host).rstrip('/')
         emby_url = f"{public_host}/web/index.html#!/item?id={series_id}&serverId={server_id}" if use_new_route else f"{public_host}/web/index.html#!/item/details.html?id={series_id}&serverId={server_id}"
-        return {"series_id": series_id, "series_name": series_name, "tmdb_id": tmdb_id, "poster": f"/api/library/image/{series_id}?type=Primary&width=300", "emby_url": emby_url, "gaps": series_gaps}
+        # 🔥 将 tmdb_status 写入内存，让查岗引擎知道这剧完结了没
+        return {"series_id": series_id, "series_name": series_name, "tmdb_id": tmdb_id, "tmdb_status": tmdb_status, "poster": f"/api/library/image/{series_id}?type=Primary&width=300", "emby_url": emby_url, "gaps": series_gaps}
     else:
         if tmdb_status in ["Ended", "Canceled"]:
             try: query_db("INSERT OR IGNORE INTO gap_perfect_series (series_id, tmdb_id, series_name) VALUES (?, ?, ?)", (series_id, tmdb_id, series_name))
@@ -153,14 +154,10 @@ def get_progress():
             except: pass
         return {"status": "success", "data": scan_state}
 
-# ==========================================
-# 🔥 新增：主动核验引擎 (摆脱对Webhook的依赖)
-# ==========================================
 def run_verify_task():
     try:
         with state_lock:
             if scan_state["is_scanning"] or not scan_state.get("results"): return
-            # 深度拷贝，防止在验证时被前端篡改
             results_copy = json.loads(json.dumps(scan_state["results"]))
             
         host = cfg.get("emby_host")
@@ -174,7 +171,6 @@ def run_verify_task():
             if not s.get("gaps"): continue
             
             try:
-                # 仅针对“当前存在缺集”的剧集，向Emby极速点名查岗（毫秒级）
                 eps_data = requests.get(f"{host}/emby/Users/{admin_id}/Items?ParentId={s_id}&IncludeItemTypes=Episode&Recursive=true&Fields=IndexNumberEnd&api_key={key}", timeout=5).json().get("Items", [])
                 local_eps = set()
                 for ep in eps_data:
@@ -189,13 +185,18 @@ def run_verify_task():
                 new_gaps = []
                 for gap in s["gaps"]:
                     if f"{gap['season']}_{gap['episode']}" in local_eps:
-                        # 这集已经入库了！剔除它。
                         changed = True
                         try: query_db("DELETE FROM gap_records WHERE series_id=? AND season_number=? AND episode_number=?", (s_id, gap['season'], gap['episode']))
                         except: pass
                     else:
                         new_gaps.append(gap)
                 s["gaps"] = new_gaps
+                
+                # 🔥 修复逻辑：查岗完毕如果缺集清零了，且剧集已完结，立刻当场发金牌送入回收站！
+                if len(new_gaps) == 0 and changed:
+                    if s.get("tmdb_status") in ["Ended", "Canceled"]:
+                        try: query_db("INSERT OR IGNORE INTO gap_perfect_series (series_id, tmdb_id, series_name) VALUES (?, ?, ?)", (s_id, s.get("tmdb_id"), s.get("series_name")))
+                        except: pass
             except: pass
                 
         if changed:
@@ -208,12 +209,10 @@ def run_verify_task():
 
 @router.post("/scan/verify")
 def trigger_verify_gaps(bg_tasks: BackgroundTasks):
-    """前端焦点唤醒时，主动触发极速核验"""
     with state_lock:
         if scan_state["is_scanning"]: return {"status": "success"}
     bg_tasks.add_task(run_verify_task)
     return {"status": "success"}
-# ==========================================
 
 @router.post("/scan/auto_toggle")
 def toggle_auto_scan(payload: dict):

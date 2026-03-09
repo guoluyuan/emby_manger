@@ -42,7 +42,15 @@
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <i class="fa-solid fa-magnifying-glass text-gray-400 group-focus-within:text-indigo-500 transition-colors"></i>
             </div>
-            <input type="text" x-model="searchQuery" name="gap_search_ignore_autofill" autocomplete="off" spellcheck="false" placeholder="搜索缺失的剧集名称..." class="w-full pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all dark:text-white placeholder-gray-400">
+            <input type="text" 
+                   x-model="searchQuery" 
+                   name="gap_search_super_fake_name" 
+                   autocomplete="new-password" 
+                   spellcheck="false" 
+                   readonly 
+                   onfocus="this.removeAttribute('readonly');"
+                   placeholder="搜索缺失的剧集名称..." 
+                   class="w-full pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all dark:text-white placeholder-gray-400">
             <button x-show="searchQuery" @click="searchQuery = ''" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" x-cloak>
                 <i class="fa-solid fa-circle-xmark"></i>
             </button>
@@ -361,9 +369,8 @@ document.addEventListener('alpine:init', () => {
             this.checkStatus(); 
             this.fetchAutoScan(); 
             this.startSilentPolling();
-            this.triggerVerify(); // 🔥 页面刚加载时，主动核验一次
+            this.triggerVerify(); 
             
-            // 🔥 焦点唤醒：当用户从别的软件(如 qB)切回本网页时，主动向后端发核验信号
             document.addEventListener('visibilitychange', () => {
                 if (!document.hidden && !this.isScanning) {
                     this.triggerVerify();
@@ -390,14 +397,12 @@ document.addEventListener('alpine:init', () => {
             return this.ignoreModal.items;
         },
         
-        // 🔥 发送核验信号，让后端不用等 Webhook，直接去查 Emby 数据库核实
         async triggerVerify() {
             try { await fetch('/api/gaps/scan/verify', { method: 'POST' }); } catch(e) {}
         },
 
         startSilentPolling() {
             if (this.silentPollInterval) clearInterval(this.silentPollInterval);
-            // 轮询时间缩短到 8 秒，反应更灵敏
             this.silentPollInterval = setInterval(() => {
                 if (document.hidden || this.isScanning) return;
                 this.checkStatusSilent();
@@ -406,7 +411,6 @@ document.addEventListener('alpine:init', () => {
 
         async checkStatusSilent() {
             try {
-                // 🔥 终极防缓存机制：加上 ?_t=时间戳 和 no-store，绝不读取浏览器的旧数据
                 const res = await fetch(`/api/gaps/scan/progress?_t=${new Date().getTime()}`, { cache: 'no-store' });
                 const data = await res.json();
                 if (data.status === 'success' && !data.data.is_scanning) {
