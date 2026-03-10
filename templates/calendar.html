@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% block title %}追剧日历 - EmbyPulse{% endblock %}
+{% block title %}追剧排期 - EmbyPulse{% endblock %}
 
 {% block head %}
 <style>
@@ -28,11 +28,11 @@
 {% endblock %}
 
 {% block content %}
-<div class="w-full max-w-[1600px] mx-auto py-4 pb-32 px-4 sm:px-6 md:px-8 space-y-6 md:space-y-8">
+<div class="w-full max-w-[1600px] mx-auto py-4 pb-32 px-4 sm:px-6 md:px-8 space-y-4 md:space-y-6">
     
     <div class="apple-card flex flex-col md:flex-row md:items-center justify-between gap-6 w-full mb-2 p-5 md:p-6">
         <div class="flex items-center gap-4 pl-1">
-            <div class="w-12 h-12 rounded-[14px] bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center text-xl shadow-lg shadow-brand-500/30 shrink-0">
+            <div class="w-12 h-12 rounded-[14px] bg-brand-500 text-white flex items-center justify-center text-xl shadow-md shadow-brand-500/30 shrink-0">
                 <i class="fa-solid fa-calendar-days"></i>
             </div>
             <div>
@@ -73,7 +73,7 @@
     </div>
 
     <div id="mobile-day-nav" class="md:hidden sticky top-[72px] z-30 -mx-4 px-4 py-3 bg-apple-bgLight/80 dark:bg-apple-bgDark/80 backdrop-blur-[24px] saturate-[1.5] border-b border-gray-200/50 dark:border-white/5 flex gap-2 overflow-x-auto mac-scrollbar shadow-sm transition-all">
-        </div>
+    </div>
 
     <div id="loading" class="flex flex-col items-center justify-center py-40">
         <i class="fa-solid fa-circle-notch fa-spin text-4xl text-brand-500 mb-4"></i>
@@ -85,8 +85,8 @@
         <button onclick="fetchCalendar(true)" class="px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-[13px] font-bold shadow-md transition-all active:scale-95">重新加载</button>
     </div>
 
-    <div id="calendar-grid" class="hidden grid grid-cols-1 md:grid-cols-7 gap-y-6 md:gap-x-4 lg:gap-x-5 items-start">
-        </div>
+    <div id="calendar-grid" class="hidden grid grid-cols-1 md:grid-cols-7 gap-y-6 md:gap-x-3 lg:gap-x-4 items-start">
+    </div>
 </div>
 
 <div id="detail-modal" class="fixed inset-0 z-[100] hidden flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity opacity-0 duration-300">
@@ -105,10 +105,9 @@
         </div>
         
         <div class="flex-1 flex flex-col justify-start p-6 md:p-8 overflow-y-auto mac-scrollbar relative z-20 bg-white dark:bg-transparent">
-            
             <h3 id="m-title" class="text-2xl md:text-3xl font-black text-gray-900 dark:text-white leading-tight pr-6 md:pr-0 mb-3"></h3>
             
-            <div class="flex flex-wrap items-center gap-2 mb-5">
+            <div class="flex flex-wrap items-center gap-2 mb-4">
                 <span id="m-episode-label" class="text-brand-600 dark:text-brand-400 font-mono font-bold bg-brand-50 dark:bg-brand-500/10 px-2 py-1 rounded-md border border-brand-100 dark:border-brand-500/20 text-[11px] md:text-xs"></span>
                 <span id="m-status-badge" class="px-2 py-1 rounded-md text-[10px] md:text-[11px] font-bold uppercase tracking-widest text-white shadow-sm"></span>
             </div>
@@ -144,8 +143,7 @@ function changeWeek(offset) {
 async function updateTTL(val) {
     try {
         await fetch('/api/calendar/config', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ ttl: parseInt(val) })
         });
         fetchCalendar(true);
@@ -184,9 +182,7 @@ async function fetchCalendar(forceRefresh = false) {
 
         if (currentOffset === 0 && window.innerWidth < 768) {
             const todayIndex = data.days.findIndex(d => d.is_today);
-            if (todayIndex !== -1) {
-                setTimeout(() => scrollToDay(todayIndex), 500); 
-            }
+            if (todayIndex !== -1) setTimeout(() => scrollToDay(todayIndex), 500); 
         }
 
     } catch (e) {
@@ -200,7 +196,6 @@ function renderMobileNav(days) {
     const navContainer = document.getElementById('mobile-day-nav');
     navContainer.innerHTML = days.map((day, index) => {
         const isToday = day.is_today && currentOffset === 0;
-        // iOS Segmented 风格：选中的变成实心亮色，未选中的是微透明底色
         const baseClass = "relative flex-1 flex flex-col items-center justify-center py-2 px-1 min-w-[60px] rounded-xl transition-all duration-300 shrink-0";
         const stateClass = isToday 
             ? "bg-brand-500 text-white shadow-md shadow-brand-500/30 scale-105" 
@@ -220,10 +215,11 @@ function renderCalendar(days) {
     
     container.innerHTML = days.map((day, index) => {
         const isToday = day.is_today && currentOffset === 0;
+        const dayNum = day.date.split('-')[2]; // 提取具体日期数字，如 09
         
         const itemsHtml = day.items.length === 0 
-            ? `<div class="py-10 text-center bg-gray-50/50 dark:bg-black/10 rounded-[20px] border border-dashed border-gray-200 dark:border-white/10">
-                   <p class="text-[11px] text-gray-400 font-bold tracking-widest">该日无排期</p>
+            ? `<div class="py-10 text-center bg-gray-50/50 dark:bg-black/10 rounded-[20px] border border-dashed border-gray-200/80 dark:border-white/5">
+                   <p class="text-[11px] text-gray-400 font-bold tracking-widest">无排期</p>
                </div>`
             : day.items.map(item => generateCardHtml(item)).join('');
 
@@ -232,16 +228,18 @@ function renderCalendar(days) {
                 
                 <div id="scroll-anchor-${index}" class="absolute -top-[140px] pointer-events-none"></div>
                 
-                <div class="hidden md:flex justify-between items-end pb-2 pt-3 mb-1 border-b-2 ${isToday ? 'border-brand-500' : 'border-gray-200/60 dark:border-white/10'} sticky top-[72px] z-30 bg-apple-bgLight/90 dark:bg-apple-bgDark/90 backdrop-blur-md">
-                    <span class="font-black text-base ${isToday ? 'text-brand-600 dark:text-brand-400' : 'text-gray-800 dark:text-gray-200'}">${isToday ? '今天' : day.weekday_cn}</span>
-                    <span class="text-[11px] font-mono font-bold text-gray-400">${day.date.slice(5)}</span>
+                <div class="hidden md:flex flex-col items-center justify-center pb-2 pt-3 mb-1 sticky top-[72px] z-30 bg-apple-bgLight/90 dark:bg-apple-bgDark/90 backdrop-blur-md">
+                    <span class="text-[10px] font-bold uppercase tracking-widest mb-1 ${isToday ? 'text-brand-500' : 'text-gray-400 dark:text-gray-500'}">${day.weekday_cn}</span>
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-[15px] font-black ${isToday ? 'bg-brand-500 text-white shadow-md shadow-brand-500/30' : 'text-gray-800 dark:text-gray-200'}">
+                        ${dayNum}
+                    </div>
                 </div>
                 
-                <div class="md:hidden flex items-center gap-3 pt-4 pb-2 sticky top-[132px] z-30 bg-apple-bgLight/95 dark:bg-apple-bgDark/95 backdrop-blur-md">
-                    <span class="font-black text-lg ${isToday ? 'text-brand-600 dark:text-brand-400' : 'text-gray-800 dark:text-white'}">${isToday ? '今天' : day.weekday_cn}</span>
+                <div class="md:hidden flex items-center gap-3 pt-2 pb-1 relative z-10">
+                    <span class="font-black text-lg ${isToday ? 'text-brand-500' : 'text-gray-800 dark:text-white'}">${isToday ? '今天' : day.weekday_cn}</span>
                     <span class="text-[11px] font-mono font-bold text-gray-400 mt-1">${day.date.slice(5)}</span>
                     ${isToday ? '<span class="px-2 py-0.5 bg-brand-500 text-white rounded-md text-[9px] font-bold shadow-sm">今 日 更新</span>' : ''}
-                    <div class="flex-1 h-px bg-gray-200 dark:border-white/5"></div>
+                    <div class="flex-1 h-px bg-gray-200 dark:bg-white/5"></div>
                 </div>
 
                 ${itemsHtml}
@@ -250,7 +248,6 @@ function renderCalendar(days) {
     }).join('');
 }
 
-// 🔥 优化3：Apple TV 级精致剧集卡片
 function generateCardHtml(item) {
     const statusMap = {
         'ready': { color: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-500/20', text: '已入库', dot: 'bg-emerald-500' },
@@ -258,34 +255,37 @@ function generateCardHtml(item) {
         'today': { color: 'bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400 border border-brand-200/50 dark:border-brand-500/20', text: '今日更新', dot: 'bg-brand-500 animate-pulse' },
         'upcoming': { color: 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-200/50 dark:border-blue-500/20', text: '待播出', dot: 'bg-blue-500' }
     };
-    const s = statusMap[item.status] || { color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400', text: '未知', dot: 'bg-gray-500' };
+    const s = statusMap[item.status] || { color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400 border-transparent', text: '未知', dot: 'bg-gray-500' };
     const poster = item.poster_path ? (imgBase + item.poster_path) : 'https://via.placeholder.com/300x450?text=No+Poster';
-    const desc = item.series_overview || item.overview || "暂无剧情简介，静待更新...";
     
-    const formattedAirDate = item.air_date ? item.air_date.replace(/-/g, '.') : '未知时间';
+    // 🔥 优化4：找回丢失的简介！
+    const desc = item.series_overview || item.overview || "暂无剧情简介，静待更新...";
+    const formattedAirDate = item.air_date ? item.air_date.replace(/-/g, '.') : '未知';
 
     return `
     <div onclick='showDetails(${JSON.stringify(item).replace(/'/g, "&apos;")})' 
-         class="group flex flex-row md:flex-col bg-white dark:bg-[#1C1C1E] rounded-[20px] overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-gray-100 dark:border-white/5 cursor-pointer hover:-translate-y-1 transition-all duration-300 hover:shadow-[0_12px_32px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)]">
+         class="group flex flex-row md:flex-col bg-white dark:bg-[#1C1C1E] rounded-[20px] overflow-hidden shadow-sm border border-gray-100 dark:border-white/5 cursor-pointer hover:-translate-y-1 transition-all duration-300 hover:shadow-lg h-full">
         
         <div class="relative w-28 sm:w-36 md:w-full shrink-0 aspect-[2/3] bg-gray-100 dark:bg-[#2C2C2E] overflow-hidden border-r md:border-r-0 md:border-b border-gray-100 dark:border-white/5">
             <img src="${poster}" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy">
         </div>
 
         <div class="p-3 sm:p-4 flex-1 flex flex-col justify-start min-w-0">
-            <div class="flex items-start gap-2 mb-1.5">
-                <h3 class="text-[13px] md:text-[14px] font-bold text-gray-900 dark:text-white leading-tight line-clamp-2 md:line-clamp-1 break-all transition-colors group-hover:text-brand-500 flex-1">${item.series_name}</h3>
-            </div>
+            <h3 class="text-[13px] md:text-[14px] font-bold text-gray-900 dark:text-white leading-tight line-clamp-2 mb-1.5 transition-colors group-hover:text-brand-500">${item.series_name}</h3>
             
-            <div class="flex items-center justify-between mb-2.5">
+            <div class="flex items-center justify-between mb-2">
                 <span class="shrink-0 text-[10px] font-mono font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-black/30 px-1.5 py-[1px] rounded">
                     S${String(item.season).padStart(2,'0')}E${String(item.episode).padStart(2,'0')}
                 </span>
-                <span class="text-[10px] font-mono font-medium text-gray-400 truncate">${formattedAirDate}</span>
+                <span class="text-[10px] font-mono font-medium text-gray-400 truncate ml-2">${formattedAirDate}</span>
             </div>
+            
+            <p class="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-2 md:line-clamp-3 leading-relaxed mb-3 flex-1">
+                ${desc}
+            </p>
 
             <div class="flex items-center w-max px-2 py-0.5 rounded-md ${s.color} mt-auto shadow-sm">
-                <span class="w-1 h-1 rounded-full ${s.dot} mr-1.5"></span>
+                <span class="w-1.5 h-1.5 rounded-full ${s.dot} mr-1.5"></span>
                 <span class="text-[9px] font-bold uppercase tracking-wider">${s.text}</span>
             </div>
         </div>
@@ -305,9 +305,7 @@ function setupScrollSpy() {
                 highlightNavBtn(dayIndex, true); 
             }
         });
-    }, { 
-        rootMargin: '-150px 0px -50% 0px' 
-    });
+    }, { rootMargin: '-150px 0px -50% 0px' });
 
     sections.forEach(sec => scrollObserver.observe(sec));
 }
@@ -321,10 +319,7 @@ function highlightNavBtn(activeIndex, isAutoScroll = false) {
     const activeBtn = document.getElementById(`nav-btn-${activeIndex}`);
     if (activeBtn) {
         activeBtn.className = "relative flex-1 flex flex-col items-center justify-center py-2 px-1 min-w-[60px] rounded-xl transition-all duration-300 shrink-0 bg-brand-500 text-white shadow-md shadow-brand-500/30 scale-105";
-        
-        if (isAutoScroll) {
-            activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-        }
+        if (isAutoScroll) activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }
 }
 
@@ -333,15 +328,11 @@ function scrollToDay(index) {
     if (anchor) {
         isScrolling = true; 
         anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        
-        if (window.innerWidth < 768) { 
-            highlightNavBtn(index, false); 
-        }
+        if (window.innerWidth < 768) highlightNavBtn(index, false); 
         setTimeout(() => { isScrolling = false; }, 800);
     }
 }
 
-// 🔥 弹窗数据注入与动画触发
 function showDetails(item) {
     const modal = document.getElementById('detail-modal');
     const container = document.getElementById('modal-container');
@@ -379,13 +370,8 @@ function showDetails(item) {
     container.offsetHeight; 
     modal.classList.remove('opacity-0');
     
-    if(window.innerWidth < 640) {
-        // 手机端底部滑出
-        container.classList.remove('translate-y-full');
-    } else {
-        // PC端居中缩放放大
-        container.classList.remove('scale-95');
-    }
+    if(window.innerWidth < 640) container.classList.remove('translate-y-full');
+    else container.classList.remove('scale-95');
 }
 
 function closeDetails() {
@@ -393,23 +379,17 @@ function closeDetails() {
     const container = document.getElementById('modal-container');
     
     modal.classList.add('opacity-0');
-    if(window.innerWidth < 640) {
-        container.classList.add('translate-y-full');
-    } else {
-        container.classList.add('scale-95');
-    }
+    if(window.innerWidth < 640) container.classList.add('translate-y-full');
+    else container.classList.add('scale-95');
     
     setTimeout(() => modal.classList.add('hidden'), 300);
 }
 
-function playItem(id) {
-    window.open(`${currentEmbyUrl}/web/index.html#!/item?id=${id}&serverId=${currentServerId}`, '_blank');
-}
+function playItem(id) { window.open(`${currentEmbyUrl}/web/index.html#!/item?id=${id}&serverId=${currentServerId}`, '_blank'); }
 
 function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(() => {
-        const btn = document.querySelector('#m-actions button');
-        const ogHtml = btn.innerHTML;
+        const btn = document.querySelector('#m-actions button'); const ogHtml = btn.innerHTML;
         btn.innerHTML = '<i class="fa-solid fa-check text-emerald-500"></i> <span class="text-emerald-500">已复制</span>';
         setTimeout(() => { btn.innerHTML = ogHtml; closeDetails(); }, 1000);
     });
