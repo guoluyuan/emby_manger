@@ -235,7 +235,7 @@
     <div id="global-toast-container" class="fixed top-20 right-2 md:top-auto md:bottom-6 md:right-6 z-[100] flex flex-col gap-3 pointer-events-none"></div>
     <div id="ep-global-search" class="fixed inset-0 z-[100] hidden opacity-0 transition-opacity duration-200">
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeGlobalSearch()"></div>
-        <div class="absolute top-[8%] left-1/2 -translate-x-1/2 w-[90%] max-w-3xl bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-2xl border border-gray-200 dark:border-white/5 overflow-hidden flex flex-col transform scale-95 transition-transform duration-200" id="ep-search-container">
+        <div class="absolute top-[8%] left-1/2 -translate-x-1/2 w-[90%] max-w-3xl bg-white dark:bg-[#1C1C1E] rounded-[24px] shadow-2xl border border-gray-200 dark:border-white/5 overflow-hidden flex flex-col transform scale-95 transition-transform duration-200" id="ep-search-container">
             <div class="relative border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-black/10">
                 <i class="fa-solid fa-magnifying-glass absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 text-xl"></i>
                 <input type="text" id="ep-search-input" autocomplete="off" class="w-full bg-transparent border-none pl-14 pr-24 py-5 text-[17px] font-medium focus:ring-0 placeholder-gray-400 outline-none" placeholder="输入影视名称、拼音穿透搜索...">
@@ -244,7 +244,7 @@
                     <button onclick="closeGlobalSearch()" class="px-2 py-1 text-[11px] font-mono font-medium bg-gray-200/50 dark:bg-white/10 text-gray-500 dark:text-gray-300 rounded border border-gray-200 dark:border-white/5 hover:bg-gray-200 transition hidden sm:inline-block">ESC</button>
                 </div>
             </div>
-            <div id="ep-search-results" class="max-h-[60vh] overflow-y-auto mac-scrollbar p-2">
+            <div id="ep-search-results" class="max-h-[60vh] overflow-y-auto mac-scrollbar p-3">
                 <div class="text-center py-16 text-gray-400" id="ep-search-empty"><i class="fa-solid fa-clapperboard text-5xl mb-4 opacity-20"></i><p class="text-[15px] font-medium">全局检索 Emby 媒体库</p></div>
             </div>
         </div>
@@ -320,19 +320,98 @@
         document.addEventListener('DOMContentLoaded', () => { setTimeout(fetchPendingNotify, 1000); setInterval(fetchPendingNotify, 30000); setTimeout(fetchGlobalLive, 2000); setInterval(fetchGlobalLive, 10000); });
         
         /* 全局搜索 */
-        const searchModal = document.getElementById('ep-global-search'); const searchContainer = document.getElementById('ep-search-container'); const searchInput = document.getElementById('ep-search-input'); const searchResults = document.getElementById('ep-search-results'); const searchLoading = document.getElementById('ep-search-loading'); const searchEmpty = document.getElementById('ep-search-empty'); let searchTimeout = null;
-        function openGlobalSearch() { searchModal.classList.remove('hidden'); void searchModal.offsetWidth; searchModal.classList.remove('opacity-0'); searchContainer.classList.remove('scale-95'); searchInput.value = ''; searchResults.innerHTML = ''; searchResults.appendChild(searchEmpty); searchEmpty.style.display = 'block'; setTimeout(() => searchInput.focus(), 100); }
-        function closeGlobalSearch() { searchModal.classList.add('opacity-0'); searchContainer.classList.add('scale-95'); setTimeout(() => { searchModal.classList.add('hidden'); searchInput.blur(); }, 200); }
-        document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openGlobalSearch(); } if (e.key === 'Escape' && !searchModal.classList.contains('hidden')) { closeGlobalSearch(); } });
-        searchInput.addEventListener('input', (e) => {
-            clearTimeout(searchTimeout); const query = e.target.value.trim();
-            if (!query) { searchResults.innerHTML = ''; searchResults.appendChild(searchEmpty); searchEmpty.style.display = 'block'; return; }
-            searchLoading.classList.remove('hidden'); searchEmpty.style.display = 'none';
-            searchTimeout = setTimeout(async () => { try { const res = await fetch(`/api/library/search?query=${encodeURIComponent(query)}`); const data = await res.json(); renderSearchResults(data.data || []); } catch (err) { searchResults.innerHTML = '<div class="text-center py-10 text-red-500 font-medium">搜索失败</div>'; } finally { searchLoading.classList.add('hidden'); } }, 500);
+        const searchModal = document.getElementById('ep-global-search'); 
+        const searchContainer = document.getElementById('ep-search-container'); 
+        const searchInput = document.getElementById('ep-search-input'); 
+        const searchResults = document.getElementById('ep-search-results'); 
+        const searchLoading = document.getElementById('ep-search-loading'); 
+        const searchEmpty = document.getElementById('ep-search-empty'); 
+        let searchTimeout = null;
+
+        function openGlobalSearch() { 
+            searchModal.classList.remove('hidden'); 
+            void searchModal.offsetWidth; 
+            searchModal.classList.remove('opacity-0'); 
+            searchContainer.classList.remove('scale-95'); 
+            searchInput.value = ''; 
+            searchResults.innerHTML = ''; 
+            searchResults.appendChild(searchEmpty); 
+            searchEmpty.style.display = 'block'; 
+            setTimeout(() => searchInput.focus(), 100); 
+        }
+
+        function closeGlobalSearch() { 
+            searchModal.classList.add('opacity-0'); 
+            searchContainer.classList.add('scale-95'); 
+            setTimeout(() => { searchModal.classList.add('hidden'); searchInput.blur(); }, 200); 
+        }
+
+        document.addEventListener('keydown', (e) => { 
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openGlobalSearch(); } 
+            if (e.key === 'Escape' && !searchModal.classList.contains('hidden')) { closeGlobalSearch(); } 
         });
+
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout); 
+            const query = e.target.value.trim();
+            if (!query) { 
+                searchResults.innerHTML = ''; 
+                searchResults.appendChild(searchEmpty); 
+                searchEmpty.style.display = 'block'; 
+                return; 
+            }
+            searchLoading.classList.remove('hidden'); 
+            searchEmpty.style.display = 'none';
+            searchTimeout = setTimeout(async () => { 
+                try { 
+                    const res = await fetch(`/api/library/search?query=${encodeURIComponent(query)}`); 
+                    const data = await res.json(); 
+                    renderSearchResults(data.data || []); 
+                } catch (err) { 
+                    searchResults.innerHTML = '<div class="text-center py-10 text-red-500 font-medium">搜索失败</div>'; 
+                } finally { 
+                    searchLoading.classList.add('hidden'); 
+                } 
+            }, 500);
+        });
+
+        // 🔥 修复：找回彩色标签、简介、年份，并套用 Apple 级悬浮卡片 UI
         function renderSearchResults(items) {
-            if (items.length === 0) { searchResults.innerHTML = '<div class="text-center py-12 text-gray-400 font-medium">未找到资源</div>'; return; } let html = '';
-            items.forEach(item => { let badgesHtml = item.badges.map(b => `<span class="px-2 py-0.5 text-[10px] font-medium rounded bg-gray-100 dark:bg-gray-800 text-gray-500">${b.text}</span>`).join(''); html += `<a href="${item.emby_url}" target="_blank" class="flex gap-4 p-3 mb-1 hover:bg-gray-50 dark:hover:bg-apple-hoverDark rounded-xl cursor-pointer transition-colors group"><img src="${item.poster}" onerror="this.src='/static/img/logo-app.png';" class="w-14 h-20 object-cover rounded-lg bg-gray-100 dark:bg-gray-800 shrink-0"><div class="flex-1 min-w-0 flex flex-col justify-center"><div class="flex items-center gap-2 mb-1"><h4 class="font-medium text-[15px] truncate">${item.name}</h4></div><div class="flex flex-wrap gap-2 mt-1">${badgesHtml}</div></div></a>`; });
+            if (items.length === 0) { 
+                searchResults.innerHTML = '<div class="text-center py-12 text-gray-400 font-medium">未找到资源</div>'; 
+                return; 
+            } 
+            let html = '';
+            items.forEach(item => { 
+                // 动态渲染彩色 Badge
+                let badgesHtml = '';
+                if (item.badges && item.badges.length > 0) {
+                    badgesHtml = item.badges.map(b => {
+                        const colorClass = b.color ? b.color : 'bg-gray-100 text-gray-600 dark:bg-[#3A3A3C] dark:text-gray-300 border border-gray-200/50 dark:border-white/5';
+                        return `<span class="px-2 py-0.5 text-[10px] font-bold rounded-md ${colorClass} shadow-sm">${b.text}</span>`;
+                    }).join('');
+                }
+                
+                // 简介与年份
+                const overview = item.overview ? `<p class="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-1 mt-1.5 leading-relaxed">${item.overview}</p>` : '';
+                const yearText = item.year ? `<span class="text-[12px] font-mono font-bold text-gray-400 ml-2">${item.year}</span>` : '';
+
+                // Apple Card Hover UI
+                html += `
+                <a href="${item.emby_url}" target="_blank" class="flex gap-4 p-3 mb-2 bg-transparent hover:bg-gray-50 dark:hover:bg-black/20 rounded-[16px] cursor-pointer transition-all group border border-transparent hover:border-gray-200/60 dark:hover:border-white/5 hover:shadow-sm">
+                    <img src="${item.poster}" onerror="this.src='/static/img/logo-app.png';" class="w-16 h-24 object-cover rounded-[10px] bg-gray-100 dark:bg-[#2C2C2E] shrink-0 border border-gray-200/50 dark:border-white/5 shadow-sm group-hover:scale-105 transition-transform">
+                    <div class="flex-1 min-w-0 flex flex-col justify-center">
+                        <div class="flex items-center mb-1.5">
+                            <h4 class="font-bold text-[15px] text-gray-900 dark:text-white truncate group-hover:text-brand-500 transition-colors">${item.name}</h4>
+                            ${yearText}
+                        </div>
+                        <div class="flex flex-wrap gap-1.5">
+                            ${badgesHtml}
+                        </div>
+                        ${overview}
+                    </div>
+                </a>`; 
+            });
             searchResults.innerHTML = html;
         }
 
