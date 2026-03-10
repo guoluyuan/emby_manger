@@ -17,9 +17,9 @@
             theme: {
                 extend: {
                     colors: {
-                        /* Apple 经典色彩规范 */
-                        apple: { gray: '#F5F5F7', dark: '#000000', cardDark: '#1C1C1E', hoverDark: '#2C2C2E' },
-                        brand: { 50: '#eff6ff', 500: '#007AFF', 600: '#0056b3' } /* 纯正 iOS 蓝 */
+                        /* Apple 经典色彩规范 - 彻底解决融为一体的问题 */
+                        apple: { bgLight: '#F2F2F7', bgDark: '#000000', cardLight: '#FFFFFF', cardDark: '#1C1C1E', hoverDark: '#2C2C2E', borderLight: '#E5E5EA', borderDark: '#38383A' },
+                        brand: { 50: '#eff6ff', 500: '#007AFF', 600: '#0056b3' }
                     }
                 }
             }
@@ -35,77 +35,81 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Noto Sans SC", sans-serif; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        /* iOS 抽屉动画 */
         #bottom-sheet { transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1); }
     </style>
     {% block head %}{% endblock %}
 </head>
 
-<body class="bg-apple-gray dark:bg-apple-dark text-gray-900 dark:text-gray-100 min-h-screen flex overflow-hidden transition-colors duration-300">
+<body class="bg-apple-bgLight dark:bg-apple-bgDark text-gray-900 dark:text-gray-100 min-h-screen flex overflow-hidden transition-colors duration-300">
 
-    <aside class="w-[240px] bg-apple-gray dark:bg-apple-dark border-r border-gray-200/60 dark:border-white/5 hidden md:flex flex-col shrink-0 z-50">
-        <div class="h-[72px] flex items-center px-6 shrink-0">
+    <aside class="w-[240px] bg-apple-cardLight dark:bg-apple-cardDark border-r border-apple-borderLight dark:border-apple-borderDark hidden md:flex flex-col shrink-0 z-50 shadow-[4px_0_24px_rgba(0,0,0,0.02)] dark:shadow-none">
+        
+        <div class="h-[72px] flex items-center px-6 shrink-0 border-b border-apple-borderLight/50 dark:border-apple-borderDark/50">
             <img src="/static/img/logo-app.png" class="w-7 h-7 mr-3 drop-shadow-sm">
             <span class="font-bold text-[17px] tracking-tight">EmbyPulse</span>
         </div>
 
-        <nav class="flex-1 overflow-y-auto hide-scrollbar px-3 py-2 space-y-6">
+        <nav class="flex-1 overflow-y-auto hide-scrollbar px-3 py-4 space-y-6">
+            
             <div>
-                <p class="px-3 text-[11px] font-semibold text-gray-400 dark:text-gray-500 mb-2">数据与质量</p>
+                <p class="px-3 text-[11px] font-semibold text-gray-400 dark:text-gray-500 mb-2">数据与分析</p>
                 <div class="space-y-0.5">
-                    <a href="/" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'dashboard' %}bg-white dark:bg-apple-cardDark text-brand-500 shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark{% endif %}">
+                    <a href="/" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'dashboard' %}bg-brand-50 dark:bg-apple-hoverDark text-brand-500 font-semibold{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-apple-hoverDark/50{% endif %}">
                         <i class="fa-solid fa-chart-line w-6 text-center text-[15px]"></i> 仪表盘
                     </a>
-                    <a href="/details" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'details' %}bg-white dark:bg-apple-cardDark text-brand-500 shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark{% endif %}">
-                        <i class="fa-solid fa-magnifying-glass-chart w-6 text-center text-[15px]"></i> 数据洞察
-                    </a>
-                    <a href="/content" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'content' %}bg-white dark:bg-apple-cardDark text-brand-500 shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark{% endif %}">
+                    <a href="/content" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'content' %}bg-brand-50 dark:bg-apple-hoverDark text-brand-500 font-semibold{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-apple-hoverDark/50{% endif %}">
                         <i class="fa-solid fa-film w-6 text-center text-[15px]"></i> 内容排行
                     </a>
-                    <a href="/insight" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'insight' %}bg-white dark:bg-apple-cardDark text-brand-500 shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark{% endif %}">
+                    <a href="/details" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'details' %}bg-brand-50 dark:bg-apple-hoverDark text-brand-500 font-semibold{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-apple-hoverDark/50{% endif %}">
+                        <i class="fa-solid fa-magnifying-glass-chart w-6 text-center text-[15px]"></i> 数据洞察
+                    </a>
+                    <a href="/insight" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'insight' %}bg-brand-50 dark:bg-apple-hoverDark text-brand-500 font-semibold{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-apple-hoverDark/50{% endif %}">
                         <i class="fa-solid fa-chart-pie w-6 text-center text-[15px]"></i> 质量盘点
                     </a>
-                    <a href="/gaps" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'gaps' %}bg-white dark:bg-apple-cardDark text-brand-500 shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark{% endif %}">
+                    <a href="/gaps" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'gaps' %}bg-brand-50 dark:bg-apple-hoverDark text-brand-500 font-semibold{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-apple-hoverDark/50{% endif %}">
                         <i class="fa-solid fa-puzzle-piece w-6 text-center text-[15px]"></i> 缺集管理
                     </a>
-                </div>
-            </div>
-
-            <div>
-                <p class="px-3 text-[11px] font-semibold text-gray-400 dark:text-gray-500 mb-2">社区管理</p>
-                <div class="space-y-0.5">
-                    <a href="/requests_admin" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'requests_admin' %}bg-white dark:bg-apple-cardDark text-brand-500 shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark{% endif %}">
-                        <i class="fa-solid fa-clapperboard w-6 text-center text-[15px]"></i> 工单大厅
-                    </a>
-                    <a href="/users_manage" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'users' %}bg-white dark:bg-apple-cardDark text-brand-500 shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark{% endif %}">
-                        <i class="fa-solid fa-users-gear w-6 text-center text-[15px]"></i> 用户管理
-                    </a>
-                    <a href="/clients" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'clients' %}bg-white dark:bg-apple-cardDark text-brand-500 shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark{% endif %}">
-                        <i class="fa-solid fa-desktop w-6 text-center text-[15px]"></i> 客户端管控
-                    </a>
-                    <a href="/calendar" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'calendar' %}bg-white dark:bg-apple-cardDark text-brand-500 shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark{% endif %}">
-                        <i class="fa-solid fa-calendar-days w-6 text-center text-[15px]"></i> 追剧日历
-                    </a>
-                    <a href="/history" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'history' %}bg-white dark:bg-apple-cardDark text-brand-500 shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark{% endif %}">
+                    <a href="/history" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'history' %}bg-brand-50 dark:bg-apple-hoverDark text-brand-500 font-semibold{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-apple-hoverDark/50{% endif %}">
                         <i class="fa-solid fa-clock-rotate-left w-6 text-center text-[15px]"></i> 播放历史
                     </a>
                 </div>
             </div>
 
             <div>
-                <p class="px-3 text-[11px] font-semibold text-gray-400 dark:text-gray-500 mb-2">系统</p>
+                <p class="px-3 text-[11px] font-semibold text-gray-400 dark:text-gray-500 mb-2">互动与维护</p>
                 <div class="space-y-0.5">
-                    <a href="/bot" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'bot' %}bg-white dark:bg-apple-cardDark text-brand-500 shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark{% endif %}">
+                    <a href="/requests_admin" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'requests_admin' %}bg-brand-50 dark:bg-apple-hoverDark text-brand-500 font-semibold{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-apple-hoverDark/50{% endif %}">
+                        <i class="fa-solid fa-clapperboard w-6 text-center text-[15px]"></i> 工单大厅
+                    </a>
+                    <a href="/users_manage" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'users' %}bg-brand-50 dark:bg-apple-hoverDark text-brand-500 font-semibold{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-apple-hoverDark/50{% endif %}">
+                        <i class="fa-solid fa-users-gear w-6 text-center text-[15px]"></i> 用户管理
+                    </a>
+                    <a href="/clients" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'clients' %}bg-brand-50 dark:bg-apple-hoverDark text-brand-500 font-semibold{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-apple-hoverDark/50{% endif %}">
+                        <i class="fa-solid fa-desktop w-6 text-center text-[15px]"></i> 客户端管控
+                    </a>
+                    <a href="/calendar" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'calendar' %}bg-brand-50 dark:bg-apple-hoverDark text-brand-500 font-semibold{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-apple-hoverDark/50{% endif %}">
+                        <i class="fa-solid fa-calendar-days w-6 text-center text-[15px]"></i> 追剧日历
+                    </a>
+                </div>
+            </div>
+
+            <div>
+                <p class="px-3 text-[11px] font-semibold text-gray-400 dark:text-gray-500 mb-2">系统与构建</p>
+                <div class="space-y-0.5">
+                    <a href="/bot" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'bot' %}bg-brand-50 dark:bg-apple-hoverDark text-brand-500 font-semibold{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-apple-hoverDark/50{% endif %}">
                         <i class="fa-solid fa-robot w-6 text-center text-[15px]"></i> 机器人助手
                     </a>
-                    <a href="/tasks" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'tasks' %}bg-white dark:bg-apple-cardDark text-brand-500 shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark{% endif %}">
+                    <a href="/tasks" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'tasks' %}bg-brand-50 dark:bg-apple-hoverDark text-brand-500 font-semibold{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-apple-hoverDark/50{% endif %}">
                         <i class="fa-solid fa-bolt w-6 text-center text-[15px]"></i> 任务中心
                     </a>
-                    <a href="/report" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'report' %}bg-white dark:bg-apple-cardDark text-brand-500 shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark{% endif %}">
+                    <a href="/report" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'report' %}bg-brand-50 dark:bg-apple-hoverDark text-brand-500 font-semibold{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-apple-hoverDark/50{% endif %}">
                         <i class="fa-solid fa-wand-magic-sparkles w-6 text-center text-[15px]"></i> 映迹工坊
                     </a>
-                    <a href="/settings" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'settings' %}bg-white dark:bg-apple-cardDark text-brand-500 shadow-sm{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark{% endif %}">
+                    <a href="/settings" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'settings' %}bg-brand-50 dark:bg-apple-hoverDark text-brand-500 font-semibold{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-apple-hoverDark/50{% endif %}">
                         <i class="fa-solid fa-gear w-6 text-center text-[15px]"></i> 系统设置
+                    </a>
+                    <a href="/about" class="nav-item flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-colors {% if active_page == 'about' %}bg-brand-50 dark:bg-apple-hoverDark text-brand-500 font-semibold{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-apple-hoverDark/50{% endif %}">
+                        <i class="fa-solid fa-circle-info w-6 text-center text-[15px]"></i> 关于与支持
                     </a>
                 </div>
             </div>
@@ -114,7 +118,7 @@
 
     <div class="flex-1 flex flex-col min-w-0 h-screen relative">
         
-        <header class="h-[72px] shrink-0 bg-apple-gray/70 dark:bg-apple-dark/70 backdrop-blur-2xl saturate-150 flex items-center justify-between px-4 md:px-8 z-40 sticky top-0 border-b border-gray-200/30 dark:border-white/5">
+        <header class="h-[72px] shrink-0 bg-apple-cardLight/80 dark:bg-apple-cardDark/80 backdrop-blur-2xl saturate-150 flex items-center justify-between px-4 md:px-8 z-40 sticky top-0 border-b border-apple-borderLight dark:border-apple-borderDark">
             
             <div class="flex items-center gap-3 md:hidden">
                 <img src="/static/img/logo-app.png" class="w-7 h-7">
@@ -122,49 +126,48 @@
             </div>
 
             <div class="hidden md:flex items-center flex-1">
-                <button onclick="openGlobalSearch()" class="flex items-center gap-3 px-4 py-2 bg-gray-200/50 hover:bg-gray-200 dark:bg-apple-cardDark dark:hover:bg-apple-hoverDark rounded-xl text-[13px] text-gray-500 dark:text-gray-400 transition-colors w-72 shadow-sm border border-transparent dark:border-white/5">
+                <button onclick="openGlobalSearch()" class="flex items-center gap-3 px-4 py-2 bg-gray-100/80 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] rounded-[10px] text-[13px] text-gray-500 dark:text-gray-400 transition-colors w-80">
                     <i class="fa-solid fa-magnifying-glass"></i> <span class="font-medium flex-1 text-left">搜索媒体库...</span>
-                    <kbd class="text-[10px] font-mono font-medium bg-white dark:bg-black/50 px-1.5 py-0.5 rounded shadow-sm border border-gray-200 dark:border-white/5">Cmd+K</kbd>
+                    <kbd class="text-[10px] font-mono font-bold bg-white dark:bg-black/50 px-1.5 py-0.5 rounded shadow-sm border border-gray-200 dark:border-white/5">Cmd+K</kbd>
                 </button>
             </div>
 
             <div class="flex items-center gap-2 relative">
-                
                 <button onclick="openGlobalSearch()" class="md:hidden w-10 h-10 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300">
                     <i class="fa-solid fa-magnifying-glass"></i>
                 </button>
 
-                <button onclick="toggleLiveDropdown()" id="global-live-btn" class="relative w-10 h-10 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark transition-colors">
+                <button onclick="toggleLiveDropdown()" id="global-live-btn" class="relative w-10 h-10 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-apple-hoverDark transition-colors">
                     <i class="fa-solid fa-satellite-dish"></i>
                     <span id="global-live-badge" class="hidden absolute top-[6px] right-[6px] flex h-2.5 w-2.5">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border-2 border-apple-gray dark:border-apple-dark"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border-2 border-white dark:border-apple-cardDark"></span>
                     </span>
                 </button>
 
-                <button onclick="toggleNotifyDropdown()" class="notify-bell-btn relative w-10 h-10 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark transition-colors">
+                <button onclick="toggleNotifyDropdown()" class="notify-bell-btn relative w-10 h-10 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-apple-hoverDark transition-colors">
                     <i class="fa-regular fa-bell"></i>
-                    <span id="notify-badge-desktop" class="hidden absolute top-[6px] right-[6px] h-2.5 w-2.5 bg-brand-500 rounded-full border-2 border-apple-gray dark:border-apple-dark animate-pulse"></span>
+                    <span id="notify-badge-desktop" class="hidden absolute top-[6px] right-[6px] h-2.5 w-2.5 bg-brand-500 rounded-full border-2 border-white dark:border-apple-cardDark animate-pulse"></span>
                 </button>
 
-                <button onclick="toggleTheme()" class="w-10 h-10 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark transition-colors">
+                <button onclick="toggleTheme()" class="w-10 h-10 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-apple-hoverDark transition-colors">
                     <i class="fa-solid fa-moon dark:hidden"></i>
                     <i class="fa-solid fa-sun hidden dark:block text-yellow-400"></i>
                 </button>
 
-                <div class="hidden md:flex items-center ml-2 pl-2 border-l border-gray-200 dark:border-white/10">
-                    <div class="relative w-8 h-8 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-800 shrink-0 border border-gray-200/50 dark:border-gray-700 shadow-sm">
+                <div class="hidden md:flex items-center ml-2 pl-2 border-l border-gray-200 dark:border-apple-borderDark">
+                    <div class="relative w-8 h-8 rounded-full overflow-hidden bg-gray-100 dark:bg-[#2C2C2E] shrink-0 border border-gray-200/50 dark:border-white/5 shadow-sm">
                         <img src="/api/proxy/user_image/{{ user.Id if user and user.Id else '' }}" 
                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" 
-                             class="w-full h-full object-cover absolute inset-0 z-10" alt="Avatar">
-                        <div class="w-full h-full flex items-center justify-center font-bold text-gray-500 dark:text-gray-300 text-xs bg-gray-100 dark:bg-apple-hoverDark absolute inset-0 z-0" style="display: none;">
+                             class="w-full h-full object-cover absolute inset-0 z-10">
+                        <div class="w-full h-full flex items-center justify-center font-bold text-gray-500 dark:text-gray-300 text-xs absolute inset-0 z-0" style="display: none;">
                             {{ (user.name[0] if user and user.name else 'A') | upper }}
                         </div>
                     </div>
                 </div>
             </div>
             
-            <div id="global-live-panel" class="absolute top-[100%] right-0 md:right-28 mt-2 w-[280px] sm:w-[320px] bg-white/90 dark:bg-apple-cardDark/90 backdrop-blur-2xl rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.6)] border border-gray-100 dark:border-white/5 overflow-hidden z-[100] transform scale-95 opacity-0 hidden transition-all duration-200 origin-top-right">
+            <div id="global-live-panel" class="absolute top-[100%] right-0 md:right-28 mt-2 w-[280px] sm:w-[320px] bg-white/90 dark:bg-[#2C2C2E]/90 backdrop-blur-2xl rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.6)] border border-gray-100 dark:border-white/5 overflow-hidden z-[100] transform scale-95 opacity-0 hidden transition-all duration-200 origin-top-right">
                 <div class="px-4 py-3 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-black/20">
                     <h4 class="font-bold text-[13px] flex items-center"><span class="w-1.5 h-1.5 rounded-full bg-red-500 mr-2 animate-pulse"></span>正在热播</h4>
                     <span class="text-[10px] font-medium text-gray-400" id="global-live-status-text">空闲中</span>
@@ -173,10 +176,10 @@
                     <div class="py-10 text-center text-xs text-gray-400 font-medium">当前无人观看</div>
                 </div>
             </div>
-            <div id="notify-panel" class="absolute top-[100%] right-0 md:right-16 mt-2 w-[320px] bg-white/90 dark:bg-apple-cardDark/90 backdrop-blur-2xl rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.6)] border border-gray-100 dark:border-white/5 overflow-hidden z-[100] transform scale-95 opacity-0 hidden transition-all duration-200 origin-top-right">
+            <div id="notify-panel" class="absolute top-[100%] right-0 md:right-16 mt-2 w-[320px] bg-white/90 dark:bg-[#2C2C2E]/90 backdrop-blur-2xl rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.6)] border border-gray-100 dark:border-white/5 overflow-hidden z-[100] transform scale-95 opacity-0 hidden transition-all duration-200 origin-top-right">
                 <div class="px-4 py-3 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-black/20">
                     <h3 class="font-bold text-[13px]">待处理工单</h3>
-                    <span id="notify-count-text" class="text-[10px] font-medium bg-gray-100 dark:bg-apple-hoverDark px-2 py-0.5 rounded-full">0 条</span>
+                    <span id="notify-count-text" class="text-[10px] font-medium bg-gray-100 dark:bg-[#3A3A3C] px-2 py-0.5 rounded-full">0 条</span>
                 </div>
                 <div id="notify-list" class="max-h-[50vh] overflow-y-auto hide-scrollbar p-2 flex flex-col gap-1"></div>
             </div>
@@ -188,7 +191,7 @@
     </div>
 
     <div class="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] z-50">
-        <div class="bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-xl border border-gray-200/50 dark:border-white/5 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.1)] px-2 py-1.5 flex justify-between items-center">
+        <div class="bg-white/90 dark:bg-[#2C2C2E]/90 backdrop-blur-xl border border-gray-200/50 dark:border-white/5 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.1)] px-2 py-1.5 flex justify-between items-center">
             <a href="/" class="flex flex-col items-center justify-center flex-1 py-1.5 transition-colors {% if active_page == 'dashboard' %}text-brand-500{% else %}text-gray-400{% endif %}">
                 <i class="fa-solid fa-chart-line text-lg mb-0.5"></i><span class="text-[10px] font-medium">数据</span>
             </a>
@@ -206,7 +209,7 @@
     </div>
 
     <div id="bottom-sheet-overlay" onclick="toggleBottomSheet()" class="fixed inset-0 bg-black/40 z-[60] hidden backdrop-blur-sm transition-opacity opacity-0 md:hidden"></div>
-    <div id="bottom-sheet" class="fixed inset-x-0 bottom-0 z-[70] bg-apple-gray dark:bg-apple-dark rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] transform translate-y-full transition-transform duration-400 ease-out border-t border-gray-200 dark:border-white/5 md:hidden pb-10 flex flex-col max-h-[85vh]">
+    <div id="bottom-sheet" class="fixed inset-x-0 bottom-0 z-[70] bg-apple-bgLight dark:bg-apple-bgDark rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] transform translate-y-full transition-transform duration-400 ease-out border-t border-gray-200 dark:border-white/5 md:hidden pb-10 flex flex-col max-h-[85vh]">
         <div class="flex justify-center pt-4 pb-3 shrink-0">
             <div class="w-10 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
         </div>

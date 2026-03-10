@@ -5,25 +5,24 @@
     .hide-scrollbar::-webkit-scrollbar { display: none; }
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-    /* === 🔥 Apple 级极简卡片质感 === */
+    /* === 🔥 Apple 级极简卡片质感 (背景纯白/深灰，弥散阴影) === */
     .apple-card { 
-        background-color: #ffffff; 
+        background-color: #FFFFFF; 
         border-radius: 24px; 
         padding: 24px; 
-        /* 极其微弱的弥散阴影，告别廉价感 */
-        box-shadow: 0 4px 24px -8px rgba(0,0,0,0.04);
+        box-shadow: 0 4px 24px -8px rgba(0,0,0,0.04); /* 苹果风极浅阴影 */
         border: 1px solid rgba(0,0,0,0.02);
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
     html.dark .apple-card {
-        background-color: #1C1C1E; /* iOS 标准卡片底色 */
+        background-color: #1C1C1E; /* iOS 标准卡片色 */
         box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.4);
         border: 1px solid rgba(255,255,255,0.04);
     }
 
     .user-rank-card { transition: all 0.2s ease-out; cursor: pointer; }
-    .user-rank-card:hover { background-color: #F5F5F7; }
+    .user-rank-card:hover { background-color: #F2F2F7; }
     html.dark .user-rank-card:hover { background-color: #2C2C2E; }
     
     .user-rank-arrow { opacity: 0; transform: translateX(-4px); transition: all 0.2s ease-out; }
@@ -62,7 +61,7 @@
             <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400 z-10">
                 <i class="fa-solid fa-earth-americas"></i>
             </div>
-            <select id="dash-user-select" onchange="changeUser()" class="w-full md:w-60 appearance-none bg-gray-100/80 hover:bg-gray-200 dark:bg-apple-hoverDark dark:hover:bg-[#3A3A3C] border-none text-gray-800 dark:text-gray-200 py-2.5 pl-10 pr-10 rounded-full focus:outline-none focus:ring-0 text-[13px] font-medium transition-colors cursor-pointer">
+            <select id="dash-user-select" onchange="changeUser()" class="w-full md:w-60 appearance-none bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] border-none text-gray-800 dark:text-gray-200 py-2.5 pl-10 pr-10 rounded-full focus:outline-none focus:ring-0 text-[13px] font-medium transition-colors cursor-pointer">
                 <option value="all">全站统计数据 (All Users)</option>
             </select>
             <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400 z-10">
@@ -72,20 +71,30 @@
     </div>
 
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
+        
         <div class="apple-card stat-card-mobile flex flex-col justify-center">
             <h3 class="text-[15px] font-semibold tracking-wide mb-4 md:mb-5 text-gray-800 dark:text-gray-200">媒体库储量</h3>
             <div class="grid grid-cols-3 gap-3 md:gap-4">
-                <div class="rounded-2xl bg-blue-50 dark:bg-blue-500/10 p-4 md:p-5">
-                    <p class="text-[11px] font-semibold text-blue-600 dark:text-blue-400 mb-1 opacity-80">电影</p>
-                    <p class="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight" id="lib-movies">-</p>
+                <div class="relative overflow-hidden rounded-2xl bg-blue-50 dark:bg-blue-500/10 p-4 md:p-5 group">
+                    <i class="fa-solid fa-film absolute -right-3 -bottom-3 text-[50px] md:text-[70px] text-blue-500/10 dark:text-blue-400/10 transform group-hover:scale-110 group-hover:-rotate-6 transition-all duration-500"></i>
+                    <div class="relative z-10">
+                        <p class="text-[11px] font-semibold text-blue-600 dark:text-blue-400 mb-1 opacity-80">电影</p>
+                        <p class="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight font-mono" id="lib-movies">-</p>
+                    </div>
                 </div>
-                <div class="rounded-2xl bg-purple-50 dark:bg-purple-500/10 p-4 md:p-5">
-                    <p class="text-[11px] font-semibold text-purple-600 dark:text-purple-400 mb-1 opacity-80">剧集</p>
-                    <p class="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight" id="lib-series">-</p>
+                <div class="relative overflow-hidden rounded-2xl bg-purple-50 dark:bg-purple-500/10 p-4 md:p-5 group">
+                    <i class="fa-solid fa-tv absolute -right-3 -bottom-3 text-[50px] md:text-[70px] text-purple-500/10 dark:text-purple-400/10 transform group-hover:scale-110 group-hover:-rotate-6 transition-all duration-500"></i>
+                    <div class="relative z-10">
+                        <p class="text-[11px] font-semibold text-purple-600 dark:text-purple-400 mb-1 opacity-80">剧集</p>
+                        <p class="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight font-mono" id="lib-series">-</p>
+                    </div>
                 </div>
-                <div class="rounded-2xl bg-orange-50 dark:bg-orange-500/10 p-4 md:p-5">
-                    <p class="text-[11px] font-semibold text-orange-600 dark:text-orange-400 mb-1 opacity-80">总集数</p>
-                    <p class="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight" id="lib-episodes">-</p>
+                <div class="relative overflow-hidden rounded-2xl bg-orange-50 dark:bg-orange-500/10 p-4 md:p-5 group">
+                    <i class="fa-solid fa-layer-group absolute -right-3 -bottom-3 text-[50px] md:text-[70px] text-orange-500/10 dark:text-orange-400/10 transform group-hover:scale-110 group-hover:-rotate-6 transition-all duration-500"></i>
+                    <div class="relative z-10">
+                        <p class="text-[11px] font-semibold text-orange-600 dark:text-orange-400 mb-1 opacity-80">总集数</p>
+                        <p class="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight font-mono" id="lib-episodes">-</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -93,24 +102,33 @@
         <div class="apple-card stat-card-mobile flex flex-col justify-center">
             <h3 class="text-[15px] font-semibold tracking-wide mb-4 md:mb-5 text-gray-800 dark:text-gray-200">核心运营指标</h3>
             <div class="grid grid-cols-3 gap-3 md:gap-4">
-                <div class="rounded-2xl bg-green-50 dark:bg-green-500/10 p-4 md:p-5">
-                    <p class="text-[11px] font-semibold text-green-600 dark:text-green-400 mb-1 opacity-80">播放次数</p>
-                    <p class="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight" id="stat-plays">-</p>
+                <div class="relative overflow-hidden rounded-2xl bg-green-50 dark:bg-green-500/10 p-4 md:p-5 group">
+                    <i class="fa-solid fa-play absolute -right-3 -bottom-3 text-[50px] md:text-[70px] text-green-500/10 dark:text-green-400/10 transform group-hover:scale-110 group-hover:-rotate-6 transition-all duration-500"></i>
+                    <div class="relative z-10">
+                        <p class="text-[11px] font-semibold text-green-600 dark:text-green-400 mb-1 opacity-80">播放次数</p>
+                        <p class="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight font-mono" id="stat-plays">-</p>
+                    </div>
                 </div>
-                <div class="rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 p-4 md:p-5">
-                    <p class="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 mb-1 opacity-80">活跃观众</p>
-                    <p class="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight" id="stat-users">-</p>
+                <div class="relative overflow-hidden rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 p-4 md:p-5 group">
+                    <i class="fa-solid fa-users absolute -right-3 -bottom-3 text-[50px] md:text-[70px] text-indigo-500/10 dark:text-indigo-400/10 transform group-hover:scale-110 group-hover:-rotate-6 transition-all duration-500"></i>
+                    <div class="relative z-10">
+                        <p class="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 mb-1 opacity-80">活跃观众</p>
+                        <p class="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight font-mono" id="stat-users">-</p>
+                    </div>
                 </div>
-                <div class="rounded-2xl bg-pink-50 dark:bg-pink-500/10 p-4 md:p-5">
-                    <p class="text-[11px] font-semibold text-pink-600 dark:text-pink-400 mb-1 opacity-80">时长 (小时)</p>
-                    <p class="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight" id="stat-duration">-</p>
+                <div class="relative overflow-hidden rounded-2xl bg-pink-50 dark:bg-pink-500/10 p-4 md:p-5 group">
+                    <i class="fa-solid fa-clock absolute -right-3 -bottom-3 text-[50px] md:text-[70px] text-pink-500/10 dark:text-pink-400/10 transform group-hover:scale-110 group-hover:-rotate-6 transition-all duration-500"></i>
+                    <div class="relative z-10">
+                        <p class="text-[11px] font-semibold text-pink-600 dark:text-pink-400 mb-1 opacity-80">时长 (小时)</p>
+                        <p class="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight font-mono" id="stat-duration">-</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="apple-card w-full stat-card-mobile">
-        <h3 class="text-[15px] font-semibold tracking-wide mb-4 md:mb-5 text-gray-800 dark:text-gray-200">我的媒体库</h3>
+        <h3 class="text-[15px] font-semibold tracking-wide mb-4 md:mb-6 text-gray-800 dark:text-gray-200">我的媒体库</h3>
         <div id="library-container" class="flex overflow-x-auto hide-scrollbar gap-3 md:gap-4 snap-x md-fluid-grid-lib md:overflow-visible">
             <div class="w-full py-10 text-center text-sm text-gray-400 flex-shrink-0 col-span-full"><i class="fa-solid fa-spinner fa-spin mr-2"></i> 正在加载数据...</div>
         </div>
@@ -136,7 +154,7 @@
         <div class="lg:col-span-2 apple-card stat-card-mobile flex flex-col">
             <div class="flex justify-between items-center mb-4 md:mb-6">
                 <h3 class="text-[15px] font-semibold tracking-wide text-gray-800 dark:text-gray-200">趋势追踪</h3>
-                <div class="flex bg-gray-100 dark:bg-apple-hoverDark rounded-lg p-1 text-[11px] font-medium">
+                <div class="flex bg-gray-100 dark:bg-[#2C2C2E] rounded-lg p-1 text-[11px] font-medium">
                     <button onclick="switchTrend('day')" id="trend-btn-day" class="px-3.5 py-1.5 rounded-md bg-white dark:bg-gray-600 shadow-sm text-gray-900 dark:text-white transition">30天</button>
                     <button onclick="switchTrend('week')" id="trend-btn-week" class="px-3.5 py-1.5 rounded-md text-gray-500 hover:text-gray-900 dark:hover:text-white transition">12周</button>
                     <button onclick="switchTrend('month')" id="trend-btn-month" class="px-3.5 py-1.5 rounded-md text-gray-500 hover:text-gray-900 dark:hover:text-white transition">12月</button>
@@ -148,7 +166,7 @@
         <div class="apple-card flex flex-col stat-card-mobile h-[400px] md:h-auto">
             <div class="flex justify-between items-center mb-4 shrink-0">
                 <h3 class="text-[15px] font-semibold tracking-wide text-gray-800 dark:text-gray-200">白金观影榜</h3>
-                <div class="flex bg-gray-100 dark:bg-apple-hoverDark rounded-lg p-1 text-[11px] font-medium">
+                <div class="flex bg-gray-100 dark:bg-[#2C2C2E] rounded-lg p-1 text-[11px] font-medium">
                     <button onclick="switchTopUsers('day')" id="top-btn-day" class="px-2 py-1 rounded text-gray-500 hover:text-gray-900 dark:hover:text-white transition">今日</button>
                     <button onclick="switchTopUsers('week')" id="top-btn-week" class="px-2 py-1 rounded text-gray-500 hover:text-gray-900 dark:hover:text-white transition">本周</button>
                     <button onclick="switchTopUsers('month')" id="top-btn-month" class="px-2 py-1 rounded text-gray-500 hover:text-gray-900 dark:hover:text-white transition">本月</button>
@@ -221,7 +239,7 @@
                 json.data.forEach(user => {
                     const option = document.createElement('option');
                     option.value = user.UserId;
-                    option.innerText = `👤 ${user.UserName}`;
+                    option.innerText = `${user.UserName}`;
                     select.appendChild(option);
                 });
             }
@@ -261,7 +279,7 @@
                 json.data.forEach(lib => {
                     const imgUrl = `/api/proxy/image/${lib.Id}/primary`; 
                     html += `
-                    <div onclick="jumpToLibrary('${lib.Id}')" class="relative w-48 sm:w-60 md:w-full aspect-video flex-shrink-0 rounded-2xl overflow-hidden cursor-pointer snap-center bg-gray-200 dark:bg-gray-800">
+                    <div onclick="jumpToLibrary('${lib.Id}')" class="relative w-48 sm:w-60 md:w-full aspect-video flex-shrink-0 rounded-2xl overflow-hidden cursor-pointer snap-center bg-gray-200 dark:bg-[#2C2C2E]">
                         <img src="${imgUrl}" class="w-full h-full object-cover transition duration-500 opacity-90 hover:opacity-100 hover:scale-105" onerror="this.src='/static/img/logo-app.png'">
                         <div class="absolute bottom-0 inset-x-0 p-3 pb-3 flex justify-center items-end bg-gradient-to-t from-black/60 to-transparent">
                             <h4 class="text-white font-semibold text-sm md:text-[15px] truncate w-full text-center tracking-widest drop-shadow-md">${lib.Name}</h4>
@@ -286,7 +304,7 @@
                     
                     html += `
                     <div onclick="jumpToEmby('${item.Id}')" class="group relative w-24 sm:w-28 md:w-full flex-shrink-0 cursor-pointer snap-center">
-                        <div class="aspect-[2/3] rounded-xl overflow-hidden bg-gray-100 dark:bg-apple-hoverDark relative border border-gray-100 dark:border-white/5">
+                        <div class="aspect-[2/3] rounded-xl overflow-hidden bg-gray-100 dark:bg-[#2C2C2E] relative border border-gray-100 dark:border-white/5">
                             <img src="${imgUrl}" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" onerror="this.src='/static/img/logo-app.png'">
                         </div>
                         <div class="mt-2 px-0.5">
@@ -312,7 +330,7 @@
                     const imgUrl = `/api/proxy/image/${item.ItemId}/primary`;
                     html += `
                     <div onclick="jumpToEmby('${item.ItemId}')" class="group relative w-24 sm:w-28 md:w-full flex-shrink-0 cursor-pointer snap-center">
-                        <div class="aspect-[2/3] rounded-xl overflow-hidden bg-gray-100 dark:bg-apple-hoverDark relative border border-gray-100 dark:border-white/5">
+                        <div class="aspect-[2/3] rounded-xl overflow-hidden bg-gray-100 dark:bg-[#2C2C2E] relative border border-gray-100 dark:border-white/5">
                             <img src="${imgUrl}" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" onerror="this.src='/static/img/logo-app.png'">
                             <div class="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent flex items-end">
                                 <p class="text-[10px] text-white font-medium truncate flex items-center w-full drop-shadow-md"><i class="fa-solid fa-play text-[8px] mr-1.5 opacity-80"></i>${item.UserName}</p>
@@ -350,8 +368,7 @@
             if (json.status === 'success' && json.data.length > 0) {
                 let html = '';
                 json.data.forEach((user, index) => {
-                    // Apple 风克制色彩，去掉花哨渐变
-                    let rankClass = "bg-gray-100 text-gray-500 dark:bg-apple-hoverDark dark:text-gray-400";
+                    let rankClass = "bg-gray-100 text-gray-500 dark:bg-[#2C2C2E] dark:text-gray-400";
                     if(index === 0) rankClass = "bg-brand-500 text-white";
                     if(index === 1) rankClass = "bg-gray-800 text-white dark:bg-gray-300 dark:text-black";
                     if(index === 2) rankClass = "bg-gray-400 text-white dark:bg-gray-600 dark:text-white";
