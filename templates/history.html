@@ -1,62 +1,100 @@
 {% extends "layout.html" %}
 {% block title %}播放历史 - EmbyPulse{% endblock %}
 
-{% block content %}
-<div class="max-w-7xl mx-auto w-full px-4 md:px-8 py-8 pb-24">
+{% block head %}
+<style>
+    /* === 🔥 Apple 级极简卡片质感 === */
+    .apple-card { 
+        background-color: rgba(255, 255, 255, 0.95); 
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 24px; 
+        padding: 24px; 
+        box-shadow: 0 4px 24px -8px rgba(0,0,0,0.04);
+        border: 1px solid rgba(0,0,0,0.02);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
     
-    <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-        <div>
-            <h1 class="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                <i class="fa-solid fa-clock-rotate-left text-blue-500"></i> 播放历史
-            </h1>
-            <p class="text-xs text-gray-500 mt-1">查看所有用户的详细观影记录</p>
+    html.dark .apple-card {
+        background-color: rgba(28, 28, 30, 0.85); 
+        box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255,255,255,0.04);
+    }
+
+    @media (min-width: 768px) {
+        .apple-card:hover { transform: translateY(-2px); box-shadow: 0 12px 32px -8px rgba(0,0,0,0.08); }
+        html.dark .apple-card:hover { box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.6); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-[1600px] mx-auto py-4 pb-32 px-4 sm:px-6 md:px-8 space-y-4 md:space-y-6">
+    
+    <div class="apple-card flex flex-col xl:flex-row xl:items-center justify-between gap-6 w-full p-5 md:p-6">
+        
+        <div class="flex items-center gap-4 pl-1 shrink-0">
+            <div class="w-12 h-12 rounded-[14px] bg-gradient-to-br from-slate-400 to-slate-600 text-white flex items-center justify-center text-xl shadow-lg shadow-slate-500/30 shrink-0">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <div>
+                <h2 class="text-xl md:text-[22px] font-bold tracking-tight text-gray-900 dark:text-white">播放历史</h2>
+                <div class="text-[12px] text-gray-500 mt-1 font-medium flex items-center gap-1.5">
+                    <i class="fa-solid fa-server opacity-70"></i> <span>查看全站用户的详细观影流水</span>
+                </div>
+            </div>
         </div>
         
-        <div class="glass-card bg-white dark:bg-gray-800 p-2 rounded-xl flex flex-col md:flex-row gap-2 w-full md:w-auto">
-            <select id="filter-user" onchange="loadHistory(1)" class="bg-gray-50 dark:bg-gray-700 border-none text-sm rounded-lg px-3 py-2 w-full md:w-40 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-gray-700 dark:text-gray-200">
-                <option value="all">👥 所有用户</option>
-            </select>
+        <div class="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
             
-            <div class="relative w-full md:w-64">
-                <input type="text" id="filter-keyword" placeholder="搜索电影/剧集名称..." 
-                       onkeydown="if(event.key==='Enter') loadHistory(1)"
-                       class="w-full bg-gray-50 dark:bg-gray-700 pl-9 pr-3 py-2 rounded-lg text-sm border-none focus:ring-2 focus:ring-blue-500 outline-none text-gray-700 dark:text-gray-200">
-                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-400 text-xs"></i>
+            <div class="relative w-full sm:w-48 shrink-0">
+                <div class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400 z-10"><i class="fa-solid fa-users"></i></div>
+                <select id="filter-user" onchange="loadHistory(1)" class="w-full appearance-none bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] border border-transparent dark:border-white/5 text-gray-800 dark:text-gray-200 py-2.5 pl-10 pr-8 rounded-[12px] focus:outline-none focus:ring-2 focus:ring-slate-500/50 text-[13px] font-bold transition-all cursor-pointer shadow-sm">
+                    <option value="all">所有用户大盘</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-gray-400 z-10"><i class="fa-solid fa-chevron-down text-[10px]"></i></div>
             </div>
             
-            <button onclick="loadHistory(1)" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold text-sm transition shadow-sm whitespace-nowrap">
-                查询
+            <div class="relative w-full sm:w-64 flex shrink-0">
+                <div class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400"><i class="fa-solid fa-magnifying-glass text-[13px]"></i></div>
+                <input type="text" id="filter-keyword" placeholder="搜索影视名称..." 
+                       onkeydown="if(event.key==='Enter') loadHistory(1)"
+                       class="w-full bg-gray-100 dark:bg-[#2C2C2E] pl-9 pr-4 py-2.5 rounded-[12px] border border-transparent dark:border-white/5 focus:bg-white dark:focus:bg-black/30 focus:ring-2 focus:ring-slate-500 outline-none text-[13px] font-medium text-gray-700 dark:text-gray-200 transition-all shadow-sm placeholder-gray-400">
+            </div>
+            
+            <button onclick="loadHistory(1)" class="w-full sm:w-auto bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-[12px] font-bold text-[13px] shadow-md transition-all active:scale-95 shrink-0 whitespace-nowrap">
+                立即查询
             </button>
         </div>
     </div>
 
-    <div class="glass-card bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
+    <div class="apple-card p-0 overflow-hidden flex flex-col min-h-[500px]">
         
-        <div class="hidden md:block overflow-x-auto">
-            <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                <thead class="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-700/50">
+        <div class="hidden md:block overflow-x-auto mac-scrollbar flex-1 relative bg-gray-50/30 dark:bg-black/10">
+            <table class="w-full text-left text-[13px] text-gray-600 dark:text-gray-300">
+                <thead class="bg-gray-50 dark:bg-black/20 text-gray-500 dark:text-gray-400 font-bold border-b border-gray-100 dark:border-white/5 uppercase tracking-wider text-[11px] sticky top-0 z-10 backdrop-blur-md">
                     <tr>
-                        <th class="px-6 py-3">时间</th>
-                        <th class="px-6 py-3">用户</th>
-                        <th class="px-6 py-3">内容</th>
-                        <th class="px-6 py-3">时长</th>
-                        <th class="px-6 py-3">客户端</th>
-                        <th class="px-6 py-3 text-right">设备</th>
+                        <th class="px-6 py-3.5">时间</th>
+                        <th class="px-6 py-3.5">用户</th>
+                        <th class="px-6 py-3.5">内容媒体</th>
+                        <th class="px-6 py-3.5">观影时长</th>
+                        <th class="px-6 py-3.5">客户端接入</th>
+                        <th class="px-6 py-3.5 text-right">终端设备</th>
                     </tr>
                 </thead>
-                <tbody id="history-table-body">
+                <tbody class="divide-y divide-gray-50 dark:divide-white/5" id="history-table-body">
                     </tbody>
             </table>
         </div>
 
-        <div class="md:hidden p-4 space-y-3" id="history-mobile-list">
+        <div class="md:hidden flex-1 p-0 divide-y divide-gray-100 dark:divide-white/5 bg-white dark:bg-transparent" id="history-mobile-list">
             </div>
 
-        <div class="mt-auto border-t border-gray-100 dark:border-gray-700 p-4 flex items-center justify-between bg-gray-50 dark:bg-gray-800/50">
-            <span class="text-xs text-gray-500 font-medium" id="page-info">第 1 页</span>
-            <div class="flex gap-2">
-                <button onclick="changePage(-1)" id="btn-prev" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50">上一页</button>
-                <button onclick="changePage(1)" id="btn-next" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50">下一页</button>
+        <div class="border-t border-gray-100 dark:border-white/5 p-4 md:px-6 flex items-center justify-between bg-gray-50/50 dark:bg-[#1C1C1E] shrink-0 rounded-b-2xl">
+            <span class="text-[12px] text-gray-500 font-bold tracking-widest uppercase" id="page-info">第 1 页</span>
+            <div class="flex gap-2.5">
+                <button onclick="changePage(-1)" id="btn-prev" class="px-4 py-2.5 text-[12px] font-bold rounded-[10px] bg-white dark:bg-[#2C2C2E] border border-gray-200/50 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#3A3A3C] text-gray-700 dark:text-gray-200 disabled:opacity-30 transition-all shadow-sm active:scale-95">上一页</button>
+                <button onclick="changePage(1)" id="btn-next" class="px-4 py-2.5 text-[12px] font-bold rounded-[10px] bg-white dark:bg-[#2C2C2E] border border-gray-200/50 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-[#3A3A3C] text-gray-700 dark:text-gray-200 disabled:opacity-30 transition-all shadow-sm active:scale-95">下一页</button>
             </div>
         </div>
     </div>
@@ -82,7 +120,7 @@
                 json.data.forEach(u => {
                     const opt = document.createElement('option');
                     opt.value = u.UserId;
-                    opt.innerText = u.UserName;
+                    opt.innerText = u.UserName; // 剥离掉原先杂乱的表情符号
                     select.appendChild(opt);
                 });
             }
@@ -95,15 +133,15 @@
         const tbody = document.getElementById('history-table-body');
         const mobileList = document.getElementById('history-mobile-list');
         
-        // Loading 状态
-        const loadingHTML = '<tr><td colspan="6" class="text-center py-12"><i class="fa-solid fa-circle-notch fa-spin text-2xl text-blue-500"></i></td></tr>';
-        const mobileLoading = '<div class="text-center py-12"><i class="fa-solid fa-circle-notch fa-spin text-2xl text-blue-500"></i></div>';
+        // 高级骨架屏风格 Loading
+        const loadingHTML = '<tr><td colspan="6" class="text-center py-20"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-slate-400"></i><p class="text-xs font-bold text-slate-400 mt-3 animate-pulse tracking-widest">调取时空数据...</p></td></tr>';
+        const mobileLoading = '<div class="text-center py-20"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-slate-400"></i><p class="text-xs font-bold text-slate-400 mt-3 animate-pulse tracking-widest">调取时空数据...</p></div>';
         
         tbody.innerHTML = loadingHTML;
         mobileList.innerHTML = mobileLoading;
 
         try {
-            const res = await fetch(`/api/history/list?page=${page}&limit=15&user_id=${userId}&keyword=${encodeURIComponent(keyword)}`);
+            const res = await fetch(`/api/history/list?page=${page}&limit=20&user_id=${userId}&keyword=${encodeURIComponent(keyword)}`);
             const json = await res.json();
             
             if(json.status === 'success') {
@@ -115,61 +153,67 @@
                 updatePagination();
 
                 if(data.length === 0) {
-                    const emptyHTML = '<tr><td colspan="6" class="text-center py-12 text-gray-400 text-xs">暂无记录</td></tr>';
+                    const emptyHTML = '<tr><td colspan="6" class="text-center py-24 text-gray-400 text-[13px] font-bold tracking-widest"><i class="fa-solid fa-ghost mr-2 opacity-50"></i> 当前维度下暂无记录</td></tr>';
                     tbody.innerHTML = emptyHTML;
-                    mobileList.innerHTML = '<div class="text-center py-12 text-gray-400 text-xs">暂无记录</div>';
+                    mobileList.innerHTML = '<div class="text-center py-24 text-gray-400 text-[13px] font-bold tracking-widest"><i class="fa-solid fa-ghost mr-2 opacity-50"></i> 当前维度下暂无记录</div>';
                     return;
                 }
 
-                // 渲染表格 (电脑端) - 🔥 已移除 IP 显示
+                // 渲染表格 (电脑端)
                 tbody.innerHTML = data.map(item => `
-                    <tr class="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
-                        <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-500 font-mono">${item.DateStr}</td>
-                        <td class="px-6 py-4 font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            <div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px]">${item.UserName[0]}</div>
-                            ${item.UserName}
+                    <tr class="hover:bg-gray-50/80 dark:hover:bg-[#2C2C2E]/40 transition-colors group cursor-default">
+                        <td class="px-6 py-3.5 whitespace-nowrap text-[11px] text-gray-500 font-mono tracking-tight group-hover:text-slate-500 transition-colors">${item.DateStr}</td>
+                        <td class="px-6 py-3.5 whitespace-nowrap">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-6 h-6 rounded-md bg-slate-100 dark:bg-[#3A3A3C] text-slate-600 dark:text-slate-300 flex items-center justify-center text-[10px] font-bold shadow-sm border border-gray-200/50 dark:border-white/5 shrink-0">${item.UserName[0]}</div>
+                                <span class="font-bold text-gray-900 dark:text-white text-[13px]">${item.UserName}</span>
+                            </div>
                         </td>
-                        <td class="px-6 py-4">
-                            <div class="font-medium text-gray-800 dark:text-gray-200">${item.ItemName}</div>
-                            <div class="text-[10px] text-gray-400">${item.ItemType || '未知类型'}</div>
+                        <td class="px-6 py-3.5">
+                            <div class="font-bold text-[13px] text-gray-800 dark:text-gray-200 leading-tight mb-0.5 max-w-[240px] truncate" title="${item.ItemName}">${item.ItemName}</div>
+                            <div class="text-[9px] text-gray-400 font-bold tracking-wider uppercase">${item.ItemType || '未知分类'}</div>
                         </td>
-                        <td class="px-6 py-4 text-xs font-mono text-gray-600 dark:text-gray-300">${item.DurationStr}</td>
-                        <td class="px-6 py-4 text-xs text-gray-500">${item.ClientName || '未知'}</td>
-                        <td class="px-6 py-4 text-right text-xs text-gray-400">
-                            <div>${item.DeviceName || '未知设备'}</div>
+                        <td class="px-6 py-3.5 text-[12px] font-mono font-bold text-slate-600 dark:text-slate-400">${item.DurationStr}</td>
+                        <td class="px-6 py-3.5 text-[12px] text-gray-500 font-medium truncate max-w-[120px]" title="${item.ClientName || '未知'}">${item.ClientName || '未知'}</td>
+                        <td class="px-6 py-3.5 text-right text-[12px] text-gray-500 font-medium">
+                            <div class="max-w-[140px] truncate ml-auto" title="${item.DeviceName}">${item.DeviceName || '未知终端'}</div>
                         </td>
                     </tr>
                 `).join('');
 
-                // 渲染卡片 (手机端)
+                // 渲染列表 (手机端 - iOS 设置风)
                 mobileList.innerHTML = data.map(item => `
-                    <div class="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
-                        <div class="flex justify-between items-start mb-2">
-                            <div class="flex items-center gap-2">
-                                <div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold">${item.UserName[0]}</div>
-                                <span class="text-xs font-bold text-gray-700 dark:text-gray-200">${item.UserName}</span>
+                    <div class="p-4 flex flex-col gap-2 hover:bg-gray-50 dark:hover:bg-[#2C2C2E]/40 transition-colors active:bg-gray-100 dark:active:bg-[#3A3A3C]">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-6 h-6 rounded-md bg-slate-100 dark:bg-[#3A3A3C] text-slate-600 dark:text-slate-300 flex items-center justify-center text-[10px] font-bold shadow-sm border border-gray-200/50 dark:border-white/5">${item.UserName[0]}</div>
+                                <span class="text-[13px] font-bold text-gray-800 dark:text-gray-200">${item.UserName}</span>
                             </div>
                             <span class="text-[10px] text-gray-400 font-mono">${item.DateStr.split(' ')[0]}</span>
                         </div>
-                        <div class="font-bold text-gray-900 dark:text-white text-sm mb-1 line-clamp-1">${item.ItemName}</div>
-                        <div class="flex items-center justify-between mt-3">
-                            <div class="flex gap-2">
-                                <span class="px-2 py-0.5 bg-gray-200 dark:bg-gray-600 rounded text-[10px] text-gray-600 dark:text-gray-300">${item.DurationStr}</span>
-                                <span class="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded text-[10px]">${item.ClientName}</span>
+                        
+                        <div class="font-bold text-gray-900 dark:text-white text-[14px] leading-snug line-clamp-2 mt-0.5">${item.ItemName}</div>
+                        
+                        <div class="flex items-center justify-between mt-1">
+                            <div class="flex items-center gap-2">
+                                <span class="px-2 py-0.5 bg-gray-100 dark:bg-[#2C2C2E] rounded border border-gray-200/50 dark:border-white/5 text-[10px] font-mono font-bold text-gray-500 dark:text-gray-400 shadow-sm">${item.DurationStr}</span>
+                                <span class="px-2 py-0.5 bg-slate-50 dark:bg-slate-900/30 rounded border border-slate-200/50 dark:border-slate-700/50 text-[10px] font-bold text-slate-600 dark:text-slate-400 truncate max-w-[100px]">${item.ClientName}</span>
                             </div>
-                            <span class="text-[10px] text-gray-400">${item.DateStr.split(' ')[1]}</span>
+                            <span class="text-[10px] text-gray-400 font-mono tracking-wider">${item.DateStr.split(' ')[1]}</span>
                         </div>
                     </div>
                 `).join('');
             } 
-            // 🔥 新增错误处理分支
             else {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-12 text-red-500 text-xs">❌ 加载失败: ${json.message}</td></tr>`;
-                mobileList.innerHTML = `<div class="text-center py-12 text-red-500 text-xs">❌ 加载失败: ${json.message}</div>`;
+                const errHtml = `<tr><td colspan="6" class="text-center py-20"><div class="inline-flex items-center gap-2 bg-red-50 dark:bg-red-900/20 text-red-500 px-4 py-2 rounded-xl text-xs font-bold border border-red-100 dark:border-red-800/50"><i class="fa-solid fa-circle-exclamation"></i> 核心数据拉取失败: ${json.message}</div></td></tr>`;
+                tbody.innerHTML = errHtml;
+                mobileList.innerHTML = `<div class="p-6 flex justify-center">${errHtml.replace('<tr><td colspan="6" class="text-center py-20">', '').replace('</td></tr>', '')}</div>`;
             }
         } catch(e) {
             console.error(e);
-            alert("加载失败，请检查网络");
+            const errHtml = `<tr><td colspan="6" class="text-center py-20"><div class="inline-flex items-center gap-2 bg-red-50 dark:bg-red-900/20 text-red-500 px-4 py-2 rounded-xl text-xs font-bold border border-red-100 dark:border-red-800/50"><i class="fa-solid fa-wifi"></i> 服务器连接中断，请检查网络链路</div></td></tr>`;
+            tbody.innerHTML = errHtml;
+            mobileList.innerHTML = `<div class="p-6 flex justify-center">${errHtml.replace('<tr><td colspan="6" class="text-center py-20">', '').replace('</td></tr>', '')}</div>`;
         }
     }
 
@@ -181,7 +225,7 @@
     }
 
     function updatePagination() {
-        document.getElementById('page-info').innerText = `第 ${currentPage} / ${totalPages} 页`;
+        document.getElementById('page-info').innerText = `PAGE ${currentPage} / ${totalPages}`;
         document.getElementById('btn-prev').disabled = currentPage <= 1;
         document.getElementById('btn-next').disabled = currentPage >= totalPages;
     }
