@@ -74,7 +74,27 @@
         </a>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-12">
+    <div class="rounded-3xl border border-amber-100 dark:border-amber-700/40 bg-gradient-to-r from-amber-50 via-orange-50 to-white dark:from-amber-900/20 dark:via-orange-900/10 dark:to-gray-900 shadow-sm p-5 sm:p-6 mb-12">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h3 class="text-sm font-black text-gray-900 dark:text-white">赞赏支持</h3>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">如果 EmbyPulse 帮到了你，欢迎支持开发与维护</p>
+            </div>
+            <button onclick="toggleDonate()" class="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-black shadow-lg shadow-orange-500/30 active:scale-95 transition-all">
+                <i class="fa-solid fa-mug-hot"></i> 赞赏作者 (Buy me a coffee)
+            </button>
+        </div>
+        <div id="donate-card" class="mt-5 overflow-hidden transition-all duration-500 ease-in-out max-h-0 opacity-0">
+            <div class="bg-white/80 dark:bg-gray-900/40 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 flex flex-col items-center">
+                <p class="text-sm text-gray-600 dark:text-gray-300 font-bold mb-4">扫码支持，感谢你的认可</p>
+                <div class="w-48 md:w-56 rounded-2xl overflow-hidden border-4 border-gray-50 dark:border-gray-900 shadow-inner">
+                    <img src="/static/img/zanshangma.png" alt="赞赏码" class="w-full h-auto object-contain">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
         <div class="rounded-2xl border border-gray-100 dark:border-gray-700/60 bg-white dark:bg-gray-800 shadow-sm p-5">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-black text-gray-900 dark:text-white">功能矩阵</h3>
@@ -109,7 +129,6 @@
                 <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-gray-900/40 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">Docker</span>
                 <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-gray-900/40 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">群晖 / NAS</span>
                 <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-gray-900/40 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">云服务器</span>
-                <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-gray-900/40 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">极空间</span>
                 <span class="px-3 py-1 rounded-full text-[10px] font-bold bg-gray-100 dark:bg-gray-900/40 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700">本地部署</span>
             </div>
             <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-4">API 穿透与数据库直读双模式，适配几乎所有部署环境。</p>
@@ -131,25 +150,6 @@
         </div>
     </div>
 
-    <div class="rounded-3xl border border-gray-100 dark:border-gray-700/60 bg-white dark:bg-gray-800 shadow-sm p-6 sm:p-8">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-                <h3 class="text-lg font-black text-gray-900 dark:text-white">支持开发与维护</h3>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">开源不易，感谢你为服务器充入的一度电</p>
-            </div>
-            <button onclick="toggleDonate()" class="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-black shadow-lg shadow-orange-500/30 active:scale-95 transition-all">
-                <i class="fa-solid fa-mug-hot"></i> 赞赏作者 (Buy me a coffee)
-            </button>
-        </div>
-
-        <div id="donate-card" class="mt-6 overflow-hidden transition-all duration-500 ease-in-out max-h-0 opacity-0">
-            <div class="bg-gray-50 dark:bg-gray-900/40 p-6 rounded-3xl border border-gray-100 dark:border-gray-700 flex flex-col items-center">
-                <p class="text-sm text-gray-600 dark:text-gray-300 font-bold mb-4">扫码支持，感谢你的认可</p>
-                <div class="w-48 md:w-56 rounded-2xl overflow-hidden border-4 border-gray-50 dark:border-gray-900 shadow-inner">
-                    <img src="/static/img/zanshangma.png" alt="赞赏码" class="w-full h-auto object-contain">
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
