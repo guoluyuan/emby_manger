@@ -1,7 +1,6 @@
 import os
-import asyncio
+import socket
 import threading
-import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
@@ -25,23 +24,39 @@ if not os.path.exists(FONT_DIR): os.makedirs(FONT_DIR)
 init_db()
 
 # ==============================================================================
-# 🔥 黑客级双开引擎：在子线程强行拉起 10308 (无视 Docker 限制与多进程互殴)
+# 🔥 黑客级网络引擎：底层 TCP 流量微型转发器 (无视多进程冲突)
 # ==============================================================================
-def start_user_portal():
+def forward_data(source, destination):
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        # log_level="critical" 屏蔽多余日志，防止刷屏
-        config = uvicorn.Config(app, host="0.0.0.0", port=10308, log_level="critical")
-        server = uvicorn.Server(config)
+        while True:
+            data = source.recv(8192)
+            if not data: break
+            destination.sendall(data)
+    except Exception: pass
+    finally:
+        try: source.close()
+        except: pass
+        try: destination.close()
+        except: pass
+
+def start_tcp_proxy():
+    try:
+        # 创建一个纯底层的 TCP 监听器，不依赖任何 Web 框架
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind(('0.0.0.0', 10308))
+        server.listen(100)
+        print("🎈 [User Portal] 10308 端口已启动 (原生流量无感转发模式就绪)")
         
-        # 核心防崩溃：禁止子线程劫持系统信号，否则会引发主进程连环爆炸
-        server.install_signal_handlers = lambda: None 
-        
-        print("🎈 [User Portal] 求片中心专属端口 10308 已就绪！")
-        loop.run_until_complete(server.serve())
-    except OSError as e:
-        # 如果是多个 Worker 抢端口导致的 [Errno 98] 或 [Errno 48]，静默忽略
+        while True:
+            client_sock, _ = server.accept()
+            server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_sock.connect(('127.0.0.1', int(PORT))) # 内部悄悄连回主程序
+            
+            threading.Thread(target=forward_data, args=(client_sock, server_sock), daemon=True).start()
+            threading.Thread(target=forward_data, args=(server_sock, client_sock), daemon=True).start()
+    except OSError:
+        # 完美解决 Errno 98：如果是多进程启动，只有一个能抢到端口，剩下的静默退出，绝不崩服
         pass
     except Exception:
         pass
@@ -51,8 +66,8 @@ async def lifespan(app: FastAPI):
     print("🚀 Starting EmbyPulse...")
     bot.start()
     
-    # 🌟 在应用启动时，偷偷开个线程把 10308 端口跑起来
-    threading.Thread(target=start_user_portal, daemon=True).start()
+    # 🌟 启动极轻量级的 TCP 转发线程
+    threading.Thread(target=start_tcp_proxy, daemon=True).start()
     
     yield
     print("🛑 Stopping EmbyPulse...")
@@ -61,26 +76,22 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # ==============================================================================
-# 🔥 核心防御：10308 全环境穿透分流器 (完美支持 Host / 桥接 / Nginx 反代)
+# 🔥 核心防御：10308 专属隐形分流中间件
 # ==============================================================================
 @app.middleware("http")
 async def port_10308_dispatcher(request: Request, call_next):
-    # 1. 物理端口：针对 Host 模式，直接读取服务器底层 Socket 接收的实际物理端口
-    server_tuple = request.scope.get("server")
-    physical_port = server_tuple[1] if server_tuple else 0
+    # 获取浏览器发来的原始请求头（虽然走了内部转发，但 Host 头依然是 10308）
+    host_header = request.headers.get("host", "")
     
-    # 2. 逻辑端口：针对 Bridge 模式映射 (-p 10308:10307) 或反代，解析请求环境
-    logical_port = request.url.port
-    
-    # 铁律：只要物理端口或请求头里的逻辑端口是 10308，全部打入普通用户通道！
-    if physical_port == 10308 or logical_port == 10308:
+    # 铁律：只要网址后面带的是 10308，统统关进求片中心的小黑屋
+    if host_header.endswith(":10308"):
         path = request.url.path
         
-        # 隐形重写：访问根目录直接送去求片中心
+        # 隐形重写：访问根目录当做访问求片中心
         if path == "/":
             request.scope["path"] = "/request"
             
-        # 物理隔绝：只放行普通用户必须的路径，其余全部拉黑
+        # 物理隔绝：只放行这几个安全路径，后台的统统 404 封死
         allowed_prefixes = (
             "/request", "/request_login", 
             "/api/v1/request", "/api/proxy/smart_image", 
@@ -119,4 +130,5 @@ app.include_router(clients.router)
 app.include_router(gaps.router)
 
 if __name__ == "__main__":
+    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=PORT)
