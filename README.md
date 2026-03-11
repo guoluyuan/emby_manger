@@ -120,17 +120,15 @@ services:
     image: zeyu8023/emby-stats:latest
     container_name: emby-pulse
     restart: unless-stopped
-    network_mode: host
+    network_mode: host #默认端口号为10307
     volumes:
       - ./config:/app/config
       - /path/to/emby/data:/emby-data # API 模式下可不挂载数据库
     environment:
       - TZ=Asia/Shanghai
-      - DB_PATH=/emby-data/playback_reporting.db #API模式下可以不写，本地模式必填
-      #重要！必填，否则无法登录！账号密码为你emby管理员账号密码
-     - EMBY_HOST=http://127.0.0.1:8096
-      #选填，后续可以前往后台设置中添加
-     - EMBY_API_KEY=xxxxxxxxxxxxxxxxxxxxx
+      - DB_PATH=/emby-data/playback_reporting.db #API模式下可以不写，本地模式必填   
+     - EMBY_HOST=http://127.0.0.1:8096  #重要！必填，否则无法登录！账号密码为你emby管理员账号密码
+     - EMBY_API_KEY=xxxxxxxxxxxxxxxxxxxxx #选填，后续可以前往后台设置中添加
 ```
 
 ## ⚙️ 配置说明

@@ -48,12 +48,13 @@ class SystemDaemon:
 
     def stop(self): self.running = False
 
-  def on_webhook_event(self, event: str, data: dict):
+    def on_webhook_event(self, event: str, data: dict):
         """精准提取系统关注的核心事件"""
         if "item.added" in event or "library.new" in event:
             item = data.get("Item", {})
             if item.get("Id"):
                 self.add_library_task(item)
+                # 单集的同步与缺集闭环
                 if item.get("Type") == "Episode":
                     from app.services.calendar_service import calendar_service
                     calendar_service.mark_episode_ready(item.get("SeriesId"), item.get("ParentIndexNumber"), item.get("IndexNumber"))
@@ -1156,7 +1157,6 @@ class EmbyPulseOrchestrator:
     def push_now(self, user_id, period, theme):
         return self.notifier._cmd_stats("sys_notify", period, platform="all")
         
-    # 保留给那些没有用 webhook 的特殊内部路由调用
     def add_library_task(self, item):
         self.daemon.add_library_task(item)
         
