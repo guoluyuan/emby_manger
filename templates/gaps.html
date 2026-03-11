@@ -30,7 +30,6 @@
     .radar-sweep { background: conic-gradient(from 0deg at 50% 50%, transparent 270deg, rgba(99, 102, 241, 0.4) 360deg); border-radius: 50%; animation: radar-spin 2s linear infinite; }
     .dark .radar-sweep { background: conic-gradient(from 0deg at 50% 50%, transparent 270deg, rgba(129, 140, 248, 0.4) 360deg); }
     
-    /* 隐藏 search input 原生的清除按钮（因为我们自己写了） */
     input[type="search"]::-webkit-search-decoration,
     input[type="search"]::-webkit-search-cancel-button,
     input[type="search"]::-webkit-search-results-button,
@@ -123,23 +122,46 @@
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-2 font-medium">换个关键词试试，或者该剧很完美，没有缺集。</p>
     </div>
 
+    <div class="col-span-full flex flex-wrap items-center justify-between px-3 pb-2 gap-3" x-show="!isScanning && filteredGaps.length > 0" x-cloak>
+        <label class="flex items-center gap-2 cursor-pointer group">
+            <input type="checkbox" @click="toggleSelectAll()" :checked="selectedSeries.length > 0 && selectedSeries.length === displayedGaps.length" class="w-4 h-4 text-indigo-500 rounded cursor-pointer bg-white dark:bg-[#2C2C2E] border-gray-300 dark:border-gray-600 focus:ring-indigo-500">
+            <span class="text-[13px] text-gray-500 dark:text-gray-400 group-hover:text-gray-800 dark:group-hover:text-gray-200 font-bold transition">全选本页 <span x-text="displayedGaps.length"></span> 部剧集</span>
+        </label>
+
+        <div x-show="selectedSeries.length > 0" x-transition class="flex items-center gap-2.5 bg-white/50 dark:bg-[#2C2C2E]/50 px-3 py-1.5 rounded-xl border border-gray-200/50 dark:border-white/5 shadow-sm backdrop-blur-md">
+            <span class="text-[12px] font-black text-indigo-500">已选 <span x-text="selectedSeries.length"></span> 项</span>
+            <div class="w-[1px] h-4 bg-gray-300 dark:bg-gray-600 mx-1"></div>
+            <button @click="batchIgnoreSeries()" class="px-3 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 dark:text-rose-400 rounded-lg text-[12px] font-bold transition active:scale-95 shadow-sm flex items-center gap-1.5">
+                <i class="fa-solid fa-eye-slash"></i> 批量永久忽略
+            </button>
+        </div>
+    </div>
+
     <div x-show="!isScanning && filteredGaps.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-5" x-transition x-cloak>
         <template x-for="series in displayedGaps" :key="series.series_id">
             
-            <div :id="'card-' + series.series_id" class="relative apple-card !p-4 !rounded-[24px] transition-all duration-500 z-10 group hover:-translate-y-1 hover:shadow-lg overflow-hidden flex flex-row items-start gap-4 border border-gray-100 dark:border-white/5">
+            <div :id="'card-' + series.series_id" class="relative apple-card !p-4 !rounded-[24px] transition-all duration-500 z-10 group hover:-translate-y-1 hover:shadow-lg overflow-hidden flex flex-row items-center gap-4 border border-gray-100 dark:border-white/5"
+                 :class="selectedSeries.includes(series.series_id) ? 'ring-2 ring-indigo-500 bg-indigo-50/10 dark:bg-indigo-900/10' : ''">
                 
                 <div :id="'tint-' + series.series_id" class="absolute inset-0 z-0 opacity-[0.12] dark:opacity-20 pointer-events-none transition-colors duration-1000"></div>
 
-                <a :href="series.emby_url" target="_blank" class="shrink-0 relative rounded-[14px] overflow-hidden shadow-md aspect-[2/3] w-24 sm:w-28 xl:w-32 block group/poster border border-gray-200/50 dark:border-white/10 z-10">
-                    <img :src="series.poster" crossorigin="anonymous" loading="lazy" :data-color-done="false" :onload="`applyThemeColor(this, 'card-${series.series_id}')`" class="w-full h-full object-cover group-hover/poster:scale-105 transition-transform duration-500 bg-gray-100 dark:bg-[#2C2C2E]">
-                    <div class="absolute inset-0 bg-black/40 opacity-0 group-hover/poster:opacity-100 transition-opacity flex items-center justify-center">
-                        <i class="fa-solid fa-play text-white/90 text-2xl drop-shadow-lg"></i>
-                    </div>
-                </a>
-
-                <div class="flex-1 min-w-0 flex flex-col justify-start z-10 py-1 h-full">
+                <div class="shrink-0 relative rounded-[14px] overflow-hidden shadow-md aspect-[2/3] w-24 sm:w-28 xl:w-32 block group/poster border border-gray-200/50 dark:border-white/10 z-10">
                     
-                    <div class="flex justify-between items-start gap-2 mb-2.5">
+                    <div class="absolute top-2 left-2 z-30 transition-opacity duration-300" :class="selectedSeries.includes(series.series_id) ? 'opacity-100' : 'opacity-0 group-hover/poster:opacity-100'">
+                        <input type="checkbox" :value="series.series_id" x-model="selectedSeries" class="w-5 h-5 text-indigo-600 bg-white/80 backdrop-blur border-gray-300 rounded cursor-pointer shadow-sm focus:ring-indigo-500">
+                    </div>
+
+                    <a :href="series.emby_url" target="_blank" class="w-full h-full block">
+                        <img :src="series.poster" crossorigin="anonymous" loading="lazy" :data-color-done="false" :onload="`applyThemeColor(this, 'card-${series.series_id}')`" class="w-full h-full object-cover group-hover/poster:scale-105 transition-transform duration-500 bg-gray-100 dark:bg-[#2C2C2E]">
+                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover/poster:opacity-100 transition-opacity flex items-center justify-center">
+                            <i class="fa-solid fa-play text-white/90 text-2xl drop-shadow-lg"></i>
+                        </div>
+                    </a>
+                </div>
+
+                <div class="flex-1 min-w-0 flex flex-col justify-start z-10 py-1 max-h-[160px] xl:max-h-[180px]">
+                    
+                    <div class="flex justify-between items-start gap-2 mb-2.5 shrink-0">
                         <div class="min-w-0">
                             <h3 class="text-[14px] sm:text-[15px] xl:text-[16px] font-bold text-gray-900 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" x-text="series.series_name"></h3>
                             <div class="text-[10px] sm:text-[11px] text-gray-500 dark:text-gray-400 mt-1.5 flex items-center gap-1.5 font-medium">
@@ -151,7 +173,7 @@
                         </button>
                     </div>
 
-                    <div class="mt-1 overflow-y-auto pr-1 space-y-2.5 mac-scrollbar flex-1 max-h-[120px] sm:max-h-[140px] xl:max-h-[160px]">
+                    <div class="mt-1 overflow-y-auto pr-1 space-y-2.5 mac-scrollbar flex-1">
                         <template x-for="seasonGroup in series.grouped_gaps" :key="seasonGroup.season_num">
                             <div class="flex flex-col gap-1.5">
                                 <div class="flex items-center justify-between">
@@ -195,7 +217,6 @@
 
     <div x-show="configModal.open" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" x-cloak>
         <div @click.away="closeConfigModal()" class="bg-white dark:bg-[#1C1C1E] rounded-[24px] shadow-2xl w-full max-w-md flex flex-col overflow-hidden border border-transparent dark:border-white/5" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-10 scale-95" x-transition:enter-end="opacity-100 translate-y-0 scale-100">
-            
             <input type="text" style="display:none;" aria-hidden="true" autocomplete="username">
             <input type="password" style="display:none;" aria-hidden="true" autocomplete="current-password">
 
@@ -245,13 +266,13 @@
             </div>
             
             <div class="flex items-center gap-2 p-3 bg-white/80 dark:bg-[#1C1C1E]/80 border-b border-gray-100 dark:border-white/5 sticky z-10 backdrop-blur-xl shrink-0 shadow-sm">
-                <button @click="ignoreFilter = 'all'" class="px-4 py-2 rounded-xl text-[12px] font-bold transition-colors" :class="ignoreFilter === 'all' ? 'bg-gray-100 dark:bg-[#2C2C2E] shadow-sm text-indigo-600 dark:text-indigo-400 border border-gray-200/50 dark:border-white/5' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5'">全部分类</button>
-                <button @click="ignoreFilter = 'perfect'" class="px-4 py-2 rounded-xl text-[12px] font-bold transition-colors" :class="ignoreFilter === 'perfect' ? 'bg-gray-100 dark:bg-[#2C2C2E] shadow-sm text-amber-600 dark:text-amber-400 border border-gray-200/50 dark:border-white/5' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5'">🥇 完结免检</button>
-                <button @click="ignoreFilter = 'ignored'" class="px-4 py-2 rounded-xl text-[12px] font-bold transition-colors" :class="ignoreFilter === 'ignored' ? 'bg-gray-100 dark:bg-[#2C2C2E] shadow-sm text-rose-600 dark:text-rose-400 border border-gray-200/50 dark:border-white/5' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5'">🙈 手动屏蔽</button>
+                <button @click="setIgnoreFilter('all')" class="px-4 py-2 rounded-xl text-[12px] font-bold transition-colors" :class="ignoreFilter === 'all' ? 'bg-gray-100 dark:bg-[#2C2C2E] shadow-sm text-indigo-600 dark:text-indigo-400 border border-gray-200/50 dark:border-white/5' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5'">全部分类</button>
+                <button @click="setIgnoreFilter('perfect')" class="px-4 py-2 rounded-xl text-[12px] font-bold transition-colors" :class="ignoreFilter === 'perfect' ? 'bg-gray-100 dark:bg-[#2C2C2E] shadow-sm text-amber-600 dark:text-amber-400 border border-gray-200/50 dark:border-white/5' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5'">🥇 完结免检</button>
+                <button @click="setIgnoreFilter('ignored')" class="px-4 py-2 rounded-xl text-[12px] font-bold transition-colors" :class="ignoreFilter === 'ignored' ? 'bg-gray-100 dark:bg-[#2C2C2E] shadow-sm text-rose-600 dark:text-rose-400 border border-gray-200/50 dark:border-white/5' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-white/5'">🙈 手动屏蔽</button>
             </div>
 
             <div class="flex-1 overflow-y-auto p-4 mac-scrollbar space-y-3 bg-gray-50/30 dark:bg-black/10">
-                <template x-for="item in filteredIgnoreItems" :key="item.id + item.target">
+                <template x-for="item in paginatedIgnoreItems" :key="item.id + item.target">
                     <div class="flex items-center justify-between p-4 bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-white/5 transition-all shadow-sm group">
                         <div>
                             <div class="text-[13px] sm:text-[14px] font-bold text-gray-800 dark:text-gray-200 mb-1.5" x-text="item.series_name"></div>
@@ -272,6 +293,11 @@
                         <button @click="unignoreItem(item)" class="px-3.5 py-2 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500 hover:text-white dark:hover:bg-indigo-500 dark:hover:text-white rounded-xl text-[11px] font-bold transition-all shadow-sm shrink-0 flex items-center gap-1.5 active:scale-95"><i class="fa-solid fa-rotate-left"></i> <span class="hidden sm:inline">恢复扫描</span></button>
                     </div>
                 </template>
+                
+                <div x-show="paginatedIgnoreItems.length < filteredIgnoreItems.length" class="text-center py-4">
+                    <button @click="loadMoreIgnoreItems()" class="px-6 py-2.5 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 text-[12px] font-bold rounded-xl shadow-sm hover:bg-gray-50 dark:hover:bg-[#3A3A3C] transition-colors active:scale-95">加载更多记录</button>
+                </div>
+
                 <div x-show="filteredIgnoreItems.length === 0" class="text-center py-20 text-gray-400 text-[13px] font-bold tracking-widest"><i class="fa-solid fa-box-open text-5xl opacity-20 mb-4 block"></i>当前过滤条件下为空</div>
             </div>
         </div>
@@ -344,7 +370,6 @@
 </div>
 
 <script>
-// 🔥 恢复并重构 ColorThief 取色与高级光晕逻辑
 const globalColorThief = new ColorThief();
 window.applyThemeColor = function(imgElement, cardId) {
     if (imgElement.complete && imgElement.getAttribute('data-color-done') !== 'true') {
@@ -356,7 +381,6 @@ window.applyThemeColor = function(imgElement, cardId) {
             
             if (card && tint) {
                 const isDark = document.documentElement.classList.contains('dark');
-                // 让背景有微弱的同色系渐变
                 tint.style.background = `linear-gradient(135deg, rgb(${color[0]}, ${color[1]}, ${color[2]}) 0%, transparent 80%)`;
                 
                 const borderTint = isDark ? `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.3)` : `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.4)`;
@@ -387,9 +411,11 @@ document.addEventListener('alpine:init', () => {
         gapData: [],
         searchQuery: '',          
         displayLimit: 24, 
+        selectedSeries: [], // 🔥 批量选中的剧集 ID
         
         ignoreModal: { open: false, items: [] },
         ignoreFilter: 'all',      
+        ignoreDisplayLimit: 50, // 🔥 回收站分页限制防卡顿
         
         configModal: { open: false, client_type: '', client_url: '', client_user: '', client_pass: '' },
         resolver: { open: false, isLoading: false, isSubmitting: false, tmdbId: null, seriesId: '', seriesName: '', season: 0, episodes: [], targetDesc: '', targetType: 'single', genes: [], results: [], selectedIndex: null, sourceEpObj: null, sourceEpsArray: [] },
@@ -420,10 +446,68 @@ document.addEventListener('alpine:init', () => {
         
         loadMore() { this.displayLimit += 24; },
 
+        // 🔥 全选/取消全选本页剧集
+        toggleSelectAll() {
+            if (this.selectedSeries.length === this.displayedGaps.length && this.displayedGaps.length > 0) {
+                this.selectedSeries = [];
+            } else {
+                this.selectedSeries = this.displayedGaps.map(s => s.series_id);
+            }
+        },
+
+        // 🔥 批量忽略引擎
+        async batchIgnoreSeries() {
+            if (this.selectedSeries.length === 0) return;
+            if(!confirm(`确定要批量永久忽略选中的 ${this.selectedSeries.length} 部剧集吗？\n(后续可在回收站恢复)`)) return;
+            
+            this.isScanning = true;
+            this.scanItem = "正在批量抹除缺集记录...";
+            this.scanProgress = 0;
+            this.scanTotal = this.selectedSeries.length;
+            
+            try {
+                for (const sId of this.selectedSeries) {
+                    const series = this.gapData.find(s => s.series_id === sId);
+                    if (series) {
+                        try {
+                            await fetch('/api/gaps/ignore/series', { 
+                                method: 'POST', 
+                                headers: {'Content-Type': 'application/json'}, 
+                                body: JSON.stringify({ series_id: series.series_id, series_name: series.series_name }) 
+                            });
+                        } catch(e) {}
+                    }
+                    this.scanProgress++;
+                }
+                // 清理前端数据
+                this.gapData = this.gapData.filter(s => !this.selectedSeries.includes(s.series_id));
+                this._lastResultsJson = JSON.stringify(this.gapData);
+                this.selectedSeries = [];
+            } catch (e) {
+                console.error(e);
+            } finally {
+                this.isScanning = false;
+            }
+        },
+
+        // 🔥 过滤与分页后的忽略列表（防卡顿）
         get filteredIgnoreItems() {
             if (this.ignoreFilter === 'perfect') return this.ignoreModal.items.filter(i => i.type === 'perfect');
             if (this.ignoreFilter === 'ignored') return this.ignoreModal.items.filter(i => i.type === 'record');
             return this.ignoreModal.items;
+        },
+
+        get paginatedIgnoreItems() {
+            return this.filteredIgnoreItems.slice(0, this.ignoreDisplayLimit);
+        },
+
+        setIgnoreFilter(filter) {
+            this.ignoreFilter = filter;
+            this.ignoreDisplayLimit = 50;
+        },
+
+        loadMoreIgnoreItems() {
+            this.ignoreDisplayLimit += 50;
         },
         
         async triggerVerify() {
@@ -503,8 +587,8 @@ document.addEventListener('alpine:init', () => {
         },
 
         async startScan() {
-            // 🔥 修复 Bug：只有在手动点击重新扫描时，才折叠列表。日常操作和后台静默刷新不再折叠！
             this.displayLimit = 24; 
+            this.selectedSeries = [];
             try {
                 const res = await fetch('/api/gaps/scan/start', { method: 'POST' });
                 const data = await res.json();
@@ -549,10 +633,16 @@ document.addEventListener('alpine:init', () => {
                 return series;
             });
             this.hasScanned = true;
+            
+            // 如果刷新时勾选的数据已经不在了，清空勾选
+            const currentIds = this.gapData.map(s => s.series_id);
+            this.selectedSeries = this.selectedSeries.filter(id => currentIds.includes(id));
         },
 
         async openIgnoreModal() {
             this.ignoreModal.open = true;
+            this.ignoreFilter = 'all';
+            this.ignoreDisplayLimit = 50;
             try {
                 const res = await fetch(`/api/gaps/ignores?_t=${new Date().getTime()}`);
                 const data = await res.json();
@@ -578,6 +668,7 @@ document.addEventListener('alpine:init', () => {
                 if ((await res.json()).status === 'success') { 
                     this.gapData = this.gapData.filter(s => s.series_id !== series.series_id); 
                     this._lastResultsJson = JSON.stringify(this.gapData);
+                    this.selectedSeries = this.selectedSeries.filter(id => id !== series.series_id);
                 }
             } catch(e) {}
         },

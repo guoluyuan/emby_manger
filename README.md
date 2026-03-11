@@ -10,14 +10,14 @@
   </a>
   <br/>
   <p align="center">
-    <a href="#-亮点速览"><img src="https://img.shields.io/badge/亮点速览-111827?style=for-the-badge&labelColor=0F172A" alt="亮点速览" /></a>
-    <a href="#-界面预览"><img src="https://img.shields.io/badge/界面预览-111827?style=for-the-badge&labelColor=0F172A" alt="界面预览" /></a>
-    <a href="#-核心功能特性全览"><img src="https://img.shields.io/badge/核心功能-111827?style=for-the-badge&labelColor=0F172A" alt="核心功能" /></a>
-    <a href="#-快速部署"><img src="https://img.shields.io/badge/快速部署-111827?style=for-the-badge&labelColor=0F172A" alt="快速部署" /></a>
-    <a href="#️-配置说明"><img src="https://img.shields.io/badge/配置说明-111827?style=for-the-badge&labelColor=0F172A" alt="配置说明" /></a>
-    <a href="#-常见问题-faq"><img src="https://img.shields.io/badge/常见问题-111827?style=for-the-badge&labelColor=0F172A" alt="常见问题" /></a>
-    <a href="#-赞赏支持"><img src="https://img.shields.io/badge/赞赏支持-111827?style=for-the-badge&labelColor=0F172A" alt="赞赏支持" /></a>
-    <a href="#-许可证与开源协议"><img src="https://img.shields.io/badge/许可证-111827?style=for-the-badge&labelColor=0F172A" alt="许可证" /></a>
+    <a href="#-亮点速览"><img src="https://img.shields.io/badge/亮点速览-5B6B8C?style=for-the-badge&labelColor=3E4C6D" alt="亮点速览" /></a>
+    <a href="#-界面预览"><img src="https://img.shields.io/badge/界面预览-587D7E?style=for-the-badge&labelColor=3E5C5D" alt="界面预览" /></a>
+    <a href="#-核心功能特性全览"><img src="https://img.shields.io/badge/核心功能-6B7280?style=for-the-badge&labelColor=4B5563" alt="核心功能" /></a>
+    <a href="#-快速部署"><img src="https://img.shields.io/badge/快速部署-6F6AB1?style=for-the-badge&labelColor=4F4A8C" alt="快速部署" /></a>
+    <a href="#️-配置说明"><img src="https://img.shields.io/badge/配置说明-5F8F6D?style=for-the-badge&labelColor=3F6B4D" alt="配置说明" /></a>
+    <a href="#-常见问题-faq"><img src="https://img.shields.io/badge/常见问题-8A6B5A?style=for-the-badge&labelColor=6A4B3A" alt="常见问题" /></a>
+    <a href="#-赞赏支持"><img src="https://img.shields.io/badge/赞赏支持-7A6C8E?style=for-the-badge&labelColor=5A4C6E" alt="赞赏支持" /></a>
+    <a href="#-许可证与开源协议"><img src="https://img.shields.io/badge/许可证-6B7A8F?style=for-the-badge&labelColor=4B5A6F" alt="许可证" /></a>
   </p>
 </div>
 
@@ -26,17 +26,6 @@
 EmbyPulse（映迹）是专为 Emby 服主打造的现代化“第二控制台”。它不仅提供了极致的数据可视化大盘，还深度集成了用户管理、追剧日历、缺集自动补货、求片流转及媒体报告生成等核心运维功能。
 
 核心革新：本系统独家支持“API 穿透”与“数据库直读”双擎路由。这意味着您无需强制挂载 Emby 的数据库文件，仅凭 API Key 即可点亮全站统计，完美适配极空间、群晖、云服务器等各种复杂部署环境。
-
-<p align="center">
-  <a href="#-亮点速览"><img src="https://img.shields.io/badge/亮点速览-111827?style=for-the-badge&labelColor=0F172A" alt="亮点速览" /></a>
-  <a href="#-界面预览"><img src="https://img.shields.io/badge/界面预览-111827?style=for-the-badge&labelColor=0F172A" alt="界面预览" /></a>
-  <a href="#-核心功能特性全览"><img src="https://img.shields.io/badge/核心功能-111827?style=for-the-badge&labelColor=0F172A" alt="核心功能" /></a>
-  <a href="#-快速部署"><img src="https://img.shields.io/badge/快速部署-111827?style=for-the-badge&labelColor=0F172A" alt="快速部署" /></a>
-  <a href="#️-配置说明"><img src="https://img.shields.io/badge/配置说明-111827?style=for-the-badge&labelColor=0F172A" alt="配置说明" /></a>
-  <a href="#-常见问题-faq"><img src="https://img.shields.io/badge/常见问题-111827?style=for-the-badge&labelColor=0F172A" alt="常见问题" /></a>
-  <a href="#-赞赏支持"><img src="https://img.shields.io/badge/赞赏支持-111827?style=for-the-badge&labelColor=0F172A" alt="赞赏支持" /></a>
-  <a href="#-许可证与开源协议"><img src="https://img.shields.io/badge/许可证-111827?style=for-the-badge&labelColor=0F172A" alt="许可证" /></a>
-</p>
 
 ## ⭐ 亮点速览
 
@@ -159,6 +148,18 @@ services:
 - `playback_data_mode`：播放数据模式，支持 `sqlite` 或 `api`
 - `DB_PATH`：本地模式下 Playback Reporting 数据库文件路径
 - `hidden_users`：需要在大盘中隐藏的用户 ID 列表
+
+#### 🧩 两种模式如何选择（小白必看）
+
+**API 模式（推荐：不方便挂载数据库时）**
+- 适合：极空间、群晖、云服务器、容器里拿不到数据库文件的环境
+- 优点：部署最省心，只要填 `EMBY_API_KEY` 即可启动
+- 注意：需要安装 Emby 官方 Playback Reporting 插件（两种模式都需要）
+
+**本地数据库模式（推荐：可挂载数据库时）**
+- 适合：本地 Docker 或能挂载 Emby 数据目录的 NAS
+- 优点：查询性能更高，统计更及时
+- 注意：必须正确填写 `DB_PATH`，且容器内要能访问该文件
 
 说明：
 - `sqlite` 模式直接读取数据库文件，性能更高，适合本地 Docker 挂载场景
