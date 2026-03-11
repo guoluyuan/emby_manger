@@ -144,7 +144,7 @@
                         <i class="fa-solid fa-moon text-lg dark:hidden"></i>
                         <i class="fa-solid fa-sun text-lg hidden dark:block text-yellow-400"></i>
                     </button>
-                    <div id="global-live-panel" class="absolute top-[110%] right-0 md:right-12 mt-2 w-[280px] sm:w-[320px] bg-white/70 dark:bg-apple-cardDark/70 apple-blur rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.12)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.6)] border border-white/60 dark:border-white/10 overflow-hidden z-[100] transform scale-95 opacity-0 hidden transition-all duration-200 origin-top-right">
+                    <div id="global-live-panel" class="absolute top-[110%] right-0 md:right-12 mt-2 w-[280px] sm:w-[340px] bg-white/70 dark:bg-apple-cardDark/70 apple-blur rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.12)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.6)] border border-white/60 dark:border-white/10 overflow-hidden z-[100] transform scale-95 opacity-0 hidden transition-all duration-200 origin-top-right">
                         <div class="px-4 py-3 border-b border-gray-100/50 dark:border-white/5 flex justify-between items-center bg-white/40 dark:bg-black/10">
                             <h4 class="font-bold text-[13px] flex items-center"><span class="w-1.5 h-1.5 rounded-full bg-red-500 mr-2 animate-pulse"></span>正在热播</h4>
                             <span class="text-[10px] font-medium text-gray-500 dark:text-gray-400" id="global-live-status-text">空闲中</span>
@@ -237,28 +237,95 @@
         }
         
         const globalEmbyBaseUrl = "{{ emby_url | default('') }}"; const globalEmbyServerId = "{{ server_id | default('') }}";
+        
         function toggleLiveDropdown() {
             const panel = document.getElementById('global-live-panel');
             if (panel.classList.contains('hidden')) {
                 panel.classList.remove('hidden'); void panel.offsetWidth; panel.classList.remove('opacity-0', 'scale-95'); panel.classList.add('opacity-100', 'scale-100'); fetchGlobalLive(); 
             } else { panel.classList.remove('opacity-100', 'scale-100'); panel.classList.add('opacity-0', 'scale-95'); setTimeout(() => panel.classList.add('hidden'), 200); }
         }
+
+        // 🔥 史诗级重构：防爆版热播渲染引擎（支持进度时间、彻底免疫第三方播放器404）
         async function fetchGlobalLive() {
             try {
-                const res = await fetch('/api/stats/live'); const json = await res.json();
-                const listContainer = document.getElementById('global-live-list'); const badge = document.getElementById('global-live-badge'); const statusText = document.getElementById('global-live-status-text');
+                const res = await fetch('/api/stats/live');
+                const json = await res.json();
+                const listContainer = document.getElementById('global-live-list');
+                const badge = document.getElementById('global-live-badge');
+                const statusText = document.getElementById('global-live-status-text');
+
                 if(json.status === 'success' && json.data.length > 0) {
-                    badge.classList.remove('hidden'); statusText.innerText = `${json.data.length} 设备在线`; let html = '';
+                    badge.classList.remove('hidden');
+                    statusText.innerText = `${json.data.length} 设备在线`;
+                    let html = '';
+
+                    // 核心算法：Emby Ticks (千万分之一秒) 转化为 HH:MM:SS
+                    const formatTicks = (ticks) => {
+                        if (!ticks) return '00:00';
+                        let totalSeconds = Math.floor(ticks / 10000000);
+                        let h = Math.floor(totalSeconds / 3600);
+                        let m = Math.floor((totalSeconds % 3600) / 60);
+                        let s = totalSeconds % 60;
+                        if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                    };
+
                     json.data.forEach(s => {
-                        const item = s.NowPlayingItem || {}; const playState = s.PlayState || {}; const targetId = item.SeriesId || item.ParentId || s.ItemId || item.Id;
-                        const imgUrl = `/api/proxy/smart_image?item_id=${targetId}&type=Primary&name=${encodeURIComponent(title)}`; const title = item.SeriesName ? `${item.SeriesName} - ${item.Name}` : (item.Name || '未知内容');
-                        let percentage = 0; if (item.RunTimeTicks && item.RunTimeTicks > 0) { percentage = Math.round((playState.PositionTicks / item.RunTimeTicks) * 100); }
-                        html += `<div onclick="if(globalEmbyBaseUrl) window.open('${globalEmbyBaseUrl}/web/index.html#!/item?id=${targetId}&serverId=${globalEmbyServerId}')" class="flex gap-3 p-3 hover:bg-gray-50/50 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer group"><div class="w-12 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 dark:bg-gray-800 relative"><img src="${imgUrl}" class="w-full h-full object-cover"></div><div class="flex flex-col justify-center flex-1 min-w-0"><div class="flex items-center justify-between mb-1"><span class="text-[11px] font-medium text-gray-500 truncate">${s.UserName || s.User || '未知'}</span></div><h4 class="text-[13px] font-medium truncate mb-2">${title}</h4><div class="flex items-center gap-2"><div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1 overflow-hidden"><div class="bg-brand-500 h-1 rounded-full" style="width: ${percentage}%"></div></div></div></div></div>`;
+                        const item = s.NowPlayingItem || {};
+                        const playState = s.PlayState || {};
+
+                        // 1. 优先抓取 PrimaryImageItemId（防 Infuse/小鱼 导致的底层物理视频 404）
+                        const imgTargetId = item.PrimaryImageItemId || item.SeriesId || item.ParentId || s.ItemId || item.Id;
+                        const jumpId = item.Id || s.ItemId; // 点击跳转仍保留真实播放的 ID
+
+                        // 清洗标题，防御特殊字符
+                        const rawTitle = item.SeriesName ? `${item.SeriesName} - ${item.Name}` : (item.Name || '未知内容');
+                        const safeTitleForUrl = encodeURIComponent(rawTitle);
+
+                        // 2. 调用全新 smart_image 智能兜底接口，自带 TMDB 穿透防裂
+                        const imgUrl = `/api/proxy/smart_image?item_id=${imgTargetId}&type=Primary&name=${safeTitleForUrl}`;
+
+                        // 3. 计算时间与进度条
+                        let percentage = 0;
+                        let currentStr = "00:00";
+                        let totalStr = "00:00";
+
+                        if (item.RunTimeTicks && item.RunTimeTicks > 0) {
+                            percentage = Math.round((playState.PositionTicks / item.RunTimeTicks) * 100);
+                            currentStr = formatTicks(playState.PositionTicks);
+                            totalStr = formatTicks(item.RunTimeTicks);
+                        }
+
+                        html += `
+                            <div onclick="if(globalEmbyBaseUrl) window.open('${globalEmbyBaseUrl}/web/index.html#!/item?id=${jumpId}&serverId=${globalEmbyServerId}')" class="flex gap-3 p-3 hover:bg-gray-50/50 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer group">
+                                <div class="w-12 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 dark:bg-gray-800 relative shadow-sm border border-gray-200/50 dark:border-white/5">
+                                    <img src="${imgUrl}" onerror="this.src='/static/img/favicon.png'" class="w-full h-full object-cover">
+                                </div>
+                                <div class="flex flex-col justify-center flex-1 min-w-0">
+                                    <div class="flex items-center justify-between mb-1.5">
+                                        <span class="text-[11px] font-bold text-brand-500 truncate mr-2">${s.UserName || s.User || '未知'}</span>
+                                        <span class="text-[10px] font-mono text-gray-500 dark:text-gray-400 font-medium shrink-0 bg-gray-100 dark:bg-apple-hoverDark px-1.5 py-0.5 rounded shadow-sm border border-transparent dark:border-white/5">${currentStr} / ${totalStr}</span>
+                                    </div>
+                                    <h4 class="text-[13px] font-bold text-gray-800 dark:text-gray-200 truncate mb-2 group-hover:text-brand-500 transition-colors">${rawTitle}</h4>
+                                    <div class="flex items-center gap-2">
+                                        <div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden shadow-inner">
+                                            <div class="bg-brand-500 h-1.5 rounded-full transition-all duration-1000" style="width: ${percentage}%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>`;
                     });
-                    listContainer.innerHTML = html; 
-                } else { badge.classList.add('hidden'); statusText.innerText = `空闲中`; listContainer.innerHTML = `<div class="py-12 text-center text-xs text-gray-400 font-medium">当前暂无播放</div>`; }
-            } catch(e) {}
+                    listContainer.innerHTML = html;
+                } else {
+                    badge.classList.add('hidden');
+                    statusText.innerText = `空闲中`;
+                    listContainer.innerHTML = `<div class="py-12 text-center text-xs text-gray-400 font-medium"><i class="fa-solid fa-satellite text-3xl mb-3 opacity-20 block"></i>当前暂无播放</div>`;
+                }
+            } catch(e) {
+                console.error("Live Fetch Error:", e);
+            }
         }
+
         let lastNotifyIds = []; let isNotifyPanelOpen = false;
         function toggleNotifyDropdown() {
             const panel = document.getElementById('notify-panel');
@@ -328,7 +395,6 @@
             const modalHtml = `<div id="nav-config-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/40 backdrop-blur-sm opacity-0 transition-opacity duration-300 px-4"><div class="bg-apple-bgLight dark:bg-apple-cardDark w-full max-w-sm rounded-[28px] shadow-2xl p-6 transform scale-95 transition-transform duration-300 border border-white/50 dark:border-white/5"><div class="text-center mb-6"><h3 class="text-lg font-bold text-gray-900 dark:text-white">自定义底部导航</h3><p class="text-xs text-gray-500 mt-1">请选择 2 个最常用的功能</p></div><div class="space-y-4"><div><label class="text-[11px] font-bold text-gray-500 ml-1">左侧快捷按键</label><select id="nav-select-1" class="w-full mt-1.5 bg-white dark:bg-[#2C2C2E] text-gray-800 dark:text-gray-200 p-3 rounded-xl border-none focus:ring-2 focus:ring-brand-500 text-[13px] font-medium outline-none shadow-sm"></select></div><div><label class="text-[11px] font-bold text-gray-500 ml-1">右侧快捷按键</label><select id="nav-select-2" class="w-full mt-1.5 bg-white dark:bg-[#2C2C2E] text-gray-800 dark:text-gray-200 p-3 rounded-xl border-none focus:ring-2 focus:ring-brand-500 text-[13px] font-medium outline-none shadow-sm"></select></div></div><div class="flex gap-3 mt-8"><button onclick="closeNavConfigModal()" class="flex-1 py-3 bg-white dark:bg-[#2C2C2E] text-gray-600 dark:text-gray-300 rounded-[14px] font-bold text-[13px] transition-colors shadow-sm">取消</button><button onclick="saveNavConfig()" class="flex-1 py-3 bg-brand-500 text-white rounded-[14px] font-bold text-[13px] shadow-md transition-colors active:scale-95">保存配置</button></div></div></div>`;
             document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-            // 🔥 核心修复：侧边栏自动定位到当前活动菜单（避免矮屏幕下找不到位置）
             const sidebarNav = document.getElementById('sidebar-nav');
             if (sidebarNav) {
                 const activeLink = sidebarNav.querySelector('.text-brand-500');
