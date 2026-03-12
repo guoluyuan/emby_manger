@@ -17,7 +17,7 @@ from app.core.database import init_db
 from app.services.bot_service import bot
 from app.routers import media_request
 # 🔥 引入所有路由
-from app.routers import views, auth, users, stats, bot as bot_router, system, proxy, report, webhook, insight, tasks, history, calendar, search, clients, gaps, risk
+from app.routers import views, auth, users, stats, bot as bot_router, system, proxy, report, webhook, insight, tasks, history, calendar, search, clients, gaps, risk,notifications
 
 # 初始化目录和数据库
 if not os.path.exists("static"): os.makedirs("static")
@@ -149,6 +149,7 @@ app.include_router(search.router)
 app.include_router(clients.router)
 app.include_router(gaps.router)
 app.include_router(risk.router)  # 🔥 挂载风控 API
+app.include_router(notifications.router)  # 🔥 挂载全局通知 API
 
 if __name__ == "__main__":
     import uvicorn

@@ -42,6 +42,9 @@ def init_db():
         # 🔥 风控模块：新建独立的小黑屋与执法日志表
         c.execute('''CREATE TABLE IF NOT EXISTS risk_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, username TEXT, action TEXT, reason TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)''')
 
+        # 👇 新增：系统全局通知表
+        c.execute('''CREATE TABLE IF NOT EXISTS sys_notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, title TEXT, message TEXT, is_read INTEGER DEFAULT 0, action_url TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)''')
+
         conn.commit()
         conn.close()
         print("✅ 数据库结构初始化完成.")
@@ -200,3 +203,17 @@ def get_base_filter(user_id_filter):
         params.extend(hidden)
         
     return where, params
+
+# 👇 新增：向数据库写入系统通知的基础函数
+def add_sys_notification(notify_type: str, title: str, message: str, action_url: str = ""):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO sys_notifications (type, title, message, action_url) VALUES (?, ?, ?, ?)",
+            (notify_type, title, message, action_url)
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"[系统通知] 写入数据库失败: {e}")

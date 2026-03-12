@@ -4,6 +4,8 @@ import logging
 import time
 import threading
 from app.core.config import cfg, DB_PATH
+# 👇 引入刚才新增的 add_sys_notification
+from app.core.database import add_sys_notification
 from app.core.event_bus import bus
 
 logger = logging.getLogger("uvicorn")
@@ -154,7 +156,23 @@ def _risk_monitor_loop():
         except: pass
         time.sleep(60) 
 
+# 👇 新增：为 Web 端全局通知中心订阅风控事件
+def _on_risk_alert_for_web(data):
+    username = data.get("username", "未知")
+    current = data.get("current", 0)
+    limit = data.get("limit", 0)
+    
+    add_sys_notification(
+        notify_type="risk",
+        title=f"🚨 账号并发越界: {username}",
+        message=f"当前并发 {current} / 额度 {limit}，请立即处理！",
+        action_url="/risk"
+    )
+
 def start_risk_monitor():
     bus.subscribe("notify.playback.start", _on_playback_start)
+    # 👇 新增：将这个动作挂载到事件总线上
+    bus.subscribe("notify.risk.alert", _on_risk_alert_for_web)
+    
     threading.Thread(target=_risk_monitor_loop, daemon=True, name="RiskMonitorThread").start()
     logger.info("👁️ [风险管控] 零延迟天眼系统已启动 (事件驱动 + 60s兜底)")
