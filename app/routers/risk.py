@@ -138,7 +138,7 @@ def get_risk_summary():
         top_offenders = [dict(r) for r in cur.fetchall()]
 
         # 3. 统计有多少人拥有“专属并发特权”
-        cur.execute("SELECT COUNT(*) as vip_count FROM users_meta WHERE max_concurrent IS NOT NULL")
+        cur.execute("SELECT COUNT(*) as vip_count FROM users_meta WHERE is_vip = 1")
         vip_row = cur.fetchone()
         vip_count = vip_row['vip_count'] if vip_row else 0
 

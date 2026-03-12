@@ -61,7 +61,6 @@ class SystemDaemon:
             bus.publish("notify.playback.stop", data)
         elif "auth" in event or "login" in event:
             bus.publish("notify.user.login", data)
-        # 🔥 终极修复：把 deleted 缩短为 delete，完美捕获 deep.delete 和 item.deleted
         elif "delete" in event or "remove" in event:
             bus.publish("notify.item.deleted", data)
 
@@ -313,6 +312,8 @@ class NotificationBot:
         bus.subscribe("notify.user.login", self.on_user_login)
         bus.subscribe("notify.item.deleted", self.on_item_deleted)
         bus.subscribe("notify.daily_report", self.on_daily_report)
+        # 🔥 新增风控警报订阅
+        bus.subscribe("notify.risk.alert", self.on_risk_alert)
 
     def start(self):
         if self.running: return
@@ -328,6 +329,21 @@ class NotificationBot:
     def stop(self): self.running = False
 
     # ---------- 事件订阅入口 ----------
+    def on_risk_alert(self, data):
+        # 接收并发送风控警报消息
+        username = data.get("username", "未知")
+        current = data.get("current", 0)
+        limit = data.get("limit", 0)
+        devices_info = data.get("devices_info", "未知设备")
+        
+        msg = (f"🚨 <b>【风控预警】 账号并发越界</b>\n\n"
+               f"👤 <b>涉事用户：</b>{username}\n"
+               f"📈 <b>当前并发：</b>{current} / 额度 {limit}\n"
+               f"📱 <b>违规设备：</b>\n{devices_info}\n\n"
+               f"⚠️ <i>天眼系统已记录，请立即前往后台风控大盘一键拔除网线！</i>")
+        
+        self.send_message("sys_notify", msg, platform="all")
+
     def on_gap_cleared(self, data):
         if not cfg.get("enable_library_notify"): return
         s_idx = data["s_idx"]; e_idx = data["e_idx"]
@@ -484,7 +500,6 @@ class NotificationBot:
         except Exception as e: 
             logger.error(f"登录通知组装异常: {e}")
 
-# 🔥 史诗级重构：5分钟双重防抖拦截 + TMDB 云端海报溯源兜底
     def on_item_deleted(self, data):
         if not cfg.get("notify_item_deleted"): return
         try:
@@ -497,34 +512,23 @@ class NotificationBot:
             ep_num = item.get("IndexNumber")
             year = item.get("ProductionYear", "")
             
-            # ==========================================
-            # 🔥 终极防抖：5分钟 (300秒) 双重拦截器 (ID + 名称)
-            # 完美拦截 Emby 延迟一两分钟才发送的 deep.delete 确认通知
             item_id = str(item.get("Id", ""))
             unique_name = f"{series_name}_{season_num}_{ep_num}_{title}" if series_name else title
             
             now = time.time()
-            
-            # 只要 ID 或者 名称 在 5 分钟内出现过，直接静默丢弃！
             if (item_id and item_id in self.delete_cache and (now - self.delete_cache[item_id] < 300)) or \
                (unique_name and unique_name in self.delete_cache and (now - self.delete_cache[unique_name] < 300)):
                 return  
                 
             if item_id: self.delete_cache[item_id] = now
             if unique_name: self.delete_cache[unique_name] = now
-            
-            # 顺手清理 10 分钟前的老记忆，防止内存溢出
             self.delete_cache = {k: v for k, v in self.delete_cache.items() if now - v < 600}
-            # ==========================================
             
             year_str = f" ({year})" if year else ""
             del_type = "媒体"
             
-            # 精准推导删除内容的层级与结构
-            if raw_type == "Movie":
-                del_type = "电影"
-            elif raw_type == "Series":
-                del_type = "整剧"
+            if raw_type == "Movie": del_type = "电影"
+            elif raw_type == "Series": del_type = "整剧"
             elif raw_type == "Season":
                 del_type = "整季"
                 s_num = ep_num if ep_num is not None else season_num
@@ -540,15 +544,12 @@ class NotificationBot:
                    f"🕒 <b>时间：</b>{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                    f"<i>* 该项目已从媒体库物理存储中被永久移除。</i>")
             
-            # 1. 尝试获取原目标图片（对于已删除的通常拿不到）
             primary_io = self._download_emby_image(item.get("Id"), 'Primary') if item.get("Id") else None
             backdrop_io = self._download_emby_image(item.get("Id"), 'Backdrop') if item.get("Id") else None
             
-            # 2. 如果是单集/季被删，自动去借用“整剧”的海报进行兜底
             if not primary_io and not backdrop_io and item.get("SeriesId"):
                 primary_io = self._download_emby_image(item.get("SeriesId"), 'Primary')
             
-            # 3. TMDB 云端海报溯源兜底
             tmdb_img_url = None
             if not primary_io and not backdrop_io:
                 tmdb_id = item.get("ProviderIds", {}).get("Tmdb")
@@ -563,13 +564,10 @@ class NotificationBot:
                         tmdb_res = requests.get(req_url, proxies=self._get_proxies(), timeout=5)
                         if tmdb_res.status_code == 200:
                             p_path = tmdb_res.json().get("poster_path")
-                            if p_path:
-                                tmdb_img_url = f"https://image.tmdb.org/t/p/w500{p_path}"
-                    except Exception as e:
-                        logger.error(f"TMDB 云端海报获取异常: {e}")
+                            if p_path: tmdb_img_url = f"https://image.tmdb.org/t/p/w500{p_path}"
+                    except Exception as e: pass
             
             tg_img = primary_io or backdrop_io or tmdb_img_url or REPORT_COVER_URL
-            
             self.send_photo("sys_notify", tg_img, msg, platform="all", wecom_photo_io=tg_img)
         except Exception as e: 
             logger.error(f"删除通知组装异常: {e}")
@@ -601,19 +599,6 @@ class NotificationBot:
             url = f"{host}/emby/Users/{user_id}/Images/Primary?maxHeight=400&maxWidth=400&quality=90&api_key={key}"
             res = requests.get(url, timeout=5)
             if res.status_code == 200: return io.BytesIO(res.content)
-        except: pass
-        return None
-
-    def _get_admin_id(self):
-        key = cfg.get("emby_api_key"); host = cfg.get("emby_host")
-        if not key or not host: return None
-        try:
-            res = requests.get(f"{host}/emby/Users?api_key={key}", timeout=5)
-            if res.status_code == 200:
-                users = res.json()
-                for u in users:
-                    if u.get("Policy", {}).get("IsAdministrator"): return u['Id']
-                if users: return users[0]['Id']
         except: pass
         return None
 

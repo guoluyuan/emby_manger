@@ -68,6 +68,7 @@ class UserUpdateModel(BaseModel):
     max_parental_rating: Optional[int] = None
 # 🔥 新增单用户风控字段
     max_concurrent: Optional[int] = None   # 该用户的专属最大并发数
+    is_vip: Optional[bool] = False
     risk_level: Optional[str] = None       # 风控状态(例如：safe, banned)
 
 # 🔥 更新：为新建/套用模板增加颗粒度控制选项
@@ -82,6 +83,7 @@ class NewUserModel(BaseModel):
     copy_parental: Optional[bool] = True
 # 🔥 新增单用户风控字段
     max_concurrent: Optional[int] = None   # 新用户的默认最大并发数
+    is_vip: Optional[bool] = False
 
 class InviteGenModel(BaseModel):
     days: int 

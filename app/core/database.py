@@ -25,7 +25,10 @@ def init_db():
         except: pass
         try: c.execute("ALTER TABLE users_meta ADD COLUMN risk_level TEXT DEFAULT 'safe'")
         except: pass
-        
+        # 👇 添加这一行：新增 VIP 独立字段
+        try: c.execute("ALTER TABLE users_meta ADD COLUMN is_vip INTEGER DEFAULT 0")
+        except: pass
+
         c.execute('''CREATE TABLE IF NOT EXISTS invitations (code TEXT PRIMARY KEY, days INTEGER, used_count INTEGER DEFAULT 0, max_uses INTEGER DEFAULT 1, created_at TEXT, used_at DATETIME, used_by TEXT, status INTEGER DEFAULT 0, template_user_id TEXT)''')
         try: c.execute("ALTER TABLE invitations ADD COLUMN template_user_id TEXT")
         except: pass

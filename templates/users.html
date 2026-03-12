@@ -217,11 +217,23 @@
                 <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase">账号到期时间</label>
                 <input type="date" id="new-expire" class="w-full px-4 py-3 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50 dark:bg-black/20 focus:ring-2 focus:ring-brand-500 outline-none transition-all text-[13px]">
             </div>
+            
             <div>
                 <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase">专属并发限制 (可选)</label>
                 <input type="number" id="new-max-concurrent" min="1" class="w-full px-4 py-3 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50 dark:bg-black/20 focus:ring-2 focus:ring-brand-500 outline-none transition-all text-[13px]" placeholder="留空则使用全局默认限制">
             </div>
             
+            <label class="flex items-center justify-between p-3 border border-purple-200/80 dark:border-purple-500/30 bg-purple-50 dark:bg-purple-900/10 rounded-xl cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/20 transition-all shadow-sm mt-2">
+                <div>
+                    <div class="text-[13px] font-bold text-purple-700 dark:text-purple-400"><i class="fa-solid fa-crown mr-1"></i>设为 VIP 账号</div>
+                    <div class="text-[10px] text-purple-500 mt-0.5">开启后拥有免踢护身符及大盘专属标识</div>
+                </div>
+                <div class="relative">
+                    <input type="checkbox" id="new-is-vip" class="sr-only peer">
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+                </div>
+            </label>
+
             <div class="p-4 bg-brand-50/50 dark:bg-brand-500/5 rounded-xl border border-brand-100 dark:border-brand-500/10">
                 <label class="block text-xs font-bold text-brand-600 dark:text-brand-400 mb-2 uppercase tracking-wide">权限同步模板 (可选)</label>
                 <select id="new-template" onchange="toggleNewTemplateOpts()" class="w-full px-3 py-2.5 rounded-xl border border-gray-200/80 dark:border-white/10 bg-white dark:bg-[#2C2C2E] focus:ring-2 focus:ring-brand-500 outline-none appearance-none cursor-pointer text-[13px] mb-3 shadow-sm"></select>
@@ -370,13 +382,24 @@
                     </select>
                 </div>
 
-                <div class="p-4 border border-gray-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm">
+                <div class="p-4 border border-gray-200/80 dark:border-white/10 bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm mt-4">
                     <label class="block text-[11px] font-bold text-gray-500 mb-2 uppercase tracking-wider"><i class="fa-solid fa-users-viewfinder mr-1"></i>专属并发控制 (覆盖全局)</label>
                     <div class="flex items-center gap-3">
                         <input type="number" id="edit-max-concurrent" min="1" placeholder="留空则使用全局限制" class="w-full px-4 py-3 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50 dark:bg-black/20 focus:ring-2 focus:ring-brand-500 outline-none transition-all text-[13px] font-bold text-gray-800 dark:text-gray-100 shadow-inner">
                         <span class="text-[12px] text-gray-500 font-bold shrink-0">台设备</span>
                     </div>
                 </div>
+
+                <label class="flex items-center justify-between p-4 border border-purple-200/80 dark:border-purple-500/30 bg-purple-50 dark:bg-purple-900/10 rounded-xl cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/20 transition-all shadow-sm mt-4">
+                    <div>
+                        <div class="text-[13px] font-bold text-purple-700 dark:text-purple-400"><i class="fa-solid fa-crown mr-1"></i>设为 VIP 账号</div>
+                        <div class="text-[11px] text-purple-500 mt-1">开启后拥有免踢护身符及大盘专属标识</div>
+                    </div>
+                    <div class="relative">
+                        <input type="checkbox" id="edit-is-vip" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+                    </div>
+                </label>
 
             </div>
 
@@ -680,6 +703,9 @@ function renderUsers() {
 
         const isChecked = selectedUsers.has(u.Id) ? 'checked' : '';
         
+        // 🔥 添加 VIP 皇冠标识
+        const vipBadge = u.IsVIP ? '<span class="text-[9px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-400 px-1.5 py-0.5 rounded ml-1"><i class="fa-solid fa-crown mr-0.5"></i>VIP</span>' : '';
+
         desktopHtml += `
             <tr class="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-all border-b border-gray-50 dark:border-white/5">
                 <td class="px-5 py-4 text-center whitespace-nowrap">
@@ -689,8 +715,8 @@ function renderUsers() {
                     <div class="flex items-center gap-3">
                         ${avatarTag}
                         <div>
-                            <div class="font-bold text-gray-900 dark:text-white text-[14px]">${u.Name}</div>
-                            ${u.IsAdmin ? '<span class="text-[9px] font-bold bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-400 px-1.5 py-0.5 rounded">ADMIN</span>' : ''}
+                            <div class="font-bold text-gray-900 dark:text-white text-[14px] flex items-center">${u.Name} ${vipBadge}</div>
+                            ${u.IsAdmin ? '<span class="text-[9px] font-bold bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-400 px-1.5 py-0.5 rounded mt-0.5 block w-fit">ADMIN</span>' : ''}
                         </div>
                     </div>
                 </td>
@@ -711,7 +737,7 @@ function renderUsers() {
                         <div class="flex items-center gap-3">
                             ${avatarTag}
                             <div>
-                                <div class="font-bold text-gray-900 dark:text-white text-[15px]">${u.Name}</div>
+                                <div class="font-bold text-gray-900 dark:text-white text-[15px] flex items-center">${u.Name} ${vipBadge}</div>
                                 <div class="text-[10px] text-gray-400 uppercase font-mono mt-0.5">到期: ${u.ExpireDate||'永久'}</div>
                             </div>
                         </div>
@@ -956,8 +982,9 @@ async function openEditUserModal(uid) {
             document.getElementById('edit-enable-video-transcode').checked = json.data.EnableVideoTranscoding !== false; 
             document.getElementById('edit-enable-audio-transcode').checked = json.data.EnableAudioTranscoding !== false;
             document.getElementById('edit-max-parental-rating').value = (json.data.MaxParentalRating !== null && json.data.MaxParentalRating !== undefined) ? json.data.MaxParentalRating : "-1";
-            // 🔥 读取专属并发设置
+            // 🔥 读取并渲染并发和VIP
             document.getElementById('edit-max-concurrent').value = (json.data.MaxConcurrent !== null && json.data.MaxConcurrent !== undefined) ? json.data.MaxConcurrent : "";
+            document.getElementById('edit-is-vip').checked = json.data.IsVIP === true;
         }
     } catch(err) {}
     renderLibraryCheckboxes(user); 
@@ -1064,8 +1091,9 @@ async function submitEditUser() {
             enable_video_transcoding: document.getElementById('edit-enable-video-transcode').checked, 
             enable_audio_transcoding: document.getElementById('edit-enable-audio-transcode').checked, 
             max_parental_rating: parseInt(document.getElementById('edit-max-parental-rating').value),
-            // 🔥 提交并发配置
-            max_concurrent: document.getElementById('edit-max-concurrent').value ? parseInt(document.getElementById('edit-max-concurrent').value) : null
+            // 🔥 提交并发和VIP
+            max_concurrent: document.getElementById('edit-max-concurrent').value ? parseInt(document.getElementById('edit-max-concurrent').value) : null,
+            is_vip: document.getElementById('edit-is-vip').checked
         };
         
         const res = await fetch('/api/manage/user/update', { 
@@ -1093,7 +1121,9 @@ function openNewUserModal() {
     document.getElementById('new-username').value = ""; 
     document.getElementById('new-password').value = ""; 
     document.getElementById('new-expire').value = ""; 
-    document.getElementById('new-max-concurrent').value = ""; // 🔥 清空新建的并发
+    // 🔥 清空新建时的状态
+    document.getElementById('new-max-concurrent').value = ""; 
+    document.getElementById('new-is-vip').checked = false;
     populateTemplates('new-template'); 
     setTimeout(() => { modal.classList.add('flex'); }, 10); 
 }
@@ -1121,8 +1151,9 @@ async function submitNewUser() {
                 copy_library: document.getElementById('new-opt-lib').checked, 
                 copy_policy: document.getElementById('new-opt-pol').checked, 
                 copy_parental: document.getElementById('new-opt-par').checked,
-                // 🔥 提交新建账号并发数
-                max_concurrent: document.getElementById('new-max-concurrent').value ? parseInt(document.getElementById('new-max-concurrent').value) : null
+                // 🔥 提交新建的并发和VIP
+                max_concurrent: document.getElementById('new-max-concurrent').value ? parseInt(document.getElementById('new-max-concurrent').value) : null,
+                is_vip: document.getElementById('new-is-vip').checked
             }) 
         });
         if ((await res.json()).status === 'success') { 
