@@ -23,12 +23,10 @@
                 <i class="fa-solid fa-clock-rotate-left mr-2"></i>历史审计
             </button>
         </div>
-        <div class="flex items-center gap-3 w-full md:w-auto px-2">
-            <span class="text-[10px] font-black bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 px-2 py-1 rounded-lg uppercase tracking-tighter border border-gray-200/50 dark:border-white/5">v{{ version }}</span>
-            
+        <div class="flex items-center gap-3 w-full md:w-auto px-4">
             <div class="text-[12px] font-mono font-bold text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-black/20 px-3 py-1.5 rounded-xl border border-gray-200/50 dark:border-white/5 flex items-center gap-2">
                 <span id="live-indicator" class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                <span id="last-update">同步中...</span>
+                <span id="last-update">正在连接天眼...</span>
             </div>
             <button onclick="openConfigModal()" class="w-10 h-10 rounded-full bg-gray-100 dark:bg-apple-hoverDark text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 flex items-center justify-center transition-colors">
                 <i class="fa-solid fa-sliders"></i>
@@ -66,13 +64,13 @@
 
         <div id="users-container" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-12">
             <div class="col-span-full py-16 text-center text-gray-400">
-                <i class="fa-solid fa-spinner fa-spin text-4xl mb-4"></i><p class="font-bold">加载天眼数据中...</p>
+                <i class="fa-solid fa-spinner fa-spin text-4xl mb-4"></i><p class="font-bold">雷达正在扫描网络...</p>
             </div>
         </div>
 
         <div class="flex items-center gap-4 mb-6">
             <div class="h-px bg-gray-200 dark:bg-white/10 flex-1"></div>
-            <span class="text-xs font-bold text-gray-400 uppercase tracking-widest"><i class="fa-solid fa-shield-cat mr-1"></i> 天眼防线摘要</span>
+            <span class="text-xs font-bold text-gray-400 uppercase tracking-widest"><i class="fa-solid fa-shield-cat mr-1"></i> 安全防线战报</span>
             <div class="h-px bg-gray-200 dark:bg-white/10 flex-1"></div>
         </div>
         
@@ -129,30 +127,25 @@
                     <span class="text-[12px] text-gray-500">个设备同时播放</span>
                 </div>
             </div>
-            <div class="p-3 bg-blue-50 dark:bg-blue-500/10 rounded-xl flex gap-3 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-500/20">
-                <i class="fa-solid fa-circle-info mt-0.5"></i>
-                <p class="text-[11px] font-medium leading-relaxed">需要为某位 VIP 设置专属额度或无视踢出特权，请前往 <strong>[ 用户管理 ] -> 编辑用户</strong> 界面中开启。</p>
-            </div>
         </div>
         <button onclick="saveConfig()" class="w-full mt-6 py-3.5 bg-brand-500 hover:bg-brand-600 text-white rounded-[16px] font-bold text-[14px] shadow-md transition-colors active:scale-95">
             <i class="fa-solid fa-check mr-1"></i> 保存并应用配置
         </button>
     </div>
 </div>
-
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // 🔥 侧边栏选中特效：模仿 users_manage 页面的逻辑，手动注入 CSS 类
+    // 🔥 侧边栏特效：确保效果与 users_manage 100% 一致
     function setActiveNavLink() {
         const navItems = document.querySelectorAll('.nav-item');
         navItems.forEach(item => {
-            // 先清理可能存在的旧选中类
+            // 先清理样式
             item.classList.remove('bg-brand-50', 'dark:bg-apple-hoverDark', 'text-brand-500');
             item.classList.add('text-gray-600', 'dark:text-gray-400');
             
-            // 匹配风险管控对应的 href
+            // 匹配路由添加高亮
             if(item.getAttribute('href') === '/risk') {
                 item.classList.add('bg-brand-50', 'dark:bg-apple-hoverDark', 'text-brand-500');
                 item.classList.remove('text-gray-600', 'dark:text-gray-400');
@@ -160,7 +153,6 @@
         });
     }
 
-    // 切换 Tab 逻辑保持不变...
     function switchTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.getElementById('tab-' + tabId).classList.add('active');
@@ -176,7 +168,6 @@
         }
     }
 
-    // ... 其他异步请求函数保持不变 (fetchRiskData, renderDashboard, renderSummaryBoard, etc.) ...
     async function fetchRiskData() {
         if(!document.getElementById('tab-live').classList.contains('active')) return;
         try {
@@ -199,7 +190,7 @@
         const container = document.getElementById('users-container');
         let totalUsers = usersData.length, totalWarning = 0, totalDevices = 0;
         if(totalUsers === 0) {
-            container.innerHTML = `<div class="col-span-full flex flex-col items-center justify-center py-16 text-gray-400 bg-white/40 dark:bg-[#1C1C1E]/40 rounded-[24px] border border-dashed border-gray-200 dark:border-white/10"><i class="fa-solid fa-mug-hot text-5xl mb-4 opacity-30"></i><p class="text-[14px] font-bold">当前风平浪静，天眼静默待机中</p></div>`;
+            container.innerHTML = `<div class="col-span-full flex flex-col items-center justify-center py-16 text-gray-400 bg-white/40 dark:bg-[#1C1C1E]/40 rounded-[24px] border border-dashed border-gray-200 dark:border-white/10"><i class="fa-solid fa-mug-hot text-5xl mb-4 opacity-30"></i><p class="text-[14px] font-bold">天眼正静默巡逻中...</p></div>`;
         } else {
             container.innerHTML = ''; 
             usersData.forEach(user => {
@@ -221,7 +212,7 @@
         document.getElementById('stat-warning').innerText = totalWarning;
         document.getElementById('stat-devices').innerText = totalDevices;
         const now = new Date();
-        document.getElementById('last-update').innerText = `最后雷达扫描: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+        document.getElementById('last-update').innerText = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
     }
 
     function renderSummaryBoard(json) {
@@ -233,13 +224,14 @@
                 offendersHtml += `<div class="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl transition-colors border border-transparent hover:border-gray-100 dark:hover:border-white/5"><span class="text-[13px] font-bold text-gray-800 dark:text-gray-200"><span class="mr-2">${medal}</span> ${u.username}</span><span class="text-[11px] font-bold bg-red-50 text-red-500 dark:bg-red-500/10 px-2 py-1 rounded-lg">违规 ${u.total_violations} 次</span></div>`;
             });
         } else {
-            offendersHtml = `<div class="py-6 text-center text-gray-400 text-[12px] font-bold">表现良好，无违规记录</div>`;
+            offendersHtml = `<div class="py-6 text-center text-gray-400 text-[12px] font-bold">暂无违规记录</div>`;
         }
-        container.innerHTML = `<div class="bg-white dark:bg-apple-cardDark rounded-[24px] p-6 shadow-sm border border-gray-100 dark:border-white/5 relative overflow-hidden"><div class="absolute right-0 top-0 w-32 h-32 bg-brand-500/5 rounded-bl-[100px]"></div><h3 class="text-[15px] font-black text-gray-900 dark:text-white mb-6 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-brand-500"></i> 天眼 24H 拦截统计</h3><div class="grid grid-cols-3 gap-4"><div class="bg-gray-50 dark:bg-black/20 p-4 rounded-2xl border border-gray-100/50 dark:border-white/5 text-center"><div class="text-2xl font-black text-yellow-500 mb-1">${json.today_stats.warn || 0}</div><div class="text-[11px] font-bold text-gray-500">触发警报</div></div><div class="bg-gray-50 dark:bg-black/20 p-4 rounded-2xl border border-gray-100/50 dark:border-white/5 text-center"><div class="text-2xl font-black text-orange-500 mb-1">${json.today_stats.kick || 0}</div><div class="text-[11px] font-bold text-gray-500">拔断网线</div></div><div class="bg-gray-50 dark:bg-black/20 p-4 rounded-2xl border border-gray-100/50 dark:border-white/5 text-center"><div class="text-2xl font-black text-red-500 mb-1">${json.today_stats.ban || 0}</div><div class="text-[11px] font-bold text-gray-500">封禁账号</div></div></div></div><div class="bg-white dark:bg-apple-cardDark rounded-[24px] p-6 shadow-sm border border-gray-100 dark:border-white/5"><div class="flex items-center justify-between mb-4"><h3 class="text-[15px] font-black text-gray-900 dark:text-white flex items-center gap-2"><i class="fa-solid fa-clipboard-list text-purple-500"></i> 历史高危名单 (Top 5)</h3><span class="text-[10px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/20 dark:text-purple-400 px-2 py-1 rounded-lg border border-purple-100 dark:border-purple-500/20">已有 ${json.vip_count} 人获 VIP 特权</span></div><div class="flex flex-col gap-1">${offendersHtml}</div></div>`;
+
+        container.innerHTML = `<div class="bg-white dark:bg-apple-cardDark rounded-[24px] p-6 shadow-sm border border-gray-100 dark:border-white/5 relative overflow-hidden"><div class="absolute right-0 top-0 w-32 h-32 bg-brand-500/5 rounded-bl-[100px]"></div><h3 class="text-[15px] font-black text-gray-900 dark:text-white mb-6 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-brand-500"></i> 天眼 24H 拦截统计</h3><div class="grid grid-cols-3 gap-4"><div class="bg-gray-50 dark:bg-black/20 p-4 rounded-2xl border border-gray-100/50 dark:border-white/5 text-center"><div class="text-2xl font-black text-yellow-500 mb-1">${json.today_stats.warn || 0}</div><div class="text-[11px] font-bold text-gray-500">警报</div></div><div class="bg-gray-50 dark:bg-black/20 p-4 rounded-2xl border border-gray-100/50 dark:border-white/5 text-center"><div class="text-2xl font-black text-orange-500 mb-1">${json.today_stats.kick || 0}</div><div class="text-[11px] font-bold text-gray-500">物理拔线</div></div><div class="bg-gray-50 dark:bg-black/20 p-4 rounded-2xl border border-gray-100/50 dark:border-white/5 text-center"><div class="text-2xl font-black text-red-500 mb-1">${json.today_stats.ban || 0}</div><div class="text-[11px] font-bold text-gray-500">封禁</div></div></div></div><div class="bg-white dark:bg-apple-cardDark rounded-[24px] p-6 shadow-sm border border-gray-100 dark:border-white/5"><div class="flex items-center justify-between mb-4"><h3 class="text-[15px] font-black text-gray-900 dark:text-white flex items-center gap-2"><i class="fa-solid fa-clipboard-list text-purple-500"></i> 高危名单 (Top 5)</h3><span class="text-[10px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/20 dark:text-purple-400 px-2 py-1 rounded-lg border border-purple-100 dark:border-purple-500/20">VIP特权: ${json.vip_count} 人</span></div><div class="flex flex-col gap-1">${offendersHtml}</div></div>`;
     }
 
     async function kickDevice(userId, username, sessionId, deviceId) {
-        if(!confirm(`确定强制断开？`)) return;
+        if(!confirm(`物理拔网线警告：\n确定要强制掐断该设备吗？`)) return;
         try {
             const res = await fetch('/api/risk/kick', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ user_id: userId, username: username, session_id: sessionId, device_id: deviceId }) });
             alert(res.ok ? "✅ 成功拔掉网线！" : `❌ 执行失败`); fetchRiskData();
@@ -247,10 +239,10 @@
     }
 
     async function banUser(userId, username) {
-        if(!confirm(`确定封禁用户 [${username}] ？`)) return;
+        if(!confirm(`⚠️ 终极警告：确定要封禁用户 [${username}] 吗？`)) return;
         try {
             const res = await fetch('/api/risk/ban', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ user_id: userId, username: username }) });
-            alert(res.ok ? `✅ 已冻结` : `❌ 失败`); fetchRiskData();
+            alert(res.ok ? `✅ 已冻结账号` : `❌ 失败`); fetchRiskData();
         } catch (e) {}
     }
 
@@ -260,12 +252,12 @@
     }
     function renderLogs(logs) {
         const tbody = document.getElementById('logs-tbody');
-        if (logs.length === 0) return tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-gray-400">无记录</td></tr>`;
+        if (logs.length === 0) return tbody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-gray-400">暂无任何风控记录</td></tr>`;
         let html = '';
         logs.forEach(log => {
             const isBan = log.action === 'ban', isKick = log.action === 'kick';
             const actionBadge = isBan ? `<span class="bg-red-500 text-white px-2 py-1 rounded text-[11px] font-bold">封禁</span>` : isKick ? `<span class="bg-orange-500 text-white px-2 py-1 rounded text-[11px] font-bold">拔线</span>` : `<span class="bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 px-2 py-1 rounded text-[11px] font-bold">警告</span>`;
-            html += `<tr class="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors"><td class="py-3 px-5 text-gray-500 font-mono">${log.created_at}</td><td class="py-3 px-5 font-bold">${log.username}</td><td class="py-3 px-5">${actionBadge}</td><td class="py-3 px-5 text-gray-600 truncate max-w-xs">${log.reason}</td></tr>`;
+            html += `<tr class="hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors"><td class="py-3 px-5 text-gray-500 font-mono">${log.created_at}</td><td class="py-3 px-5 font-bold text-gray-800 dark:text-white">${log.username}</td><td class="py-3 px-5">${actionBadge}</td><td class="py-3 px-5 text-gray-600 truncate max-w-xs">${log.reason}</td></tr>`;
         });
         tbody.innerHTML = html;
     }
@@ -290,12 +282,12 @@
     async function saveConfig() {
         try {
             const res = await fetch('/api/risk/config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ enable_risk_control: document.getElementById('cfg-enable').checked, default_max_concurrent: parseInt(document.getElementById('cfg-limit').value) }) });
-            if(res.ok) { closeConfigModal(); alert('✅ 配置已生效'); fetchRiskData(); }
+            if(res.ok) { closeConfigModal(); alert('✅ 配置已应用'); fetchRiskData(); }
         } catch(e) {}
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        setActiveNavLink(); // 立即触发侧边栏选中特效
+        setActiveNavLink(); // 立即激活高亮效果
         fetchRiskData();
         setInterval(fetchRiskData, 30000); 
     });
