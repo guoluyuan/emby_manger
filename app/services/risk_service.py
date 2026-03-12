@@ -96,7 +96,9 @@ def scan_playbacks_and_alert():
         global _alerted_sessions
         current_alert_fingerprints = set()
         
-        logger.info(f"📡 [天眼雷达] 正在扫网... 发现 {len(active_playbacks)} 名用户正在看视频。")
+        # 🔥 只有在真正有人看视频的时候，才在控制台打印这句战报，0人的时候静默防守
+        if len(active_playbacks) > 0:
+            logger.info(f"📡 [天眼雷达] 正在扫网... 发现 {len(active_playbacks)} 名用户正在看视频。")
 
         for uid, user_sessions in active_playbacks.items():
             limit = get_user_concurrent_limit(uid)
