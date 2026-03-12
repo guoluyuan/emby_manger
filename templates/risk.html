@@ -24,7 +24,7 @@
             </button>
         </div>
         <div class="flex items-center gap-3 w-full md:w-auto px-2">
-            <span class="text-[10px] font-black bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 px-2 py-1 rounded-lg uppercase tracking-tighter border border-gray-200/50 dark:border-white/5">{{ VERSION }}</span>
+            <span class="text-[10px] font-black bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 px-2 py-1 rounded-lg uppercase tracking-tighter border border-gray-200/50 dark:border-white/5">v{{ version }}</span>
             
             <div class="text-[12px] font-mono font-bold text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-black/20 px-3 py-1.5 rounded-xl border border-gray-200/50 dark:border-white/5 flex items-center gap-2">
                 <span id="live-indicator" class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
@@ -145,16 +145,15 @@
 
 {% block scripts %}
 <script>
-    // 🔥 侧边栏特效：参考 users.html 逻辑，强制设置当前页面的选中状态
+    // 🔥 侧边栏特效：参考其他页面的逻辑，强制设置当前页面的选中状态
     function setActiveNavLink() {
         const navItems = document.querySelectorAll('#sidebar-nav .nav-item');
         navItems.forEach(item => {
+            // 匹配风险管控的路由路径
             if(item.getAttribute('href') === '/risk') {
-                // 选中态样式：浅蓝背景 + 品牌色文字
                 item.classList.add('bg-brand-50', 'dark:bg-apple-hoverDark', 'text-brand-500');
                 item.classList.remove('text-gray-600', 'dark:text-gray-400');
             } else {
-                // 非选中态样式
                 item.classList.remove('bg-brand-50', 'dark:bg-apple-hoverDark', 'text-brand-500');
                 item.classList.add('text-gray-600', 'dark:text-gray-400');
             }
@@ -335,7 +334,7 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        setActiveNavLink(); // 🔥 设置侧边栏高亮
+        setActiveNavLink(); // 🔥 激活侧边栏高亮
         fetchRiskData();
         setInterval(fetchRiskData, 30000); 
     });
