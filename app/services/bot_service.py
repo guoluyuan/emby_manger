@@ -416,7 +416,6 @@ class NotificationBot:
         wecom_img = backdrop_io or primary_io or REPORT_COVER_URL
         self.send_photo("sys_notify", tg_img, caption, reply_markup=keyboard, platform="all", wecom_photo_io=wecom_img)
 
-    # 🔥 辅助方法：将 Ticks 转换为时分秒
     def _format_ticks(self, ticks):
         if not ticks: return "00:00:00"
         total_seconds = int(ticks / 10000000)
@@ -445,7 +444,6 @@ class NotificationBot:
             emoji = "▶️" if action == "start" else "⏹️"; act = "开始播放" if action == "start" else "停止播放"
             ip = session.get("RemoteEndPoint", "127.0.0.1"); loc = self._get_location(ip)
             
-            # 🔥 提取并计算播放进度
             pos_ticks = session.get("PlayState", {}).get("PositionTicks", 0)
             run_ticks = item.get("RunTimeTicks", 1) or 1
             pct = int((pos_ticks / run_ticks) * 100) if run_ticks > 1 else 0
@@ -542,7 +540,7 @@ class NotificationBot:
             
             msg = (f"🗑️ <b>系统告警：{del_type}被删除</b>\n\n"
                    f"🎬 <b>内容：</b>{title}{year_str}\n"
-                   f"🕒 <b>时间：</b>{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                   f"🕒 <b>时间：</b>{datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
                    f"<i>* 该项目已从媒体库物理存储中被永久移除。</i>")
             
             primary_io = self._download_emby_image(item.get("Id"), 'Primary') if item.get("Id") else None
@@ -604,23 +602,22 @@ class NotificationBot:
         except: pass
         return self.user_cache.get(user_id, "Unknown User")
 
-    # 🔥 黑科技：IPv6 子网提取器，锁死国内移动/宽带不断变动的后缀
     def _get_subnet_key(self, ip):
         try:
             ip_obj = ipaddress.ip_address(ip)
             if ip_obj.version == 6:
                 parts = ip_obj.exploded.split(':')
-                return ':'.join(parts[:4]) + '::/64' # 取前 64 位作为唯一凭证
+                return ':'.join(parts[:4]) + '::/64' 
             return ip
         except: return ip
 
-    # 🔥 文本脱水器：清理冗余地名和国内运营商信息
     def _clean_location(self, loc):
         if not loc: return ""
         loc = re.sub(r'(中国|省|市|自治区|自治州|特别行政区|移动|联通|电信|铁通|教育网|广电|通信|数据中心|IDC)', ' ', loc)
-        loc = re.sub(r'\s+', ' ', loc).strip() # 压缩连放空格
+        loc = re.sub(r'\s+', ' ', loc).strip() 
         return loc
 
+    # 🔥 修复 2: 彻底解决 IPV6 乱飘与上饶自机循环，换用国内权威无鉴权库
     def _get_location(self, ip):
         if not ip: return "未知"
         is_ipv6 = False
@@ -630,26 +627,33 @@ class NotificationBot:
             is_ipv6 = (ip_obj.version == 6)
         except: pass
         
-        # 匹配子网缓存，防飘移
         cache_key = self._get_subnet_key(ip)
         if cache_key in self.ip_cache: return self.ip_cache[cache_key]
 
         loc = ""
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
-        # 🚀 瀑布流第一层：Bilibili API (国内顶尖，对 IPv6 解析极其精准)
+        # 🚀 第一层：IPW.cn (国家 IPv6 推进组织开放接口，专门防飘移)
         if not loc:
             try:
-                res = requests.get(f"https://api.bilibili.com/x/web-interface/zone?ip={ip}", headers=headers, timeout=3)
+                res = requests.get(f"https://open.ipw.cn/api/ip/location?ip={ip}", headers=headers, timeout=3)
                 if res.status_code == 200:
                     d = res.json().get('data', {})
-                    if d and d.get('country') == '中国':
+                    if d.get('province') or d.get('city'):
                         loc = f"{d.get('province', '')} {d.get('city', '')}"
-                    elif d:
-                        loc = f"{d.get('country', '')} {d.get('province', '')}"
             except: pass
 
-        # 🚀 瀑布流第二层：PConline 太平洋网络 (老牌权威 API)
+        # 🚀 第二层：ZXInc 纯真 IP 库 API (骨干网数据，应对 5G 极准)
+        if not loc:
+            try:
+                res = requests.get(f"https://ip.zxinc.org/api.php?type=json&ip={ip}", headers=headers, timeout=3)
+                if res.status_code == 200:
+                    d = res.json().get('data', {})
+                    if d.get('location'):
+                        loc = d.get('location') 
+            except: pass
+
+        # 🚀 兜底层：太平洋网络 (老牌稳健接口)
         if not loc:
             try:
                 res = requests.get(f"https://whois.pconline.com.cn/ipJson.jsp?ip={ip}&json=true", headers=headers, timeout=3)
@@ -659,22 +663,12 @@ class NotificationBot:
                         loc = f"{d.get('pro', '')} {d.get('city', '')}"
             except: pass
 
-        # 🚀 瀑布流兜底层：Speedtest 测速网
-        if not loc:
-            try:
-                res = requests.get(f"https://forge.speedtest.cn/api/location/info?ip={ip}", headers=headers, timeout=3)
-                if res.status_code == 200:
-                    d = res.json()
-                    if d.get("country"): loc = f"{d.get('country')} {d.get('province', '')} {d.get('city', '')}"
-            except: pass
-
-        # 脱水清洗
         loc = self._clean_location(loc)
         if not loc: loc = "IPv6 节点" if is_ipv6 else "未知地区"
             
         if loc != "未知地区":
             if len(self.ip_cache) > 1000: self.ip_cache.clear()
-            self.ip_cache[cache_key] = loc # 缓存锁死当前子网区域
+            self.ip_cache[cache_key] = loc 
             
         return loc
 
@@ -979,31 +973,40 @@ class NotificationBot:
         elif text.startswith("/check"): self._cmd_check(cid, platform)
         elif text.startswith("/help"): self._cmd_help(cid, platform)
 
-    # 🔥 修复 3: /latest 异常崩溃，采用安全遍历和稳定接口
+    # 🔥 修复 1: 回归极速的 /Items/Latest 接口，毫秒级响应，告别超时
     def _cmd_latest(self, cid, platform):
         key = cfg.get("emby_api_key"); host = cfg.get("emby_host")
         try:
             user_id = self._get_admin_id()
             if not user_id: return self.send_message(cid, "❌ 错误: 无法获取 Emby 用户身份", platform=platform)
-            fields = "DateCreated,Name,SeriesName,ProductionYear,Type"
-            url = f"{host}/emby/Users/{user_id}/Items"
-            params = {"IncludeItemTypes": "Movie,Episode", "Recursive": "true", "SortBy": "DateCreated", "SortOrder": "Descending", "Limit": 8, "Fields": fields, "api_key": key}
+            # 强制要求返回剧集的季集信息
+            fields = "DateCreated,Name,SeriesName,Type,ParentIndexNumber,IndexNumber"
+            url = f"{host}/emby/Users/{user_id}/Items/Latest"
+            params = {"IncludeItemTypes": "Movie,Episode", "Limit": 8, "Fields": fields, "api_key": key}
             
-            res = requests.get(url, params=params, timeout=15)
+            res = requests.get(url, params=params, timeout=10)
             if res.status_code != 200: return self.send_message(cid, f"❌ 查询失败", platform=platform)
             
-            items = res.json().get("Items", [])
+            # /Latest 接口直接返回 List，不需要 .get("Items")
+            items = res.json()
             if not items: return self.send_message(cid, "📭 最近没有新入库的资源", platform=platform)
 
             msg = "🆕 <b>最近入库 (Top 8)</b>\n\n"
             for i in items:
                 name = i.get("Name", "未知")
-                if i.get("Type") == "Episode" and i.get("SeriesName"):
-                    name = f"{i.get('SeriesName')} - {name}"
+                item_type = i.get("Type")
+                
+                # 剧集排版：精准到 SxxExx
+                if item_type == "Episode" and i.get("SeriesName"):
+                    s_idx = str(i.get("ParentIndexNumber", 0)).zfill(2) if i.get("ParentIndexNumber") is not None else "01"
+                    e_idx = str(i.get("IndexNumber", 0)).zfill(2) if i.get("IndexNumber") is not None else "XX"
+                    name = f"《{i.get('SeriesName')}》 S{s_idx}E{e_idx} {name}"
+                elif item_type == "Movie":
+                    name = f"《{name}》"
                 
                 date_raw = i.get("DateCreated")
                 date_str = date_raw[:10] if date_raw else "未知时间"
-                type_icon = "🎬" if i.get("Type") == "Movie" else "📺"
+                type_icon = "🎬" if item_type == "Movie" else "📺"
                 
                 msg += f"{type_icon} <code>{date_str}</code> | <b>{name}</b>\n"
                 
@@ -1166,7 +1169,6 @@ class NotificationBot:
         except Exception as e:
             self.send_message(chat_id, f"❌ 统计失败", platform=platform)
 
-    # 🔥 修复 4: /now 显示剧集名并加入文本进度条
     def _cmd_now(self, cid, platform):
         key = cfg.get("emby_api_key"); host = cfg.get("emby_host")
         try:
@@ -1192,7 +1194,6 @@ class NotificationBot:
                 pct = int((pos_ticks / run_ticks) * 100)
                 pct = min(max(pct, 0), 100)
                 
-                # 动态生成 10 格文本进度条
                 filled = int(pct / 10)
                 bar = "█" * filled + "⚪️" * (10 - filled)
                 
@@ -1200,7 +1201,6 @@ class NotificationBot:
             self.send_message(cid, msg.strip(), platform=platform)
         except: self.send_message(cid, "❌ 连接失败", platform=platform)
 
-    # 🔥 修复 2: /recent 单行紧凑排版，去除冗余横线
     def _cmd_recent(self, cid, platform):
         try:
             rows = query_db("SELECT UserId, ItemName, DateCreated FROM PlaybackActivity ORDER BY DateCreated DESC LIMIT 10")
@@ -1216,7 +1216,6 @@ class NotificationBot:
         except Exception as e: 
             self.send_message(cid, f"❌ 查询失败", platform=platform)
 
-    # 🔥 修复 1: /check 高级服务器探针 (带容量大盘与空容错)
     def _cmd_check(self, cid, platform):
         key = cfg.get("emby_api_key"); host = cfg.get("emby_host")
         start = time.time()
@@ -1228,7 +1227,6 @@ class NotificationBot:
                 version = info.get('Version', '未知')
                 os_name = info.get('OperatingSystem', '未知')
                 
-                # 尝试获取媒体库大盘
                 movie_count = series_count = ep_count = 0
                 try:
                     c_res = requests.get(f"{host}/emby/Items/Counts?api_key={key}", timeout=3).json()
@@ -1237,7 +1235,6 @@ class NotificationBot:
                     ep_count = c_res.get('EpisodeCount', 0)
                 except: pass
                 
-                # 尝试获取在线人数
                 active_users = 0
                 try:
                     s_res = requests.get(f"{host}/emby/Sessions?api_key={key}", timeout=3).json()
