@@ -787,14 +787,18 @@ class NotificationBot:
         try: requests.post(f"https://api.telegram.org/bot{token}/answerCallbackQuery", json={"callback_query_id": cq_id}, proxies=proxies, timeout=5)
         except: pass
 
-        # 🔥 新增：处理 TG 的风控封号指令
+# 🔥 新增：处理 TG 的风控封号指令
         if data.startswith("risk_ban_"):
             uid = data.replace("risk_ban_", "")
             from app.services.risk_service import ban_user, log_risk_action
             
             operator = cq.get('from', {}).get('first_name', 'Admin')
+            # 👇 修复：动态获取真实的用户名
+            target_username = self._get_username(uid) 
+            
             if ban_user(uid):
-                log_risk_action(uid, "快捷封号", "ban", f"机器快捷执法 (操作人: {operator})")
+                # 👇 修复：存入真实的用户名
+                log_risk_action(uid, target_username, "ban", f"机器快捷执法 (操作人: {operator})")
                 action_text = f"✅ 已成功封禁该违规账号！\n(执行人: {operator})"
             else:
                 action_text = "❌ 封禁失败，可能 API 权限不足。"
