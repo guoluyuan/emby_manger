@@ -22,14 +22,14 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - DB_PATH=/emby-data/playback_reporting.db # 本地模式必填
-      - EMBY_HOST=http://127.0.0.1:8096
-      - EMBY_API_KEY=xxxxxxxxxxxxxxxxxxxxx
 ```
+
+首次安装后，请访问 `http://localhost:10307/` 在网页中填写 Emby 地址与 API Key（无需写入 `docker-compose.yml`）。
 
 ### 1.3 部署注意事项（新手必读）
 
 1. **必须填写 Emby 地址，否则无法登录**
-   - `EMBY_HOST` 必填，例如 `http://127.0.0.1:8096`
+   - 首次进入网页设置中填写 `emby_host`（例如 `http://127.0.0.1:8096`）
    - 登录账号密码就是你的 Emby 管理员账号密码
 
 2. **必须安装 Playback Reporting 插件**

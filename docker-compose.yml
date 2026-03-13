@@ -16,6 +16,3 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - DB_PATH=/emby-data/playback_reporting.db
-      # 🔥 新增：Emby 的局域网访问地址
-      # 因为是 Host 模式，127.0.0.1 指的就是 NAS 自己
-      - EMBY_HOST=http://127.0.0.1:8096
