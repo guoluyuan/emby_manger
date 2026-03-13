@@ -8,6 +8,26 @@ import math
 
 router = APIRouter()
 
+def get_existing_item_ids(ids):
+    ids = [str(i) for i in ids if i]
+    if not ids:
+        return set()
+    existing = set()
+    try:
+        for i in range(0, len(ids), 100):
+            chunk = ids[i:i+100]
+            res = media_api.get("/Items", params={"Ids": ",".join(chunk)}, timeout=8)
+            if res.status_code == 200:
+                items = res.json().get("Items", []) or []
+                for it in items:
+                    it_id = it.get("Id")
+                    if it_id: existing.add(str(it_id))
+            else:
+                return None
+        return existing
+    except:
+        return None
+
 # --- 内部工具：获取用户映射 ---
 def get_user_map_local():
     user_map = {}
@@ -15,8 +35,13 @@ def get_user_map_local():
         # 🚀 替换为 media_api
         res = media_api.get("/Users", timeout=2)
         if res.status_code == 200:
-            for u in res.json(): 
-                user_map[u['Id']] = u['Name']
+            data = res.json() or []
+            if isinstance(data, dict):
+                data = data.get("Items", []) or []
+            if isinstance(data, list):
+                for u in data:
+                    if isinstance(u, dict) and u.get('Id'):
+                        user_map[u['Id']] = u.get('Name', '未知用户')
     except: 
         pass
     return user_map
@@ -49,7 +74,7 @@ def api_get_history(
         where_sql = " WHERE " + " AND ".join(where_clauses) if where_clauses else ""
 
         count_sql = f"SELECT COUNT(*) as c FROM PlaybackActivity{where_sql}"
-        count_res = query_db(count_sql, params)
+        count_res = query_db(count_sql, params) or []
         total = count_res[0]['c'] if count_res else 0
         total_pages = math.ceil(total / limit)
 
@@ -63,12 +88,20 @@ def api_get_history(
             LIMIT ? OFFSET ?
         """
         params.extend([limit, offset])
-        rows = query_db(data_sql, params)
+        rows = query_db(data_sql, params) or []
+
+        existing_ids = None
+        try:
+            existing_ids = get_existing_item_ids([dict(r).get("ItemId") for r in rows])
+        except:
+            existing_ids = None
 
         user_map = get_user_map_local()
         result = []
         for row in rows:
             item = dict(row)
+            if existing_ids is not None and str(item.get("ItemId")) not in existing_ids:
+                continue
             item['UserName'] = user_map.get(item['UserId'], "未知用户")
             
             seconds = item.get('PlayDuration') or 0

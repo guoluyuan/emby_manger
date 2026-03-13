@@ -195,6 +195,11 @@
                     <label class="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider pl-1">全局科学代理 (可选)</label>
                     <input type="text" id="proxy_url" class="w-full px-4 py-3 rounded-xl border border-transparent bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-[13px] font-mono text-gray-800 dark:text-gray-100 focus:bg-white dark:focus:bg-black/30 focus:ring-2 focus:ring-blue-500/50 outline-none transition-all placeholder-gray-400" placeholder="http://127.0.0.1:7890">
                 </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider pl-1">CORS 允许来源 (可选)</label>
+                    <input type="text" id="cors_origins" class="w-full px-4 py-3 rounded-xl border border-transparent bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-[13px] font-mono text-gray-800 dark:text-gray-100 focus:bg-white dark:focus:bg-black/30 focus:ring-2 focus:ring-blue-500/50 outline-none transition-all placeholder-gray-400" placeholder="https://example.com, https://app.example.com">
+                    <p class="mt-1 text-[10px] text-gray-400">提示：修改后需重启服务生效</p>
+                </div>
                 <div class="mt-auto pt-4 border-t border-gray-100 dark:border-white/5">
                     <button onclick="runHealthCheck(this)" class="w-full flex items-center justify-center gap-2 px-5 py-3 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:bg-rose-900/20 dark:text-rose-400 dark:hover:bg-rose-900/40 rounded-[14px] text-[13px] font-bold shadow-sm transition-all active:scale-95 border border-rose-100 dark:border-rose-800/30">
                         <i class="fa-solid fa-stethoscope"></i> 全库深度体检与自愈
@@ -350,6 +355,7 @@ async function loadSettings() {
         document.getElementById('emby_api_key').value = d.emby_api_key || '';
         document.getElementById('tmdb_api_key').value = d.tmdb_api_key || '';
         document.getElementById('proxy_url').value = d.proxy_url || '';
+        document.getElementById('cors_origins').value = (d.cors_origins || []).join(', ');
         document.getElementById('webhook_token').value = d.webhook_token || '';
         document.getElementById('emby_public_url').value = d.emby_public_url || '';
         document.getElementById('welcome_message').value = d.welcome_message || '';
@@ -446,6 +452,7 @@ async function saveSettings() {
         emby_api_key: document.getElementById('emby_api_key').value,
         tmdb_api_key: document.getElementById('tmdb_api_key').value,
         proxy_url: document.getElementById('proxy_url').value,
+        cors_origins: document.getElementById('cors_origins').value.split(/[\n,]/).map(s => s.trim()).filter(Boolean),
         webhook_token: document.getElementById('webhook_token').value,
         hidden_users: hiddenUsers,
         emby_public_url: document.getElementById('emby_public_url').value,

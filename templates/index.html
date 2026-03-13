@@ -291,7 +291,8 @@
             if (res.status === 'success' && res.data.length > 0) {
                 let html = '';
                 res.data.slice(0, 40).forEach(item => {
-                    const imgUrl = `/api/proxy/image/${item.ItemId}/primary`;
+                    const safeName = encodeURIComponent(item.ItemName || '');
+                    const imgUrl = `/api/proxy/smart_image?item_id=${item.ItemId}&type=Primary&name=${safeName}`;
                     html += `
                     <div onclick="jumpToEmby('${item.ItemId}')" class="group relative w-24 sm:w-28 md:w-full flex-shrink-0 cursor-pointer snap-center">
                         <div class="aspect-[2/3] rounded-xl overflow-hidden bg-gray-100 dark:bg-apple-hoverDark relative border border-gray-100 dark:border-white/5">

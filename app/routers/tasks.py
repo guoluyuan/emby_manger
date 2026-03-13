@@ -6,6 +6,7 @@ from app.core.config import cfg
 from app.core.database import DB_PATH, query_db
 # 🔥 引入核心适配器
 from app.core.media_adapter import media_api
+import re
 
 router = APIRouter()
 
@@ -95,6 +96,24 @@ COMMON_TASK_DICT = {
     "HDHomeRun: Refresh guide": "HDHomeRun: 刷新直播节目单"
 }
 
+# 简要中文说明（未覆盖的会使用“任务名 + 系统任务”兜底）
+COMMON_TASK_DESC_DICT = {
+    "Scan media library": "重新扫描媒体库文件与目录变更",
+    "Refresh Guide": "刷新直播电视的节目单与指南数据",
+    "Refresh channels": "刷新直播频道列表",
+    "Clean up image cache": "清理封面与图片缓存，释放空间",
+    "Download missing subtitles": "自动下载缺失字幕",
+    "Extract chapter images": "生成章节预览图",
+    "Optimize database": "优化数据库索引结构",
+    "Vacuum database": "压缩数据库，清理空闲空间",
+    "Remove old watch history": "清理过期的播放历史记录",
+    "Check for plugin updates": "检查并更新插件",
+    "Check for application updates": "检查并更新服务器程序"
+}
+
+def _contains_cjk(text: str) -> bool:
+    return bool(re.search(r'[\u4e00-\u9fff]', text or ""))
+
 # ==========================================
 # 2. 初始化自定义别名表
 # ==========================================
@@ -154,11 +173,16 @@ async def get_tasks(request: Request):
         for t in tasks:
             cat = t.get('Category', '未分类')
             orig_name = t.get('Name', '')
+            orig_desc = t.get('Description', '') or ''
             
             t['OriginalName'] = orig_name 
             
             if orig_name in custom_dict: t['Name'] = custom_dict[orig_name]
             elif orig_name in COMMON_TASK_DICT: t['Name'] = COMMON_TASK_DICT[orig_name]
+
+            # 任务说明中文化（若已有中文则保留）
+            if orig_desc and not _contains_cjk(orig_desc):
+                t['Description'] = COMMON_TASK_DESC_DICT.get(orig_name) or f"{t.get('Name', orig_name)}（系统任务）"
                 
             if cat not in groups: groups[cat] = []
             groups[cat].append(t)

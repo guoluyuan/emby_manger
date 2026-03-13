@@ -1,5 +1,13 @@
 # 🎬 EmbyPulse（映迹）
 
+## 二次修改说明
+
+本仓库为二次修改版本，基于原项目 https://github.com/zeyu8023/emby-pulse 进行调整。
+
+主要调整：
+- 本地化 AlpineJS 资源，避免 CDN 被拦截导致前端不渲染
+- 修复“剧集热播榜 Top 10”列表因重复 key 导致不显示的问题
+
 <div align="center">
   <img src="static/img/logo-light.png" alt="EmbyPulse Logo" width="200" />
 

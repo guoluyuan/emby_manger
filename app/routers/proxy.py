@@ -86,18 +86,10 @@ def proxy_image(item_id: str, img_type: str):
 
 @router.get("/api/proxy/smart_image")
 def proxy_smart_image(item_id: str, name: str = "", year: str = "", type: str = "Primary"):
-    # 1. 缓存拦截 (外部链接仍使用 ext_session)
+    # 1. 缓存拦截（仅允许 Emby 内部 ID，不再使用外部链接）
     cached_result = smart_image_cache.get(item_id)
     if cached_result and str(cached_result).startswith('http'):
-        try:
-            proxy = cfg.get("proxy_url")
-            proxies = {"https": proxy, "http": proxy} if proxy else None
-            resp = ext_session.get(cached_result, proxies=proxies, timeout=10, stream=True)
-            if resp.status_code == 200:
-                return Response(content=resp.content, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
-        except Exception as e:
-            logger.error(f"从缓存获取 TMDB 图片失败: {e}")
-            pass 
+        cached_result = None
 
     target_id = cached_result if cached_result and not str(cached_result).startswith('http') else item_id
     img_type = type
@@ -107,72 +99,36 @@ def proxy_smart_image(item_id: str, name: str = "", year: str = "", type: str = 
         target_id = get_real_image_id_robust(target_id)
         
     # 2. 第 1 级防御：正常请求媒体库 (使用 media_api)
+    primary_failed = False
     try:
         resp = media_api.get(f"/Items/{target_id}/Images/{img_type}", params=params, timeout=5, stream=True)
         if resp.status_code == 200:
             return Response(content=resp.content, media_type=resp.headers.get("Content-Type", "image/jpeg"), headers={"Cache-Control": "public, max-age=86400"})
+        if img_type.lower() == 'primary':
+            primary_failed = True
     except requests.exceptions.RequestException as e: 
         logger.debug(f"媒体库图片请求超时或断开: {e}")
+        if img_type.lower() == 'primary':
+            primary_failed = True
 
-    # 3. 第 2 级防御：洗版名字搜索兜底 (使用 media_api)
-    clean_name = name.split(' - ')[0].strip() if name else ""
-    if clean_name:
+    # 🔥 Primary 无图时，自动降级尝试 Backdrop / Thumb
+    if img_type.lower() == 'primary' and primary_failed:
         try:
-            s_resp = media_api.get("/Items", params={"SearchTerm": clean_name, "IncludeItemTypes": "Movie,Series,Episode", "Recursive": "true"}, timeout=5)
-            if s_resp.status_code == 200:
-                items = s_resp.json().get("Items", [])
-                if items:
-                    new_id = items[0]["Id"]
-                    if items[0]["Type"] in ["Episode", "Season", "Series"]:
-                        new_id = get_real_image_id_robust(new_id)
-                    smart_image_cache[item_id] = new_id 
-                    
-                    n_resp = media_api.get(f"/Items/{new_id}/Images/{img_type}", params=params, timeout=5, stream=True)
-                    if n_resp.status_code == 200:
-                        return Response(content=n_resp.content, media_type=n_resp.headers.get("Content-Type", "image/jpeg"), headers={"Cache-Control": "public, max-age=86400"})
-        except requests.exceptions.RequestException: pass
-
-    # 4. 第 3 级防御：TMDB 终极兜底 (外部请求，保留 ext_session)
-    tmdb_key = cfg.get("tmdb_api_key")
-    season_num = extract_season_number(name)
-
-    if clean_name and tmdb_key:
+            bd_params = {"maxWidth": 1280, "quality": 80}
+            bd_resp = media_api.get(f"/Items/{target_id}/Images/Backdrop", params=bd_params, timeout=5, stream=True)
+            if bd_resp.status_code == 200:
+                return Response(content=bd_resp.content, media_type=bd_resp.headers.get("Content-Type", "image/jpeg"), headers={"Cache-Control": "public, max-age=86400"})
+        except requests.exceptions.RequestException:
+            pass
         try:
-            proxy = cfg.get("proxy_url")
-            proxies = {"https": proxy, "http": proxy} if proxy else None
-            
-            tmdb_url = f"https://api.themoviedb.org/3/search/multi?api_key={tmdb_key}&language=zh-CN&query={urllib.parse.quote(clean_name)}"
-            t_resp = ext_session.get(tmdb_url, proxies=proxies, timeout=5)
-            
-            if t_resp.status_code == 200:
-                results = t_resp.json().get("results", [])
-                for res in results:
-                    if res.get("media_type") == "tv" and season_num is not None and img_type.lower() == 'primary':
-                        tv_id = res.get("id")
-                        season_url = f"https://api.themoviedb.org/3/tv/{tv_id}/season/{season_num}?api_key={tmdb_key}&language=zh-CN"
-                        s_resp = ext_session.get(season_url, proxies=proxies, timeout=5)
-                        if s_resp.status_code == 200:
-                            s_data = s_resp.json()
-                            if s_data.get("poster_path"):
-                                final_url = f"https://image.tmdb.org/t/p/w500{s_data['poster_path']}"
-                                smart_image_cache[item_id] = final_url
-                                final_resp = ext_session.get(final_url, proxies=proxies, timeout=8, stream=True)
-                                if final_resp.status_code == 200:
-                                    return Response(content=final_resp.content, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
+            th_params = {"maxWidth": 800, "quality": 80}
+            th_resp = media_api.get(f"/Items/{target_id}/Images/Thumb", params=th_params, timeout=5, stream=True)
+            if th_resp.status_code == 200:
+                return Response(content=th_resp.content, media_type=th_resp.headers.get("Content-Type", "image/jpeg"), headers={"Cache-Control": "public, max-age=86400"})
+        except requests.exceptions.RequestException:
+            pass
 
-                    if res.get("media_type") in ["movie", "tv"]:
-                        img_path = res.get("backdrop_path") if img_type.lower() == 'backdrop' else res.get("poster_path")
-                        if img_path:
-                            tmdb_img_url = f"https://image.tmdb.org/t/p/w500{img_path}"
-                            smart_image_cache[item_id] = tmdb_img_url 
-                            
-                            final_resp = ext_session.get(tmdb_img_url, proxies=proxies, timeout=8, stream=True)
-                            if final_resp.status_code == 200:
-                                return Response(content=final_resp.content, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
-                        break
-        except requests.exceptions.RequestException as e:
-            logger.error(f"TMDB 兜底网络异常 [{clean_name}]: {e}")
-            
+    # 3. 不再使用名称检索或 TMDB 外部兜底，确保只展示 Emby 原始封面
     return Response(status_code=404)
 
 @router.get("/api/proxy/user_image/{user_id}")

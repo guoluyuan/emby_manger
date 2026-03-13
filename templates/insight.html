@@ -38,6 +38,9 @@
             <button onclick="openIgnoreModal()" class="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-xl transition shadow-sm flex items-center gap-2 border border-transparent hover:border-gray-300 dark:hover:border-gray-500">
                 <i class="fa-solid fa-trash-can-arrow-up"></i> <span class="hidden sm:inline">回收站</span>
             </button>
+            <button onclick="forceRefresh()" id="force-refresh-btn" class="px-4 py-2 text-sm font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-800/40 rounded-xl transition shadow-sm flex items-center gap-2 border border-indigo-200 dark:border-indigo-800">
+                <i class="fa-solid fa-bolt" id="force-refresh-icon"></i> 强制刷新
+            </button>
             <button onclick="loadQualityData(true)" id="refresh-btn" class="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition active:scale-95 flex items-center gap-2">
                 <i class="fa-solid fa-rotate" id="refresh-icon"></i> 深度重扫
             </button>
@@ -181,6 +184,14 @@
 
     document.addEventListener('DOMContentLoaded', () => { loadQualityData(false); });
 
+    function showToast(msg, type = 'error') {
+        const toast = document.createElement('div');
+        toast.className = `fixed top-16 left-1/2 -translate-x-1/2 z-[120] px-5 py-3 rounded-full text-sm font-bold shadow-xl ${type === 'success' ? 'bg-emerald-500/90' : 'bg-red-500/90'} text-white`;
+        toast.textContent = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
     async function loadQualityData(force) {
         const loading = document.getElementById('loading');
         const dash = document.getElementById('dashboard');
@@ -194,7 +205,7 @@
         }
 
         try {
-            const res = await fetch(`/api/insight/quality${force ? '?force_refresh=true' : ''}`);
+            const res = await fetch(`/api/insight/quality${force ? '?force_refresh=true&ts=' + Date.now() : ''}`, { cache: 'no-store' });
             const json = await res.json();
             
             if (json.status === 'success') {
@@ -210,9 +221,38 @@
                 
                 // 重新渲染列表，不强制清空选中项
                 renderListView(currentView);
+                return true;
+            } else {
+                showToast(json.message || '加载失败');
+                return false;
             }
-        } catch(e) {} finally {
+        } catch(e) { 
+            showToast('加载失败，请查看控制台或稍后重试'); 
+            console.error(e);
+            return false;
+        } finally {
             if(force) { btn.disabled = false; icon.classList.remove('fa-spin'); }
+        }
+    }
+
+    async function forceRefresh() {
+        const btn = document.getElementById('force-refresh-btn');
+        const icon = document.getElementById('force-refresh-icon');
+        btn.disabled = true; icon.classList.add('fa-spin');
+        try {
+            const res = await fetch('/api/insight/quality/clear_cache', { method: 'POST' });
+            const json = await res.json();
+            if (json.status !== 'success') {
+                showToast(json.message || '强制刷新失败');
+                return;
+            }
+            const ok = await loadQualityData(true);
+            if (ok) showToast('强制刷新完成', 'success');
+        } catch(e) { 
+            showToast('强制刷新失败，请先确认已登录'); 
+            console.error(e);
+        } finally {
+            btn.disabled = false; icon.classList.remove('fa-spin');
         }
     }
 
@@ -289,7 +329,8 @@
 
         let html = '';
         movies.forEach(m => {
-            const imgUrl = `/api/proxy/smart_image?item_id=${m.Id}&name=${encodeURIComponent(m.Name)}&type=Primary`;
+            const imgTargetId = m.ImageId || m.Id;
+            const imgUrl = `/api/proxy/smart_image?item_id=${imgTargetId}&name=${encodeURIComponent(m.Name)}&type=Primary`;
             
             // 列表复选框 (保留选中状态)
             let isChecked = false;

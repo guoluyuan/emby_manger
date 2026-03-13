@@ -12,7 +12,8 @@ logger = logging.getLogger("uvicorn")
 templates = Jinja2Templates(directory="templates")
 router = APIRouter()
 
-APP_VERSION = os.environ.get("APP_VERSION", "1.2.0.Dev")
+APP_VERSION = os.environ.get("APP_VERSION", "1.2.0.Dev.20260314.2")
+REQUEST_ASSET_VER = os.environ.get("REQUEST_ASSET_VER") or "20260314.2"
 
 def check_login(request: Request):
     user = request.session.get("user")
@@ -138,7 +139,7 @@ async def history_page(request: Request):
 @router.get("/request", response_class=HTMLResponse)
 async def request_page(request: Request):
     req_user = request.session.get("req_user")
-    return templates.TemplateResponse("request.html", {"request": request, "req_user": req_user, "version": APP_VERSION})
+    return templates.TemplateResponse("request.html", {"request": request, "req_user": req_user, "version": APP_VERSION, "request_asset_ver": REQUEST_ASSET_VER})
 
 @router.get("/request_login", response_class=HTMLResponse)
 async def request_login_page(request: Request):
@@ -168,6 +169,8 @@ async def gaps_page(request: Request):
 @router.get("/risk", response_class=HTMLResponse)
 async def risk_control_page(request: Request):
     """风险管控大盘页面"""
+    if not check_login(request): 
+        return RedirectResponse("/login")
     # 🔥 必须补上 version 和 active_page，否则前端无法渲染版本和高亮
     return templates.TemplateResponse("risk.html", {
         "request": request, 

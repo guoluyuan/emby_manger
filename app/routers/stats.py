@@ -11,6 +11,26 @@ from collections import defaultdict
 
 router = APIRouter()
 
+def get_existing_item_ids(ids):
+    ids = [str(i) for i in ids if i]
+    if not ids:
+        return set()
+    existing = set()
+    try:
+        for i in range(0, len(ids), 100):
+            chunk = ids[i:i+100]
+            res = media_api.get("/Items", params={"Ids": ",".join(chunk)}, timeout=8)
+            if res.status_code == 200:
+                items = res.json().get("Items", []) or []
+                for it in items:
+                    it_id = it.get("Id")
+                    if it_id: existing.add(str(it_id))
+            else:
+                return None
+        return existing
+    except:
+        return None
+
 # --- 🧹 智能清洗引擎 ---
 def get_clean_name(item_name, item_type):
     if not item_name: return "未知内容"
@@ -123,9 +143,24 @@ def api_recent_activity(user_id: Optional[str] = None):
         results = query_db(f"SELECT DateCreated, UserId, ItemId, ItemName, ItemType FROM PlaybackActivity {where} ORDER BY DateCreated DESC LIMIT 50", params)
         if not results: return {"status": "success", "data": []}
         user_map = get_user_map_local()
+        # 过滤掉已从 Emby 库中删除的条目
+        existing_ids = None
+        try:
+            ids = [str(dict(r).get("ItemId")) for r in results if dict(r).get("ItemId")]
+            if ids:
+                res = media_api.get("/Items", params={"Ids": ",".join(ids)}, timeout=8)
+                if res.status_code == 200:
+                    existing_ids = {str(i.get("Id")) for i in res.json().get("Items", []) if i.get("Id")}
+        except Exception:
+            existing_ids = None
         data = []
         for row in results:
-            item = dict(row); item['UserName'] = user_map.get(item['UserId'], "User"); item['DisplayName'] = item.get('ItemName') or '未知记录'; data.append(item)
+            item = dict(row)
+            if existing_ids is not None and str(item.get("ItemId")) not in existing_ids:
+                continue
+            item['UserName'] = user_map.get(item['UserId'], "User")
+            item['DisplayName'] = item.get('ItemName') or '未知记录'
+            data.append(item)
         return {"status": "success", "data": data}
     except: return {"status": "error", "data": []}
 
@@ -164,8 +199,10 @@ def api_live_sessions_legacy():
 def api_top_movies(user_id: Optional[str] = None, category: str = 'all', sort_by: str = 'count'):
     try:
         where, params = get_base_filter(user_id)
-        if category == 'Movie': where += " AND ItemType = 'Movie'"
-        elif category == 'Episode': where += " AND ItemType = 'Episode'"
+        if category == 'Movie':
+            where += " AND ItemType = 'Movie'"
+        elif category in ('Episode', 'Series', 'Tv', 'TV'):
+            where += " AND ItemType IN ('Episode', 'Series')"
             
         sql = f"SELECT ItemName, ItemId, ItemType, PlayDuration FROM PlaybackActivity {where} LIMIT 5000"
         rows = query_db(sql, params)
@@ -213,9 +250,16 @@ def api_user_details(user_id: Optional[str] = None):
 
         u_map = get_user_map_local()
         logs = []
+        existing_ids = None
+        try:
+            existing_ids = get_existing_item_ids([dict(r).get("ItemId") for r in l_res]) if l_res else None
+        except:
+            existing_ids = None
         if l_res:
             for r in l_res: 
                 l = dict(r)
+                if existing_ids is not None and str(l.get("ItemId")) not in existing_ids:
+                    continue
                 l['UserName'] = u_map.get(l['UserId'], "User")
                 l['smart_poster'] = f"/api/proxy/smart_image?item_id={l['ItemId']}&type=Primary"
                 logs.append(l)
@@ -274,7 +318,12 @@ def api_user_details(user_id: Optional[str] = None):
                 agg_fav[clean]["c"] += 1; agg_fav[clean]["d"] += (row_dict["PlayDuration"] or 0)
             
             top_fav = max(agg_fav.values(), key=lambda x: x['d']) if agg_fav else None
-            if top_fav: resolve_poster_ids([top_fav]) 
+            if top_fav:
+                existing = get_existing_item_ids([top_fav.get("ItemId")])
+                if existing is not None and str(top_fav.get("ItemId")) not in existing:
+                    top_fav = None
+                else:
+                    resolve_poster_ids([top_fav]) 
         except: pass
                 
         return {"status": "success", "data": {
@@ -368,6 +417,9 @@ def api_poster_data(user_id: Optional[str] = None, period: str = 'all'):
         except: pass
 
         top_list = list(aggregated.values()); top_list.sort(key=lambda x: x['Count'], reverse=True)
+        existing_ids = get_existing_item_ids([i.get("ItemId") for i in top_list])
+        if existing_ids is not None:
+            top_list = [i for i in top_list if str(i.get("ItemId")) in existing_ids]
         top_10 = top_list[:10]
         resolve_poster_ids(top_10)
         

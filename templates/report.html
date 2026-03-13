@@ -72,12 +72,12 @@
     .server-pill { background: var(--theme-card); padding: 5px 12px; border-radius: 20px; font-size: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center; color: var(--theme-text); transition: color 0.3s, background 0.3s; display: block; line-height: 1.2; }
     .server-pill span { display: block; font-weight: 900; font-size: 13px; color: #4ade80; margin-bottom: 2px; }
     
-    .stats-row { display: flex; gap: 10px; margin-bottom: 25px; }
+    .stats-row { display: flex; gap: 10px; margin-bottom: 16px; }
     .stat-card { flex: 1; background: var(--theme-card); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); text-align: center; backdrop-filter: blur(10px); transition: background 0.3s;}
     .stat-val { font-size: 28px; font-weight: 900; line-height: 1; margin-bottom: 4px; padding-bottom: 4px; color: var(--theme-text); transition: color 0.3s;}
     .stat-label { font-size: 9px; opacity: 0.6; text-transform: uppercase; font-weight: bold; color: var(--theme-text); transition: color 0.3s;}
     
-    .podium-container { display: flex; justify-content: center; align-items: flex-end; gap: 10px; margin-bottom: 30px; margin-top: 10px; }
+    .podium-container { display: flex; justify-content: center; align-items: flex-end; gap: 10px; margin-bottom: 24px; margin-top: 4px; }
     .podium-item { position: relative; display: flex; flex-direction: column; align-items: center; }
     .podium-item.rank-2, .podium-item.rank-3 { width: 95px; }
     .podium-item.rank-1 { width: 115px; z-index: 10; }
@@ -101,6 +101,9 @@
     .rank-row { display: flex; align-items: center; padding: 10px 10px; background: var(--theme-card); border-radius: 10px; backdrop-filter: blur(5px); min-height: 50px; color: var(--theme-text); transition: background 0.3s, color 0.3s;}
     .rank-idx { font-size: 12px; font-weight: 900; opacity: 0.4; width: 25px; text-align: center; }
     .rank-poster-sm { width: 32px; height: 48px; border-radius: 4px; background-color: #333; margin-right: 12px; flex-shrink: 0; object-fit: cover; display: block; border: none; }
+    .rank-row.placeholder { opacity: 0.15; }
+    .rank-row.placeholder .rank-poster-sm { background-color: rgba(255,255,255,0.08); }
+    .rank-list { min-height: 360px; }
     .rank-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
     .rank-name { font-size: 12px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-bottom: 4px; margin-bottom: -2px; }
     .rank-meta-row { font-size: 9px; opacity: 0.7; display: flex; gap: 8px; }
@@ -640,23 +643,36 @@
 
             const listEl = document.getElementById('rank-list');
             let html = '';
-            const max = Math.min(list.length, 10);
-            for(let i=3; i<max; i++) {
-                const hours = Math.round(list[i].Duration/3600);
-                html += `
-                <div class="rank-row">
-                    <div class="rank-idx">${i+1}</div>
-                    <img class="rank-poster-sm" id="sm-img-${i}">
-                    <div class="rank-info">
-                        <div class="rank-name">${list[i].ItemName}</div>
-                        <div class="rank-meta-row"><span>${list[i].Count}次</span><span>${hours > 0 ? hours+'h' : '<1h'}</span></div>
-                    </div>
-                </div>`;
+            const displayMax = 10;
+            for(let i=3; i<displayMax; i++) {
+                if(list[i]) {
+                    const hours = Math.round(list[i].Duration/3600);
+                    html += `
+                    <div class="rank-row">
+                        <div class="rank-idx">${i+1}</div>
+                        <img class="rank-poster-sm" id="sm-img-${i}">
+                        <div class="rank-info">
+                            <div class="rank-name">${list[i].ItemName}</div>
+                            <div class="rank-meta-row"><span>${list[i].Count}次</span><span>${hours > 0 ? hours+'h' : '<1h'}</span></div>
+                        </div>
+                    </div>`;
+                } else {
+                    html += `
+                    <div class="rank-row placeholder">
+                        <div class="rank-idx">${i+1}</div>
+                        <div class="rank-poster-sm"></div>
+                        <div class="rank-info">
+                            <div class="rank-name">—</div>
+                            <div class="rank-meta-row"><span>—</span><span>—</span></div>
+                        </div>
+                    </div>`;
+                }
             }
             listEl.innerHTML = html;
             
             const smPromises = [];
-            for(let i=3; i<max; i++) {
+            for(let i=3; i<displayMax; i++) {
+                if(!list[i]) continue;
                 smPromises.push((async () => {
                     const imgUrl = `/api/proxy/smart_image?item_id=${list[i].ItemId}&type=Primary`;
                     const b64 = await toBase64(imgUrl);

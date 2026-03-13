@@ -91,84 +91,84 @@ def query_db(query, args=(), one=False):
     mode = cfg.get("playback_data_mode", "sqlite")
     is_playback_query = "PlaybackActivity" in query or "PlaybackReporting" in query
     
+    def _query_playback_api():
+        host = cfg.get("emby_host")
+        token = cfg.get("emby_api_key")
+        if not host or not token:
+            return None
+        full_sql = _interpolate_sql(query, args)
+        url = f"{host.rstrip('/')}/emby/user_usage_stats/submit_custom_query"
+        headers = {"X-Emby-Token": token, "Content-Type": "application/json"}
+        payload = {"CustomQueryString": full_sql}
+
+        try:
+            res = requests.post(url, headers=headers, json=payload, timeout=20)
+            if res.status_code == 200:
+                raw_data = None
+                try:
+                    res_json = res.json()
+                    if isinstance(res_json, str):
+                        try: raw_data = json.loads(res_json)
+                        except: raw_data = res_json
+                    else:
+                        raw_data = res_json
+                except:
+                    try: raw_data = json.loads(res.text)
+                    except: raw_data = {}
+
+                final_data = []
+                if isinstance(raw_data, dict):
+                    columns = raw_data.get("colums") or raw_data.get("columns")
+                    results = raw_data.get("results")
+                    if columns and isinstance(results, list):
+                        for row in results:
+                            if isinstance(row, list):
+                                row_dict = {}
+                                for i, col_name in enumerate(columns):
+                                    val = row[i] if i < len(row) else None
+                                    if isinstance(val, str) and val.isdigit():
+                                        val = int(val)
+                                    row_dict[col_name] = val
+                                final_data.append(row_dict)
+                    else:
+                        extracted = raw_data.get("results", raw_data.get("Items", [raw_data]))
+                        final_data = extracted if isinstance(extracted, list) else [extracted]
+                elif isinstance(raw_data, list):
+                    final_data = raw_data
+                else:
+                    final_data = [raw_data] if raw_data else []
+
+                print(f"[API 引擎] 🎯 完美缝合数据: {len(final_data)} 条 (API 穿透成功)")
+                data = [APIRow(item) if isinstance(item, dict) else item for item in final_data]
+                if query.strip().upper().startswith("SELECT"):
+                    return (data[0] if data else None) if one else data
+                return True
+            else:
+                print(f"[API 引擎] ❌ 接口拒绝请求! 响应: {res.text[:200]}")
+        except Exception as e:
+            print(f"[API 引擎] ❌ 网络崩溃异常: {e}")
+        return None
+
     # ==========================================
     # 🔥 双擎路由拦截器 (API 穿透模式)
     # ==========================================
     if mode == "api" and is_playback_query:
-        host = cfg.get("emby_host")
-        token = cfg.get("emby_api_key")
-        if host and token:
-            full_sql = _interpolate_sql(query, args)
-            url = f"{host.rstrip('/')}/emby/user_usage_stats/submit_custom_query"
-            headers = {"X-Emby-Token": token, "Content-Type": "application/json"}
-            payload = {"CustomQueryString": full_sql}
-            
-            try:
-                res = requests.post(url, headers=headers, json=payload, timeout=20)
-                
-                if res.status_code == 200:
-                    raw_data = None
-                    try:
-                        res_json = res.json()
-                        if isinstance(res_json, str):
-                            try: raw_data = json.loads(res_json)
-                            except: raw_data = res_json
-                        else:
-                            raw_data = res_json
-                    except:
-                        try: raw_data = json.loads(res.text)
-                        except: raw_data = {}
-                    
-                    final_data = []
-                    
-                    if isinstance(raw_data, dict):
-                        # 💡 核心拉链缝合逻辑开始：专门对付 Emby 插件的奇葩结构
-                        columns = raw_data.get("colums") or raw_data.get("columns") # 兼容作者拼写错误
-                        results = raw_data.get("results")
-                        
-                        if columns and isinstance(results, list):
-                            # 是那种带表头和二维数组的变态格式
-                            for row in results:
-                                if isinstance(row, list):
-                                    row_dict = {}
-                                    for i, col_name in enumerate(columns):
-                                        val = row[i] if i < len(row) else None
-                                        # 🔥 智能类型推断：把 "2267" 这种字符串变回纯数字
-                                        if isinstance(val, str) and val.isdigit():
-                                            val = int(val)
-                                        row_dict[col_name] = val
-                                    final_data.append(row_dict)
-                        else:
-                            # 如果它抽风返回了正常的结构 (防患于未然)
-                            extracted = raw_data.get("results", raw_data.get("Items", [raw_data]))
-                            final_data = extracted if isinstance(extracted, list) else [extracted]
-                            
-                    elif isinstance(raw_data, list):
-                        final_data = raw_data
-                    else:
-                        final_data = [raw_data] if raw_data else []
-                    
-                    # 打印成功缝合的战报
-                    print(f"[API 引擎] 🎯 完美缝合数据: {len(final_data)} 条 (API 穿透成功)")
-                    
-                    # 使用神级 APIRow 类包裹，前端不再罢工
-                    data = [APIRow(item) if isinstance(item, dict) else item for item in final_data]
-
-                    if query.strip().upper().startswith("SELECT"):
-                        return (data[0] if data else None) if one else data
-                    return True
-                else:
-                    print(f"[API 引擎] ❌ 接口拒绝请求! 响应: {res.text[:200]}")
-            except Exception as e:
-                print(f"[API 引擎] ❌ 网络崩溃异常: {e}")
+        api_result = _query_playback_api()
+        if api_result is not None:
+            return api_result
         else:
-            print("[API 引擎] ⚠️ 警告: Emby Host 或 Token 未配置，自动降级回 SQLite。")
+            print("[API 引擎] ⚠️ 警告: API 模式失败，自动降级回 SQLite。")
             
     # ==========================================
     # 🚂 原版 SQLite 执行器 (处理非播放表及降级情况)
     # ==========================================
     if not os.path.exists(DB_PATH): 
-        if is_playback_query: print(f"[SQLite 引擎] ❌ 找不到文件: {DB_PATH}")
+        if is_playback_query:
+            print(f"[SQLite 引擎] ❌ 找不到文件: {DB_PATH}")
+            # 如果是播放数据且 SQLite 不可用，尝试 API 兜底
+            api_result = _query_playback_api()
+            if api_result is not None:
+                return api_result
         return None
         
     try:
@@ -185,7 +185,11 @@ def query_db(query, args=(), one=False):
             conn.close()
             return True
     except Exception as e: 
-        if is_playback_query: print(f"[SQLite 引擎] 💥 执行失败: {e}")
+        if is_playback_query:
+            print(f"[SQLite 引擎] 💥 执行失败: {e}")
+            api_result = _query_playback_api()
+            if api_result is not None:
+                return api_result
         return None
 
 def get_base_filter(user_id_filter):

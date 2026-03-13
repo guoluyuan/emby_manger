@@ -9,8 +9,45 @@ import datetime
 import secrets
 import base64
 import logging
+import ipaddress
+import socket
+import urllib.parse
 
 router = APIRouter()
+
+def is_safe_image_url(url: str) -> bool:
+    try:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        host = parsed.hostname
+        if not host:
+            return False
+        if host.lower() in ("localhost",):
+            return False
+        if host.endswith(".local"):
+            return False
+
+        try:
+            ip = ipaddress.ip_address(host)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved:
+                return False
+            return True
+        except ValueError:
+            pass
+
+        try:
+            infos = socket.getaddrinfo(host, None)
+            for info in infos:
+                ip_str = info[4][0]
+                ip = ipaddress.ip_address(ip_str)
+                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved:
+                    return False
+        except Exception:
+            return False
+        return True
+    except Exception:
+        return False
 
 # 🔥 自动无损升级数据库，确保有 remark 字段
 try:
@@ -200,8 +237,13 @@ async def api_update_user_image(request: Request, user_id: str = Form(...), url:
     try:
         img_data = None; c_type = "image/png"
         if url:
+            if not is_safe_image_url(url):
+                return {"status": "error", "message": "图片 URL 不安全或不可解析"}
             d_res = requests.get(url, timeout=10)
             if d_res.status_code == 200: 
+                content_len = d_res.headers.get("Content-Length")
+                if content_len and int(content_len) > 5 * 1024 * 1024:
+                    return {"status": "error", "message": "图片过大，超过 5MB"}
                 img_data = d_res.content
                 c_type = d_res.headers.get('Content-Type', 'image/png')
         elif file:
@@ -400,7 +442,9 @@ def api_manage_users_batch(data: BatchActionModelLocal, request: Request):
     except Exception as e: return {"status": "error", "message": str(e)}
 
 @router.get("/api/users")
-def api_get_users():
+def api_get_users(request: Request):
+    if not request.session.get("user"): 
+        return {"status": "error"}
     try:
         res = media_api.get("/Users", timeout=5)
         if res.status_code == 200:
@@ -409,4 +453,5 @@ def api_get_users():
             data.sort(key=lambda x: x['UserName'])
             return {"status": "success", "data": data}
         return {"status": "success", "data": []}
-    except: return {"status": "error"}
+    except: 
+        return {"status": "error"}

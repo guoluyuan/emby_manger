@@ -42,36 +42,82 @@
                 <i class="fa-solid fa-heart-pulse text-green-400 text-3xl animate-pulse"></i>
             </div>
             <h1 class="text-3xl font-black tracking-tight mb-1">EmbyPulse</h1>
-            <p class="text-gray-400 text-xs uppercase tracking-widest font-bold">Admin Access</p>
+            <p id="login-subtitle" class="text-gray-400 text-xs uppercase tracking-widest font-bold">Admin Access</p>
         </div>
 
-        <form id="login-form" class="space-y-5" onsubmit="handleLogin(event)">
-            <div>
-                <label class="block text-xs font-bold uppercase text-gray-500 mb-2 ml-1">Emby Username</label>
-                <div class="relative group">
-                    <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500 group-focus-within:text-green-400 transition"><i class="fa-solid fa-user"></i></span>
-                    <input type="text" id="username" required 
-                        class="w-full bg-black/30 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500 transition text-sm font-medium"
-                        placeholder="请输入用户名">
-                </div>
+        <div id="setup-section" class="space-y-5 hidden">
+            <div class="bg-amber-500/15 border border-amber-500/30 text-amber-200 text-[11px] px-4 py-3 rounded-xl leading-relaxed">
+                首次启动需要先配置 Emby 连接信息。保存成功后即可登录。
             </div>
-
-            <div>
-                <label class="block text-xs font-bold uppercase text-gray-500 mb-2 ml-1">Password</label>
-                <div class="relative group">
-                    <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500 group-focus-within:text-green-400 transition"><i class="fa-solid fa-lock"></i></span>
-                    <input type="password" id="password"
-                        class="w-full bg-black/30 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500 transition text-sm font-medium"
-                        placeholder="请输入密码 (选填)">
+            <form id="setup-form" class="space-y-5" onsubmit="handleSetup(event)">
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-500 mb-2 ml-1">Server Type</label>
+                    <div class="flex gap-2">
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="server_type" value="emby" checked class="peer sr-only">
+                            <div class="py-3 text-center rounded-xl border border-white/10 bg-black/30 text-xs font-bold peer-checked:bg-green-600/30 peer-checked:border-green-500/60">Emby</div>
+                        </label>
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="server_type" value="jellyfin" class="peer sr-only">
+                            <div class="py-3 text-center rounded-xl border border-white/10 bg-black/30 text-xs font-bold peer-checked:bg-green-600/30 peer-checked:border-green-500/60">Jellyfin</div>
+                        </label>
+                    </div>
                 </div>
-            </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-500 mb-2 ml-1">Emby Host</label>
+                    <div class="relative group">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500 group-focus-within:text-green-400 transition"><i class="fa-solid fa-server"></i></span>
+                        <input type="text" id="setup-host" required 
+                            class="w-full bg-black/30 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500 transition text-sm font-medium"
+                            placeholder="http://192.168.2.196:8091">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-500 mb-2 ml-1">Emby API Key</label>
+                    <div class="relative group">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500 group-focus-within:text-green-400 transition"><i class="fa-solid fa-key"></i></span>
+                        <input type="password" id="setup-api-key" required
+                            class="w-full bg-black/30 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500 transition text-sm font-medium"
+                            placeholder="请输入 API Key">
+                    </div>
+                </div>
+                <button type="submit" id="setup-btn"
+                    class="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-amber-900/20 transform transition hover:scale-[1.02] active:scale-95 flex items-center justify-center mt-2">
+                    <span>保存并继续</span>
+                    <i class="fa-solid fa-arrow-right ml-2 text-xs opacity-70"></i>
+                </button>
+            </form>
+        </div>
 
-            <button type="submit" id="submit-btn"
-                class="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-900/20 transform transition hover:scale-[1.02] active:scale-95 flex items-center justify-center mt-2">
-                <span>进入仪表盘</span>
-                <i class="fa-solid fa-chevron-right ml-2 text-xs opacity-70"></i>
-            </button>
-        </form>
+        <div id="login-section" class="space-y-5">
+            <form id="login-form" class="space-y-5" onsubmit="handleLogin(event)">
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-500 mb-2 ml-1">Emby Username</label>
+                    <div class="relative group">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500 group-focus-within:text-green-400 transition"><i class="fa-solid fa-user"></i></span>
+                        <input type="text" id="username" required 
+                            class="w-full bg-black/30 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500 transition text-sm font-medium"
+                            placeholder="请输入用户名">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-500 mb-2 ml-1">Password</label>
+                    <div class="relative group">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500 group-focus-within:text-green-400 transition"><i class="fa-solid fa-lock"></i></span>
+                        <input type="password" id="password"
+                            class="w-full bg-black/30 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500 transition text-sm font-medium"
+                            placeholder="请输入密码 (选填)">
+                    </div>
+                </div>
+
+                <button type="submit" id="submit-btn"
+                    class="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-900/20 transform transition hover:scale-[1.02] active:scale-95 flex items-center justify-center mt-2">
+                    <span>进入仪表盘</span>
+                    <i class="fa-solid fa-chevron-right ml-2 text-xs opacity-70"></i>
+                </button>
+            </form>
+        </div>
         
         <div class="text-center mt-8">
             <p class="text-[10px] text-gray-600 font-mono" id="bg-source">Wallpaper from TMDB</p>
@@ -98,6 +144,63 @@
             } catch(e) { console.error("BG Error:", e); }
         }
         loadBackground();
+
+        async function checkSetup() {
+            try {
+                const res = await fetch('/api/setup/status');
+                const json = await res.json();
+                const setup = document.getElementById('setup-section');
+                const login = document.getElementById('login-section');
+                const subtitle = document.getElementById('login-subtitle');
+                if (json.status === 'success' && json.configured) {
+                    setup.classList.add('hidden');
+                    login.classList.remove('hidden');
+                    subtitle.textContent = 'Admin Access';
+                } else {
+                    setup.classList.remove('hidden');
+                    login.classList.add('hidden');
+                    subtitle.textContent = 'First-Time Setup';
+                }
+            } catch(e) {}
+        }
+        checkSetup();
+
+        async function handleSetup(e) {
+            e.preventDefault();
+            const btn = document.getElementById('setup-btn');
+            const host = document.getElementById('setup-host').value;
+            const apiKey = document.getElementById('setup-api-key').value;
+            const serverType = document.querySelector('input[name="server_type"]:checked')?.value || 'emby';
+
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+            btn.disabled = true;
+            btn.classList.add('opacity-80', 'cursor-not-allowed');
+
+            try {
+                const res = await fetch('/api/setup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ emby_host: host, emby_api_key: apiKey, server_type: serverType })
+                });
+                const json = await res.json();
+                if (json.status === 'success') {
+                    await checkSetup();
+                } else {
+                    throw new Error(json.message || '初始化失败');
+                }
+            } catch (err) {
+                const toast = document.createElement('div');
+                toast.className = 'fixed top-10 left-1/2 transform -translate-x-1/2 bg-red-500/90 backdrop-blur text-white px-6 py-3 rounded-full shadow-2xl z-50 text-sm font-bold flex items-center animate-bounce border border-red-400/30';
+                toast.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2"></i> ${err.message}`;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            } finally {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+                btn.classList.remove('opacity-80', 'cursor-not-allowed');
+            }
+        }
 
         async function handleLogin(e) {
             e.preventDefault();

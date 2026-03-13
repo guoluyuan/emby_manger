@@ -1,9 +1,53 @@
 from fastapi import APIRouter, Request
-from app.schemas.models import SettingsModel
+from app.schemas.models import SettingsModel, SetupModel
 from app.core.config import cfg, save_config
 import requests
 
 router = APIRouter()
+
+def normalize_host(host: str) -> str:
+    h = (host or "").strip()
+    if not h:
+        return ""
+    if not h.startswith("http://") and not h.startswith("https://"):
+        h = "http://" + h
+    return h.rstrip("/")
+
+def is_configured() -> bool:
+    host = (cfg.get("emby_host") or "").strip()
+    key = (cfg.get("emby_api_key") or "").strip()
+    return bool(host and key)
+
+@router.get("/api/setup/status")
+def setup_status():
+    return {"status": "success", "configured": is_configured()}
+
+@router.post("/api/setup")
+def setup_system(data: SetupModel, request: Request):
+    if is_configured() and not request.session.get("user"):
+        return {"status": "error", "message": "系统已配置，禁止重复初始化"}
+
+    server_type = getattr(data, "server_type", "emby")
+    host = normalize_host(data.emby_host)
+    api_key = (data.emby_api_key or "").strip()
+    if not host or not api_key:
+        return {"status": "error", "message": "请填写完整的 Emby Host 和 API Key"}
+
+    url = f"{host}/System/Info" if server_type == "jellyfin" else f"{host}/emby/System/Info"
+    headers = {"Authorization": f'MediaBrowser Token="{api_key}"'} if server_type == "jellyfin" else {"X-Emby-Token": api_key}
+
+    try:
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code != 200:
+            return {"status": "error", "message": "无法连接媒体服务器，请检查地址或 API Key"}
+    except:
+        return {"status": "error", "message": "服务器地址无法访问"}
+
+    cfg["server_type"] = server_type
+    cfg["emby_host"] = host
+    cfg["emby_api_key"] = api_key
+    save_config()
+    return {"status": "success", "message": "初始化完成"}
 
 @router.get("/api/settings")
 def api_get_settings(request: Request):
@@ -16,8 +60,9 @@ def api_get_settings(request: Request):
             "emby_api_key": cfg.get("emby_api_key"),
             "tmdb_api_key": cfg.get("tmdb_api_key"),
             "proxy_url": cfg.get("proxy_url"),
-            "webhook_token": cfg.get("webhook_token", "embypulse"),
+            "webhook_token": cfg.get("webhook_token", ""),
             "hidden_users": cfg.get("hidden_users") or [],
+            "cors_origins": cfg.get("cors_origins") or [],
             "emby_public_url": cfg.get("emby_public_url", ""),
             "welcome_message": cfg.get("welcome_message", ""),
             "client_download_url": cfg.get("client_download_url", ""),
@@ -52,6 +97,7 @@ def api_update_settings(data: SettingsModel, request: Request):
     cfg["proxy_url"] = data.proxy_url
     cfg["webhook_token"] = data.webhook_token
     cfg["hidden_users"] = data.hidden_users
+    cfg["cors_origins"] = data.cors_origins or []
     cfg["emby_public_url"] = data.emby_public_url
     cfg["welcome_message"] = data.welcome_message
     cfg["client_download_url"] = data.client_download_url

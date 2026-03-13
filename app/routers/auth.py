@@ -1,6 +1,7 @@
 import sqlite3
 import requests
 import datetime
+import secrets
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from app.core.config import cfg
@@ -122,7 +123,7 @@ async def api_login(data: LoginModel, request: Request):
     try:
         host = cfg.get("emby_host")
         if not host: 
-            return JSONResponse(content={"status": "error", "message": "请先在 config.yaml 配置 EMBY_HOST"})
+            return JSONResponse(content={"status": "error", "message": "请先在网页完成首次配置"})
             
         url = f"{host}/emby/Users/AuthenticateByName"
         payload = {"Username": data.username, "Pw": data.password}
@@ -141,6 +142,7 @@ async def api_login(data: LoginModel, request: Request):
                 "is_admin": True,
                 "server_id": res.json().get("ServerId") 
             }
+            request.session["csrf_token"] = secrets.token_urlsafe(32)
             return JSONResponse(content={"status": "success"})
         
         elif res.status_code == 401: return JSONResponse(content={"status": "error", "message": "账号或密码错误"})
@@ -153,3 +155,14 @@ async def api_login(data: LoginModel, request: Request):
 async def api_logout(request: Request):
     request.session.clear()
     return RedirectResponse("/login", status_code=302)
+
+@router.get("/api/csrf")
+async def api_csrf(request: Request):
+    user = request.session.get("user") or request.session.get("req_user")
+    if not user:
+        return {"status": "error"}
+    token = request.session.get("csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        request.session["csrf_token"] = token
+    return {"status": "success", "token": token}

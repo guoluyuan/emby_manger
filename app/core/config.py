@@ -1,5 +1,6 @@
 import os
 import json
+import secrets
 from fastapi.templating import Jinja2Templates
 
 # ================= 路径配置 =================
@@ -52,7 +53,7 @@ DEFAULT_CONFIG = {
     # 🔥 新增：细颗粒度事件开关
     "notify_user_login": False,   
     "notify_item_deleted": False, 
-    "webhook_token": "embypulse",
+    "webhook_token": "",
     "calendar_cache_ttl": 86400,
     "scheduled_tasks": [],
     "emby_public_url": "", 
@@ -61,7 +62,9 @@ DEFAULT_CONFIG = {
     "moviepilot_url": "",
     "moviepilot_token": "",
     "pulse_url": "",
-    "server_type": "emby" 
+    "server_type": "emby",
+    "secret_key": "",
+    "cors_origins": []
 }
 
 class ConfigManager:
@@ -104,7 +107,19 @@ class ConfigManager:
 
 cfg = ConfigManager()
 templates = Jinja2Templates(directory="templates")
-SECRET_KEY = os.getenv("SECRET_KEY", "embypulse_secret_key_2026")
+
+# Ensure critical secrets are not left at insecure defaults.
+env_secret = os.getenv("SECRET_KEY", "").strip()
+if env_secret:
+    SECRET_KEY = env_secret
+else:
+    if not cfg.get("secret_key"):
+        cfg.set("secret_key", secrets.token_urlsafe(32))
+    SECRET_KEY = cfg.get("secret_key")
+
+if not cfg.get("webhook_token") or cfg.get("webhook_token") == "embypulse":
+    cfg.set("webhook_token", secrets.token_urlsafe(24))
+
 PORT = 10307
 DB_PATH = os.getenv("DB_PATH", "/emby-data/playback_reporting.db")
 

@@ -3,10 +3,12 @@ import asyncio
 import threading
 import socket
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from app.routers import dedupe
 from app.routers import notify_rules
 from app.routers import system_tools
@@ -15,7 +17,7 @@ from app.routers import system_tools
 from app.services.risk_service import start_risk_monitor
 
 from app.routers import insight
-from app.core.config import PORT, SECRET_KEY, CONFIG_DIR, FONT_DIR
+from app.core.config import PORT, SECRET_KEY, CONFIG_DIR, FONT_DIR, cfg
 from app.core.database import init_db
 from app.services.bot_service import bot
 from app.routers import media_request
@@ -126,9 +128,27 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# CSRF protection for session-authenticated requests
+class CSRFMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            session = request.session if hasattr(request, "session") else {}
+            if session and (session.get("user") or session.get("req_user")):
+                token = request.headers.get("x-csrf-token")
+                if not token or token != session.get("csrf_token"):
+                    return JSONResponse(status_code=403, content={"status": "error", "message": "CSRF token invalid"})
+        return await call_next(request)
+
 # 中间件
+app.add_middleware(CSRFMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, max_age=86400*7)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+cors_env = os.getenv("CORS_ORIGINS", "")
+cors_origins = [o.strip() for o in cors_env.split(",") if o.strip()]
+if not cors_origins:
+    cors_origins = cfg.get("cors_origins") or []
+if not cors_origins:
+    cors_origins = ["http://localhost", "http://127.0.0.1"]
+app.add_middleware(CORSMiddleware, allow_origins=cors_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # 静态文件
 app.mount("/static", StaticFiles(directory="static"), name="static")

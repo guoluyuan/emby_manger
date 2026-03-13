@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
 import sqlite3
 import requests
@@ -6,7 +6,13 @@ import json
 from app.core.config import cfg, DB_PATH, save_config
 from app.services.risk_service import ban_user, log_risk_action, get_user_concurrent_limit
 
-router = APIRouter(prefix="/api/risk", tags=["RiskControl"])
+def admin_required(request: Request):
+    user = request.session.get("user")
+    if not user or not user.get("is_admin"):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return True
+
+router = APIRouter(prefix="/api/risk", tags=["RiskControl"], dependencies=[Depends(admin_required)])
 
 class ActionRequest(BaseModel):
     user_id: str

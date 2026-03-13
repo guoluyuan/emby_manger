@@ -54,7 +54,9 @@ def intercept_illegal_client(data: dict):
 @router.post("/api/v1/webhook")
 async def emby_webhook(request: Request):
     query_token = request.query_params.get("token")
-    if query_token != cfg.get("webhook_token"):
+    header_token = request.headers.get("x-webhook-token")
+    token = header_token or query_token
+    if token != cfg.get("webhook_token"):
         raise HTTPException(status_code=403, detail="Invalid Token")
 
     try:

@@ -4,6 +4,7 @@ import threading
 import time
 import requests
 from collections import defaultdict
+import re
 from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, List, Dict
@@ -126,6 +127,24 @@ def calculate_score(src: dict, strategy: str = "quality", custom_weights: dict =
         "a_codec": a_codec.upper() if a_codec else "未知音轨"
     }
 
+def normalize_title(name: str) -> str:
+    if not name: 
+        return ""
+    t = name.lower()
+    # 去掉括号类描述信息
+    t = re.sub(r'[\[\(\{【（].*?[\]\)\}】）]', '', t)
+    # 去掉所有空白与常见符号，仅保留中英文与数字
+    t = re.sub(r'[^0-9a-z\u4e00-\u9fff]+', '', t)
+    return t
+
+def is_valid_tmdb(val) -> bool:
+    if val is None:
+        return False
+    s = str(val).strip()
+    if not s or s.lower() in {"none", "null", "0"}:
+        return False
+    return s.isdigit()
+
 def run_dedupe_scan(strategy: str = "quality", custom_weights: dict = None):
     global scan_state
     start_time = time.time()
@@ -172,13 +191,25 @@ def run_dedupe_scan(strategy: str = "quality", custom_weights: dict = None):
             mtype = i.get("Type")
             if mtype == "Movie":
                 tmdb = i.get("ProviderIds", {}).get("Tmdb")
-                if not tmdb: continue
-                g_key = f"movie_{tmdb}"
+                if not is_valid_tmdb(tmdb): continue
+                norm_title = normalize_title(i.get("Name", ""))
+                g_key = f"movie_{tmdb}_{norm_title}" if norm_title else f"movie_{tmdb}"
             elif mtype == "Episode":
-                # 🔥 核心修复 2：单集没有 TMDB ID，必须查刚才建的字典！查不到用自身 SeriesId 兜底！
-                series_id = i.get("SeriesId") or i.get("ParentId") or "unknown"
-                series_tmdb = series_map.get(series_id) or series_id
-                g_key = f"tv_{series_tmdb}_s{i.get('ParentIndexNumber', 0)}e{i.get('IndexNumber', 0)}"
+                # 🔥 核心修复 2：优先使用「单集级」TMDB ID；缺失时再用 Series + S/E
+                ep_tmdb = i.get("ProviderIds", {}).get("Tmdb")
+                if is_valid_tmdb(ep_tmdb):
+                    g_key = f"ep_{ep_tmdb}"
+                else:
+                    season = i.get("ParentIndexNumber")
+                    episode = i.get("IndexNumber")
+                    series_id = i.get("SeriesId") or i.get("ParentId") or "unknown"
+                    series_tmdb = series_map.get(series_id)
+                    series_tmdb = series_tmdb if is_valid_tmdb(series_tmdb) else series_id
+                    # 如果缺少可靠的集号（例如 S0E0），则不参与去重，避免误判
+                    if season is not None and episode is not None and episode > 0:
+                        g_key = f"tv_{series_tmdb}_s{season}e{episode}"
+                    else:
+                        g_key = f"ep_{i.get('Id')}"
             else: continue
             
             if g_key not in whitelist: groups[g_key].append(i)

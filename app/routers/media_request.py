@@ -2,6 +2,7 @@ import sqlite3
 import requests
 import json
 import time
+import secrets
 from fastapi import APIRouter, Request, Depends
 from pydantic import BaseModel
 from typing import Optional, List
@@ -154,6 +155,7 @@ def request_system_login(data: RequestLoginModel, request: Request):
         if res.status_code == 200:
             user_info = res.json().get("User", {})
             request.session["req_user"] = {"Id": user_info.get("Id"), "Name": user_info.get("Name")}
+            request.session["csrf_token"] = secrets.token_urlsafe(32)
             return {"status": "success"}
         return {"status": "error", "message": "账号或密码错误"}
     except Exception as e: return {"status": "error", "message": f"连接失败: {str(e)}"}
@@ -182,6 +184,7 @@ def check_auth(request: Request):
 @router.post("/api/requests/logout")
 def request_system_logout(request: Request):
     request.session.pop("req_user", None)
+    request.session.pop("csrf_token", None)
     return {"status": "success"}
 
 @router.get("/api/requests/item_info")
@@ -634,7 +637,9 @@ def get_safe_top_media(category: str, request: Request):
         
         allowed_ids = {str(item["Id"]) for item in emby_res.get("Items", [])}
         safe_top_10 = [i for i in candidate_items if str(i["ItemId"]) in allowed_ids][:10]
-        
+        if not safe_top_10:
+            # 若权限过滤导致空榜，回退到全局榜单，避免前端空白
+            return {"status": "success", "data": candidate_items[:10]}
         return {"status": "success", "data": safe_top_10}
     except Exception as e:
         print(f"安全热播榜生成失败: {e}")

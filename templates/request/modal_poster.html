@@ -69,13 +69,14 @@
                         </div>
                         
                         <div class="flex flex-col gap-2 mb-8">
-                            <template x-for="(item, i) in (posterStudio.data?.top_list || []).slice(3, 10)" :key="item.ItemId">
-                                <div class="my-rank-row">
-                                    <div class="w-8 text-center font-black text-xs opacity-30" x-text="i + 4"></div>
-                                    <img class="my-rank-poster-sm" :id="'my-sm-img-'+i" src="">
+                            <template x-for="(row, i) in posterStudio.rankRows" :key="row.rank">
+                                <div class="my-rank-row" :class="row.item ? '' : 'placeholder'">
+                                    <div class="w-8 text-center font-black text-xs opacity-30" x-text="row.rank"></div>
+                                    <img class="my-rank-poster-sm" :id="'my-sm-img-'+i" src="" x-show="row.item">
+                                    <div class="my-rank-poster-sm" x-show="!row.item"></div>
                                     <div class="flex-1 min-w-0 ml-1">
-                                        <div class="font-bold text-xs truncate pb-1" x-text="item.ItemName"></div>
-                                        <div class="text-[9px] opacity-60 font-bold" x-text="item.Count + ' 次播放 · ' + Math.round(item.Duration/3600) + 'h'"></div>
+                                        <div class="font-bold text-xs truncate pb-1" x-text="row.item ? row.item.ItemName : '—'"></div>
+                                        <div class="text-[9px] opacity-60 font-bold" x-text="row.item ? (row.item.Count + ' 次播放 · ' + Math.round(row.item.Duration/3600) + 'h') : '—'"></div>
                                     </div>
                                 </div>
                             </template>

@@ -108,7 +108,7 @@ def scan_library_quality(request: Request):
 
     try:
         headers = {"X-Emby-Token": key, "Accept": "application/json"}
-        query_params = "Recursive=true&IncludeItemTypes=Movie&Fields=MediaSources,Path,MediaStreams,ProviderIds,DateCreated"
+        query_params = "Recursive=true&IncludeItemTypes=Movie&Fields=MediaSources,Path,MediaStreams,ProviderIds,DateCreated,PrimaryImageItemId"
         url = f"{host}/emby/Items?{query_params}"
         
         response = requests.get(url, headers=headers, timeout=60)
@@ -141,6 +141,7 @@ def scan_library_quality(request: Request):
 
             movie_obj = {
                 "Id": item_id,
+                "ImageId": item.get("PrimaryImageItemId") or item_id,
                 "Name": item.get("Name"),
                 "Year": item.get("ProductionYear"),
                 "Resolution": f"{width}x{height}",
@@ -172,3 +173,11 @@ def scan_library_quality(request: Request):
     except Exception as e:
         logger.error(f"质量盘点错误: {str(e)}")
         return {"status": "error"}
+
+@router.post("/api/insight/quality/clear_cache")
+def clear_quality_cache(request: Request):
+    if not request.session.get("user"):
+        return {"status": "error", "message": "Unauthorized"}
+    GLOBAL_CACHE["quality_stats"] = None
+    GLOBAL_CACHE["last_scan_time"] = 0
+    return {"status": "success"}

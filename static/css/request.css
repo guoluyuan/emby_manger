@@ -182,7 +182,7 @@ input, textarea { -webkit-user-select: auto; user-select: auto; }
 .my-server-pill { background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 900; border: 1px solid rgba(255,255,255,0.1); }
 
 /* 2. 核心指标数字区 */
-.my-stats-row { display: flex; gap: 15px; padding: 0 25px 25px; position: relative; z-index: 5; }
+.my-stats-row { display: flex; gap: 15px; padding: 0 25px 14px; position: relative; z-index: 5; }
 .my-stat-card { flex: 1; background: var(--p-theme-card, rgba(255,255,255,0.08)); border-radius: 12px; padding: 12px; border: 1px solid rgba(255,255,255,0.05); }
 .my-stat-val { font-size: 24px; font-weight: 900; font-family: 'Monaco', monospace; line-height: 1; margin-bottom: 4px; }
 .my-stat-label { font-size: 9px; font-weight: bold; opacity: 0.6; text-transform: uppercase; letter-spacing: 1px; }
@@ -190,16 +190,27 @@ input, textarea { -webkit-user-select: auto; user-select: auto; }
 /* 3. 领奖台排版 (重点修复：高度与对齐) */
 .my-podium-container { 
     display: flex; justify-content: center; align-items: flex-end; 
-    gap: 8px; padding: 30px 20px 40px; position: relative; z-index: 5; 
-    height: 260px; /* 原来是 240px，拉高一点腾出空间 */
-    margin-top: 25px; /* 增加顶部间距，强行往下推，远离上方卡片 */
-}.my-podium-item { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; }
+    gap: 8px; padding: 18px 20px 28px; position: relative; z-index: 5; 
+    height: auto; min-height: 260px; /* 自适应高度，避免封面溢出遮挡上方内容 */
+    margin-top: 8px;
+}
+.my-podium-item { 
+    flex: 0 0 auto; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    position: relative; 
+    width: 95px;
+}
+.my-podium-item.rank-1 { width: 125px; z-index: 2; }
+.my-podium-item.rank-2, 
+.my-podium-item.rank-3 { width: 95px; }
 .my-podium-cover { 
     width: 100%; border-radius: 10px; aspect-ratio: 2/3; object-cover: cover; 
     box-shadow: 0 10px 20px rgba(0,0,0,0.3); border: 2px solid rgba(255,255,255,0.1); 
     background: rgba(255,255,255,0.05);
 }
-.rank-1 .my-podium-cover { transform: scale(1.15); z-index: 2; border-color: rgba(252, 211, 77, 0.5); }
+.rank-1 .my-podium-cover { transform: none; z-index: 2; border-color: rgba(252, 211, 77, 0.5); }
 .my-podium-title { font-size: 10px; font-weight: 900; margin-top: 12px; text-align: center; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.9; }
 .rank-1 .my-podium-title { font-size: 12px; margin-top: 18px; }
 .my-podium-meta { font-size: 9px; font-weight: bold; opacity: 0.5; margin-top: 2px; }
@@ -210,6 +221,8 @@ input, textarea { -webkit-user-select: auto; user-select: auto; }
     position: relative; z-index: 5; transition: background 0.3s;
 }
 .my-rank-poster-sm { width: 34px; height: 50px; border-radius: 6px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.05); }
+.my-rank-row.placeholder { opacity: 0.25; }
+.my-rank-row.placeholder .my-rank-poster-sm { background: rgba(255,255,255,0.08); }
 
 /* 5. 情绪看板区域控制 */
 #my-mood-area { padding: 0 25px; position: relative; z-index: 5; }

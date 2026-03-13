@@ -10,7 +10,7 @@ class SettingsModel(BaseModel):
     emby_api_key: str
     tmdb_api_key: Optional[str] = ""
     proxy_url: Optional[str] = ""
-    webhook_token: Optional[str] = "embypulse"
+    webhook_token: Optional[str] = ""
     hidden_users: List[str] = []
     emby_public_url: Optional[str] = ""  
     welcome_message: Optional[str] = ""  
@@ -18,6 +18,7 @@ class SettingsModel(BaseModel):
     moviepilot_url: Optional[str] = ""
     moviepilot_token: Optional[str] = ""
     pulse_url: Optional[str] = ""
+    cors_origins: Optional[List[str]] = []
     # 🔥 新增：双引擎模式开关
     playback_data_mode: Optional[str] = "sqlite"
     server_type: str = "emby"
@@ -26,6 +27,11 @@ class SettingsModel(BaseModel):
 # 🔥 新增风控全局字段
     enable_risk_control: Optional[bool] = False         # 全局风控总开关
     default_max_concurrent: Optional[int] = 2           # 全局默认允许并发数
+
+class SetupModel(BaseModel):
+    emby_host: str
+    emby_api_key: str
+    server_type: Optional[str] = "emby"
 
 class BotSettingsModel(BaseModel):
     tg_bot_token: str
