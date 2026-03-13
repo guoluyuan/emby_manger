@@ -12,7 +12,7 @@
 version: '3.8'
 services:
   emby-pulse:
-    image: guogai/emby_manger:latest
+    image: mp740429299/emby_manger:latest
     container_name: emby-pulse
     restart: unless-stopped
     network_mode: host
@@ -58,7 +58,7 @@ services:
 3. 重新启动容器
 
 ```bash
-docker pull guogai/emby_manger:latest
+docker pull mp740429299/emby_manger:latest
 docker compose down
 docker compose up -d
 ```

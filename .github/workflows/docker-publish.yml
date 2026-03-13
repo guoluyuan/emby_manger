@@ -31,8 +31,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           # 🔥 修改 1：打上 latest 和自动递增版本号的双标签
           tags: |
-            guogai/emby_manger:latest
-            guogai/emby_manger:1.2.0.${{ github.run_number }}
+            mp740429299/emby_manger:latest
+            mp740429299/emby_manger:1.2.0.${{ github.run_number }}
           # 🔥 修改 2：将版本号作为参数传进 Dockerfile
           build-args: |
             APP_VERSION=1.2.0.${{ github.run_number }}
