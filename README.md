@@ -132,7 +132,7 @@ version: '3.8'
 services:
   emby-pulse:
     image: mp740429299/emby_manger:latest
-    container_name: emby-pulse
+    container_name: emby-manger
     restart: unless-stopped
     network_mode: host #默认端口号为10307
     volumes:
