@@ -7,6 +7,9 @@
 主要调整：
 - 本地化 AlpineJS 资源，避免 CDN 被拦截导致前端不渲染
 - 修复“剧集热播榜 Top 10”列表因重复 key 导致不显示的问题
+- 修复去重管理中部分剧集、电影去重异常的问题
+- 全局播放记录展示时过滤 Emby 库中已不存在的条目（仪表盘、最近播放、质量盘点等）
+- 统一观影成就海报生成样式并优化布局，修复本月/本周海报图片遮挡播放记录的问题
 
 <div align="center">
   <img src="static/img/logo-light.png" alt="EmbyPulse Logo" width="200" />
