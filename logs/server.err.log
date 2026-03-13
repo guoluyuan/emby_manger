@@ -1,9 +1,0 @@
-INFO:     Will watch for changes in these directories: ['D:\\AI\\emby-pulse']
-INFO:     Uvicorn running on http://0.0.0.0:10307 (Press CTRL+C to quit)
-INFO:     Started reloader process [16532] using StatReload
-INFO:     ✅ 数据库无损升级：已成功添加用户备注(remark)字段
-INFO:     Started server process [16416]
-INFO:     Waiting for application startup.
-INFO:     👁️ [风险管控] 零延迟天眼系统已启动 (事件驱动 + 60s兜底)
-INFO:     Application startup complete.
-INFO:     🔄 [定时任务] 开始在后台自动刷新追剧日历缓存...
