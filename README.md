@@ -12,6 +12,7 @@
 - 统一观影成就海报生成样式并优化布局，修复本月/本周海报图片遮挡播放记录的问题
 - 用户社区详情弹窗新增“去 Emby 播放”直达按钮
 - 用户社区跳转链接自动附带 serverId，并优先使用 SeriesId，确保跳转准确
+- 用户社区跳转会智能选择内网或公网地址：内网可达优先走内网，无法直连则回退公网
 
 <div align="center">
   <img src="static/img/logo-light.png" alt="EmbyPulse Logo" width="200" />
