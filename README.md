@@ -10,6 +10,8 @@
 - 修复去重管理中部分剧集、电影去重异常的问题
 - 全局播放记录展示时过滤 Emby 库中已不存在的条目（仪表盘、最近播放、质量盘点等）
 - 统一观影成就海报生成样式并优化布局，修复本月/本周海报图片遮挡播放记录的问题
+- 用户社区详情弹窗新增“去 Emby 播放”直达按钮
+- 用户社区跳转链接自动附带 serverId，并优先使用 SeriesId，确保跳转准确
 
 <div align="center">
   <img src="static/img/logo-light.png" alt="EmbyPulse Logo" width="200" />
