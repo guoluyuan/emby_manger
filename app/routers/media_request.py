@@ -436,7 +436,7 @@ def submit_media_request(data: MediaRequestSubmitModel, request: Request):
             execute_sql("INSERT INTO media_requests (tmdb_id, media_type, title, year, poster_path, status, season) VALUES (?, ?, ?, ?, ?, 0, ?)", (data.tmdb_id, data.media_type, data.title, data.year, data.poster_path, sn))
         elif existing[0] == 3: 
             execute_sql("UPDATE media_requests SET status = 0, reject_reason = NULL WHERE tmdb_id = ? AND season = ?", (data.tmdb_id, sn))
-        elif existing[0] == 2: 
+        elif existing[0] in (0, 1, 2, 4):
             conn.close(); continue
             
         execute_sql("INSERT OR REPLACE INTO request_users (tmdb_id, user_id, username, season) VALUES (?, ?, ?, ?)", (data.tmdb_id, uid, uname, sn))

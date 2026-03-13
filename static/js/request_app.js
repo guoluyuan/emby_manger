@@ -15,7 +15,7 @@ document.addEventListener('alpine:init', () => {
         userId: '', userName: '', expireDate: '未知', serverUrl: '', serverUrlLocal: '', serverUrlPublic: '', serverId: '', showServerUrl: false, loginForm: { username: '', password: '', captcha: '' }, captchaQuestion: '', isLoggingIn: false,
         currentTab: 'explore', searchQuery: '', isSearching: false, searchResults: [], recommendResults: [], recommendRow1: [], recommendRow2: [], recommendRow3: [],
         serverDashboard: null, serverLatest: [], serverTopRated: [], serverGenres: [], serverTopMovies: [], serverTopSeries: [],
-        showcaseModal: { open: false, isLoading: false, data: null }, queueModal: { open: false, activeTab: 'request' }, myQueue: [], myFeedbacks: [],
+        showcaseModal: { open: false, isLoading: false, data: null }, queueModal: { open: false, activeTab: 'request' }, myQueue: [], myRequestMap: {}, myFeedbacks: [],
         userStats: null, userBadges: [], userTrend: null, isStatsLoading: false, statsLoaded: false, charts: { hour: null, device: null, client: null, trend: null },
         isModalOpen: false, activeItem: null, tvSeasons: [], isLoadingSeasons: false, isCheckingLocal: false, selectedSeasons: [], isSubmitting: false,
         toast: { show: false, message: '', type: 'success' }, feedbackModal: { open: false, itemName: '', posterPath: '', issueType: '缺少字幕', desc: '' }, feedbackIssues: ['缺少字幕', '字幕错位', '视频卡顿/花屏', '清晰度太低', '音轨无声/音画不同步', '其他问题'], isFeedbackSubmitting: false,
@@ -130,7 +130,7 @@ document.addEventListener('alpine:init', () => {
         openQueueModal(tab) { this.queueModal.activeTab = tab; this.queueModal.open = true; document.body.style.overflow = 'hidden'; if(tab === 'request') this.loadQueue(); else this.loadMyFeedback(); },
         closeQueueModal() { this.queueModal.open = false; document.body.style.overflow = ''; },
 
-        async submitRequest() { if (this.activeItem.media_type === 'movie' && this.activeItem.local_status === 2) return; this.isSubmitting = true; const payload = { tmdb_id: this.activeItem.tmdb_id, media_type: this.activeItem.media_type, title: this.activeItem.title, year: this.activeItem.year, poster_path: this.activeItem.poster_path, overview: this.activeItem.overview, seasons: this.activeItem.media_type === 'tv' ? this.selectedSeasons.map(Number) : [0] }; try { const res = await fetch('/api/requests/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const text = await res.text(); let data = {}; try { data = JSON.parse(text); } catch(e) { data = { message: text }; } if (res.ok && (data.status === 'success' || !data.detail)) { this.showToast('✅ ' + (data.message || '心愿已发送！')); this.closeModal(); this.openQueueModal('request'); } else { this.showToast('❌ ' + (data.message || data.detail || '提交异常'), 'error'); } } catch (e) { this.showToast('网络异常', 'error'); } finally { this.isSubmitting = false; } },
+        async submitRequest() { if (this.activeItem.media_type === 'movie' && (this.activeItem.local_status === 2 || this.isRequestSubmitted(this.activeItem.tmdb_id, 0))) return; this.isSubmitting = true; const seasons = this.activeItem.media_type === 'tv' ? this.selectedSeasons.map(Number).filter(sn => !this.isRequestSubmitted(this.activeItem.tmdb_id, sn)) : [0]; if (this.activeItem.media_type === 'tv' && seasons.length === 0) { this.showToast('✅ 已提交申请，等待管理员处理'); this.isSubmitting = false; return; } const payload = { tmdb_id: this.activeItem.tmdb_id, media_type: this.activeItem.media_type, title: this.activeItem.title, year: this.activeItem.year, poster_path: this.activeItem.poster_path, overview: this.activeItem.overview, seasons }; try { const res = await fetch('/api/requests/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const text = await res.text(); let data = {}; try { data = JSON.parse(text); } catch(e) { data = { message: text }; } if (res.ok && (data.status === 'success' || !data.detail)) { this.showToast('✅ ' + (data.message || '心愿已发送！')); this.closeModal(); this.openQueueModal('request'); } else { this.showToast('❌ ' + (data.message || data.detail || '提交异常'), 'error'); } } catch (e) { this.showToast('网络异常', 'error'); } finally { this.isSubmitting = false; } },
         openFeedbackModal(itemName, posterPath = '') { this.feedbackModal.itemName = itemName; this.feedbackModal.posterPath = posterPath; this.feedbackModal.issueType = '缺少字幕'; this.feedbackModal.desc = ''; this.feedbackModal.open = true; if(this.isModalOpen) this.closeModal(); if(this.showcaseModal.open) this.closeShowcaseModal(); },
         async submitFeedback() { this.isFeedbackSubmitting = true; try { const res = await fetch('/api/requests/feedback/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_name: this.feedbackModal.itemName, issue_type: this.feedbackModal.issueType, description: this.feedbackModal.desc, poster_path: this.feedbackModal.posterPath }) }); const text = await res.text(); let data = {}; try { data = JSON.parse(text); } catch(e) { data = { message: text }; } if (res.ok && (data.status === 'success' || !data.detail)) { this.showToast(data.message || '反馈成功'); this.feedbackModal.open = false; this.openQueueModal('feedback'); } else { this.showToast(data.message || data.detail || '报错失败', 'error'); } } catch(e) { this.showToast('网络错误', 'error'); } finally { this.isFeedbackSubmitting = false; } },
         async searchMedia() { if (!this.searchQuery.trim()) return; this.isSearching = true; if (this.currentTab !== 'request') this.currentTab = 'request'; window.scrollTo(0, 0); try { const res = await fetch(`/api/requests/search?query=${encodeURIComponent(this.searchQuery)}`); const data = await res.json(); if (data.status === 'success') { this.searchResults = data.data; if (data.data.length === 0) this.showToast('未找到结果', 'error'); } } catch (e) { this.showToast('网络错误', 'error'); } finally { this.isSearching = false; } },
@@ -175,7 +175,7 @@ document.addEventListener('alpine:init', () => {
         
         // 🔥 修复3：补上丢失的“全选/全消”函数引擎
         toggleSelectAllSeasons() {
-            const availableSeasons = this.tvSeasons.filter(s => !s.exists_locally).map(s => s.season_number);
+            const availableSeasons = this.tvSeasons.filter(s => !s.exists_locally && !this.isSeasonSubmitted(s.season_number)).map(s => s.season_number);
             if (this.selectedSeasons.length === availableSeasons.length && availableSeasons.length > 0) {
                 this.selectedSeasons = []; // 已经全选了，就执行全消
             } else {
@@ -183,9 +183,48 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        async openModal(item) { this.activeItem = item; this.isModalOpen = true; this.tvSeasons = []; this.selectedSeasons = []; document.body.style.overflow = 'hidden'; if (item.media_type === 'tv') { this.isLoadingSeasons = true; try { const res = await fetch(`/api/requests/tv/${item.tmdb_id}`); const data = await res.json(); if (data.status === 'success') { this.tvSeasons = data.seasons; if (this.tvSeasons.some(s => s.exists_locally)) this.activeItem.local_status = 2; } } catch (e) {} this.isLoadingSeasons = false; } else if (item.media_type === 'movie') { this.isCheckingLocal = true; try { const res = await fetch(`/api/requests/check/movie/${item.tmdb_id}`); const data = await res.json(); if (data.status === 'success' && data.exists) this.activeItem.local_status = 2; } catch(e) {} this.isCheckingLocal = false; } },
+        async openModal(item) { this.activeItem = item; this.isModalOpen = true; this.tvSeasons = []; this.selectedSeasons = []; document.body.style.overflow = 'hidden'; const queuePromise = this.loadQueue(); if (item.media_type === 'tv') { this.isLoadingSeasons = true; try { const res = await fetch(`/api/requests/tv/${item.tmdb_id}`); const data = await res.json(); if (data.status === 'success') { this.tvSeasons = data.seasons; if (this.tvSeasons.some(s => s.exists_locally)) this.activeItem.local_status = 2; } } catch (e) {} this.isLoadingSeasons = false; } else if (item.media_type === 'movie') { this.isCheckingLocal = true; try { const res = await fetch(`/api/requests/check/movie/${item.tmdb_id}`); const data = await res.json(); if (data.status === 'success' && data.exists) this.activeItem.local_status = 2; } catch(e) {} this.isCheckingLocal = false; } await queuePromise; this.pruneSelectedSeasons(); },
         closeModal() { this.isModalOpen = false; document.body.style.overflow = ''; },
-        async loadQueue() { try { const res = await fetch('/api/requests/my'); const data = await res.json(); if (data.status === 'success') this.myQueue = data.data; } catch (e) {} },
+        buildMyRequestMap(list) { const map = {}; (list || []).forEach(r => { if (r && r.tmdb_id !== undefined && r.tmdb_id !== null) map[`${r.tmdb_id}_${r.season || 0}`] = r.status; }); this.myRequestMap = map; },
+        getRequestStatus(tmdbId, season = 0) { return this.myRequestMap[`${tmdbId}_${season}`]; },
+        isRequestSubmitted(tmdbId, season = 0) { const status = this.getRequestStatus(tmdbId, season); return status !== undefined && status !== null && status !== 3; },
+        getRequestStatusText(status) {
+            if (status === 0) return '已提交申请';
+            if (status === 1) return '已审批';
+            if (status === 2) return '已完成';
+            if (status === 4) return '管理员接单';
+            if (status === 3) return '已拒绝，可重新提交';
+            return '';
+        },
+        getRequestBadgeText(status) {
+            if (status === 3) return '已拒绝';
+            return this.getRequestStatusText(status);
+        },
+        getRequestStatusClass(status) {
+            if (status === 0) return 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300';
+            if (status === 1) return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300';
+            if (status === 2) return 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300';
+            if (status === 4) return 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300';
+            if (status === 3) return 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300';
+            return 'bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-zinc-400';
+        },
+        getSeasonRequestStatus(seasonNumber) { if (!this.activeItem) return undefined; return this.getRequestStatus(this.activeItem.tmdb_id, seasonNumber); },
+        getSeasonStatusText(seasonNumber) { return this.getRequestBadgeText(this.getSeasonRequestStatus(seasonNumber)); },
+        getSeasonStatusClass(seasonNumber) { return this.getRequestStatusClass(this.getSeasonRequestStatus(seasonNumber)); },
+        getSeasonStatusTooltip(seasonNumber) {
+            const status = this.getSeasonRequestStatus(seasonNumber);
+            if (status === undefined || status === null) return '';
+            if (status === 0) return '该季度已提交，等待管理员处理';
+            if (status === 1) return '管理员已审批，正在安排';
+            if (status === 2) return '已完成，资源可用';
+            if (status === 4) return '管理员已接单，处理中';
+            if (status === 3) return '该季度已被拒绝，可重新提交';
+            return '';
+        },
+        getMovieStatusText() { return this.getRequestStatusText(this.getRequestStatus(this.activeItem?.tmdb_id, 0)); },
+        isSeasonSubmitted(seasonNumber) { if (!this.activeItem) return false; return this.isRequestSubmitted(this.activeItem.tmdb_id, seasonNumber); },
+        pruneSelectedSeasons() { if (this.activeItem?.media_type !== 'tv') return; const allowed = this.selectedSeasons.filter(sn => !this.isSeasonSubmitted(sn)); if (allowed.length !== this.selectedSeasons.length) this.selectedSeasons = allowed; },
+        async loadQueue() { try { const res = await fetch('/api/requests/my'); const data = await res.json(); if (data.status === 'success') { this.myQueue = data.data; this.buildMyRequestMap(data.data); } } catch (e) {} },
         async loadMyFeedback() { try { const res = await fetch('/api/requests/feedback/my'); const data = await res.json(); if (data.status === 'success') this.myFeedbacks = data.data; } catch (e) {} },
         
         async openMyPosterStudio() { this.posterStudio.open = true; document.body.style.overflow = 'hidden'; this.setMyPosterTheme('#1a1a1a', 'white', '#eab308'); await this.setMyPosterPeriod('month'); },

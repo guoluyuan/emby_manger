@@ -39,9 +39,10 @@
                 <div class="flex flex-col gap-2 max-h-56 overflow-y-auto hide-scrollbar pr-1">
                     <template x-for="s in tvSeasons" :key="s.season_number">
                         <label class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all border cursor-pointer select-none group"
-                               :class="s.exists_locally ? 'bg-green-50/50 border-green-200 text-green-700 dark:bg-green-500/5 dark:border-green-500/10 dark:text-green-500 opacity-60 cursor-not-allowed' : (selectedSeasons.includes(s.season_number) ? 'bg-brand-500 border-brand-400 text-white shadow-md shadow-brand-500/20' : 'bg-white border-slate-200 text-slate-700 hover:border-brand-300 dark:bg-white/5 dark:border-white/5 dark:text-zinc-300 dark:hover:bg-white/10')">
+                               :class="s.exists_locally ? 'bg-green-50/50 border-green-200 text-green-700 dark:bg-green-500/5 dark:border-green-500/10 dark:text-green-500 opacity-60 cursor-not-allowed' : (isSeasonSubmitted(s.season_number) ? 'bg-slate-100 border-slate-200 text-slate-500 dark:bg-white/5 dark:border-white/5 dark:text-zinc-500 opacity-60 cursor-not-allowed' : (selectedSeasons.includes(s.season_number) ? 'bg-brand-500 border-brand-400 text-white shadow-md shadow-brand-500/20' : 'bg-white border-slate-200 text-slate-700 hover:border-brand-300 dark:bg-white/5 dark:border-white/5 dark:text-zinc-300 dark:hover:bg-white/10'))"
+                               :title="getSeasonStatusTooltip(s.season_number)">
                             
-                            <input type="checkbox" :value="s.season_number" x-model="selectedSeasons" :disabled="s.exists_locally" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 dark:bg-black dark:border-white/20" :class="s.exists_locally ? 'hidden' : ''">
+                            <input type="checkbox" :value="s.season_number" x-model="selectedSeasons" :disabled="s.exists_locally || isSeasonSubmitted(s.season_number)" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 dark:bg-black dark:border-white/20" :class="(s.exists_locally || isSeasonSubmitted(s.season_number)) ? 'hidden' : ''">
                             
                             <div class="flex-1">
                                 <div class="flex items-center gap-2">
@@ -50,6 +51,7 @@
                                     <span x-show="s.exists_locally" class="text-[9px] bg-green-200 dark:bg-green-500/20 text-green-800 dark:text-green-400 px-1.5 py-0.5 rounded font-black">
                                         已入库 ( <span x-text="s.local_ep_count || 0"></span> / <span x-text="s.episode_count"></span> 集 )
                                     </span>
+                                    <span x-show="!s.exists_locally && getSeasonRequestStatus(s.season_number) !== undefined" class="text-[9px] px-1.5 py-0.5 rounded font-black" :class="getSeasonStatusClass(s.season_number)" x-text="getSeasonStatusText(s.season_number)"></span>
                                 </div>
                                 <div class="text-[10px] opacity-60 mt-0.5" x-text="`共 ${s.episode_count} 集内容`"></div>
                             </div>
@@ -63,12 +65,12 @@
             </div>
 
             <div class="flex gap-3 mt-4 mb-[env(safe-area-inset-bottom)]">
-                <button @click="submitRequest()" :disabled="isSubmitting || isCheckingLocal || (activeItem?.media_type === 'tv' && selectedSeasons.length === 0) || (activeItem?.media_type === 'movie' && activeItem?.local_status === 2)" class="flex-1 py-4 rounded-2xl font-black text-lg flex justify-center items-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-xl" :class="(activeItem?.local_status === 2 && activeItem?.media_type !== 'tv') ? 'bg-green-600 shadow-green-600/30 cursor-default' : 'bg-slate-900 hover:bg-slate-800 dark:bg-brand-600 dark:hover:bg-brand-500 dark:shadow-brand-600/30 active:scale-95'">
+                <button @click="submitRequest()" :disabled="isSubmitting || isCheckingLocal || (activeItem?.media_type === 'tv' && selectedSeasons.length === 0) || (activeItem?.media_type === 'movie' && (activeItem?.local_status === 2 || isRequestSubmitted(activeItem?.tmdb_id, 0)))" class="flex-1 py-4 rounded-2xl font-black text-lg flex justify-center items-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-xl" :class="(activeItem?.local_status === 2 && activeItem?.media_type !== 'tv') ? 'bg-green-600 shadow-green-600/30 cursor-default' : ((activeItem?.media_type === 'movie' && isRequestSubmitted(activeItem?.tmdb_id, 0)) ? 'bg-blue-600 shadow-blue-600/30 cursor-default' : 'bg-slate-900 hover:bg-slate-800 dark:bg-brand-600 dark:hover:bg-brand-500 dark:shadow-brand-600/30 active:scale-95')">
                     <span x-show="isSubmitting || isCheckingLocal" class="animate-spin w-5 h-5 border-2 border-white/30 border-t-white rounded-full"></span>
                     <template x-if="!isSubmitting && !isCheckingLocal">
                         <div class="flex items-center gap-2">
-                            <i class="fa-solid" :class="(activeItem?.local_status === 2 && activeItem?.media_type !== 'tv') ? 'fa-check-double' : 'fa-paper-plane'"></i>
-                            <span x-text="(activeItem?.local_status === 2 && activeItem?.media_type !== 'tv') ? '该电影已在库中' : '发送许愿心愿'"></span>
+                            <i class="fa-solid" :class="(activeItem?.local_status === 2 && activeItem?.media_type !== 'tv') ? 'fa-check-double' : ((activeItem?.media_type === 'movie' && isRequestSubmitted(activeItem?.tmdb_id, 0)) ? 'fa-circle-check' : 'fa-paper-plane')"></i>
+                            <span x-text="(activeItem?.local_status === 2 && activeItem?.media_type !== 'tv') ? '该电影已在库中' : ((activeItem?.media_type === 'movie' && isRequestSubmitted(activeItem?.tmdb_id, 0)) ? getMovieStatusText() : '发送许愿心愿')"></span>
                         </div>
                     </template>
                 </button>
