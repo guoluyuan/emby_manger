@@ -145,6 +145,23 @@ services:
 
 首次安装后，请访问 `http://localhost:10307/` 在网页中填写 Emby 地址与 API Key（无需写入 `docker-compose.yml`）。
 
+### 本地部署（非 Docker）
+
+1. 安装 Python 与 pip（建议使用系统自带或官方安装包）
+2. 在项目根目录安装依赖：
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+3. 启动服务：
+
+```bash
+python run.py
+```
+
+4. 首次访问 `http://localhost:10307/` 在网页中完成配置（Emby 地址与 API Key）
+
 ## ⚙️ 配置说明
 
 以下为部署后建议优先检查的核心配置项：

@@ -78,7 +78,7 @@ def resolve_poster_ids(items_list):
             for x in items_list:
                 orig_id = str(x.get('ItemId'))
                 if orig_id in id_map: 
-                    x['ItemId'] = id_map[orig_id]
+                    x['JumpId'] = id_map[orig_id]
                     x['smart_poster'] = f"/api/proxy/smart_image?item_id={id_map[orig_id]}&type=Primary"
     except Exception: pass
 
@@ -216,6 +216,9 @@ def api_top_movies(user_id: Optional[str] = None, category: str = 'all', sort_by
             
         res = list(aggregated.values())
         res.sort(key=lambda x: x['TotalTime'] if sort_by == 'time' else x['PlayCount'], reverse=True)
+        existing_ids = get_existing_item_ids([i.get("ItemId") for i in res])
+        if existing_ids is not None:
+            res = [i for i in res if str(i.get("ItemId")) in existing_ids]
         top_50 = res[:50]
         resolve_poster_ids(top_50) 
         return {"status": "success", "data": top_50}

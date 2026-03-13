@@ -12,7 +12,7 @@ document.addEventListener('alpine:init', () => {
 
     Alpine.data('requestApp', () => ({
         scrolled: false, lastScrollTop: 0, isScrollingDown: false, isLoaded: false, isLoggedIn: false, isDarkMode: false,
-        userId: '', userName: '', expireDate: '未知', serverUrl: '', serverId: '', showServerUrl: false, loginForm: { username: '', password: '', captcha: '' }, captchaQuestion: '', isLoggingIn: false,
+        userId: '', userName: '', expireDate: '未知', serverUrl: '', serverUrlLocal: '', serverUrlPublic: '', serverId: '', showServerUrl: false, loginForm: { username: '', password: '', captcha: '' }, captchaQuestion: '', isLoggingIn: false,
         currentTab: 'explore', searchQuery: '', isSearching: false, searchResults: [], recommendResults: [], recommendRow1: [], recommendRow2: [], recommendRow3: [],
         serverDashboard: null, serverLatest: [], serverTopRated: [], serverGenres: [], serverTopMovies: [], serverTopSeries: [],
         showcaseModal: { open: false, isLoading: false, data: null }, queueModal: { open: false, activeTab: 'request' }, myQueue: [], myFeedbacks: [],
@@ -21,12 +21,42 @@ document.addEventListener('alpine:init', () => {
         toast: { show: false, message: '', type: 'success' }, feedbackModal: { open: false, itemName: '', posterPath: '', issueType: '缺少字幕', desc: '' }, feedbackIssues: ['缺少字幕', '字幕错位', '视频卡顿/花屏', '清晰度太低', '音轨无声/音画不同步', '其他问题'], isFeedbackSubmitting: false,
         posterStudio: { open: false, isLoading: false, isSaving: false, period: 'month', periodLabel: '本月 观影报告', data: null, useCoverBg: false, top1BgBase64: null, rankRows: [] },
 
-        async initTheme() { this.isDarkMode = document.documentElement.classList.contains('dark'); try { const res = await fetch('/api/requests/check'); const data = await res.json(); if (data.status === 'success') { this.isLoggedIn = true; this.userId = data.user.Id; this.userName = data.user.Name; this.expireDate = data.user.expire_date; this.serverUrl = data.server_url; this.serverId = data.server_id || ''; this.loadServerData(); } } catch(e) {} this.isLoaded = true; this.refreshCaptcha(); },
+        async initTheme() { this.isDarkMode = document.documentElement.classList.contains('dark'); try { const res = await fetch('/api/requests/check'); const data = await res.json(); if (data.status === 'success') { this.isLoggedIn = true; this.userId = data.user.Id; this.userName = data.user.Name; this.expireDate = data.user.expire_date; this.serverUrlLocal = data.server_url_local || ''; this.serverUrlPublic = data.server_url_public || ''; this.serverUrl = await this.pickBestServerUrl(); this.serverId = data.server_id || ''; this.loadServerData(); } } catch(e) {} this.isLoaded = true; this.refreshCaptcha(); },
         handleScroll() { const st = window.pageYOffset || document.documentElement.scrollTop; this.scrolled = st > 50; this.isScrollingDown = st > this.lastScrollTop && st > 50; this.lastScrollTop = st <= 0 ? 0 : st; },
         toggleTheme() { this.isDarkMode = !this.isDarkMode; localStorage.setItem('ep_theme', this.isDarkMode ? 'dark' : 'light'); document.documentElement.classList.toggle('dark', this.isDarkMode); if (this.currentTab === 'profile' && this.statsLoaded) setTimeout(() => this.renderCharts(), 150); },
         showToast(msg, type = 'success') { this.toast = { show: true, message: msg, type }; setTimeout(() => this.toast.show = false, 3000); },
         async copyToClipboard(text) { try { await navigator.clipboard.writeText(text); } catch(e) { const input = document.createElement('input'); input.value = text; document.body.appendChild(input); input.select(); document.execCommand('copy'); document.body.removeChild(input); } },
-        async login() { if(!this.loginForm.username || !this.loginForm.password || !this.loginForm.captcha) return; this.isLoggingIn = true; try { const res = await fetch('/api/requests/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.loginForm) }); const data = await res.json(); if (data.status === 'success') { const checkRes = await fetch('/api/requests/check'); const checkData = await checkRes.json(); if (checkData.status === 'success') { this.userId = checkData.user.Id; this.userName = checkData.user.Name; this.expireDate = checkData.user.expire_date; this.serverUrl = checkData.server_url; this.serverId = checkData.server_id || ''; } this.isLoggedIn = true; this.loadServerData(); this.showToast('登录成功'); } else { this.showToast(data.message, 'error'); this.loginForm.captcha = ''; this.refreshCaptcha(); } } catch(e) { this.showToast('网络错误', 'error'); } this.isLoggingIn = false; },
+        async login() { if(!this.loginForm.username || !this.loginForm.password || !this.loginForm.captcha) return; this.isLoggingIn = true; try { const res = await fetch('/api/requests/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.loginForm) }); const data = await res.json(); if (data.status === 'success') { const checkRes = await fetch('/api/requests/check'); const checkData = await checkRes.json(); if (checkData.status === 'success') { this.userId = checkData.user.Id; this.userName = checkData.user.Name; this.expireDate = checkData.user.expire_date; this.serverUrlLocal = checkData.server_url_local || ''; this.serverUrlPublic = checkData.server_url_public || ''; this.serverUrl = await this.pickBestServerUrl(); this.serverId = checkData.server_id || ''; } this.isLoggedIn = true; this.loadServerData(); this.showToast('登录成功'); } else { this.showToast(data.message, 'error'); this.loginForm.captcha = ''; this.refreshCaptcha(); } } catch(e) { this.showToast('网络错误', 'error'); } this.isLoggingIn = false; },
+        isPrivateHost(host) {
+            if (!host) return false;
+            if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+            if (/^10\./.test(host)) return true;
+            if (/^192\.168\./.test(host)) return true;
+            const m = host.match(/^172\.(\d+)\./);
+            if (m) { const n = parseInt(m[1], 10); if (n >= 16 && n <= 31) return true; }
+            return false;
+        },
+        async probeLocalEmby(localUrl) {
+            if (!localUrl) return false;
+            return new Promise((resolve) => {
+                const img = new Image();
+                const timer = setTimeout(() => resolve(false), 800);
+                img.onload = () => { clearTimeout(timer); resolve(true); };
+                img.onerror = () => { clearTimeout(timer); resolve(false); };
+                img.src = `${localUrl.replace(/\/$/, '')}/web/favicon.ico?ts=${Date.now()}`;
+            });
+        },
+        async pickBestServerUrl() {
+            const localUrl = (this.serverUrlLocal || '').replace(/\/$/, '');
+            const publicUrl = (this.serverUrlPublic || '').replace(/\/$/, '');
+            if (!localUrl && !publicUrl) return '';
+            if (!publicUrl) return localUrl;
+            if (!localUrl) return publicUrl;
+            const host = window.location.hostname;
+            if (this.isPrivateHost(host)) return localUrl;
+            const ok = await this.probeLocalEmby(localUrl);
+            return ok ? localUrl : publicUrl;
+        },
         async refreshCaptcha() { try { const res = await fetch('/api/captcha'); const data = await res.json(); if (data.status === 'success') this.captchaQuestion = data.question; } catch(e) {} },
         async logout() { try { await fetch('/api/requests/logout', { method: 'POST' }); this.isLoggedIn = false; } catch (e) {} },
 
@@ -85,7 +115,7 @@ document.addEventListener('alpine:init', () => {
         },
         getEmbyItemUrl(item) {
             const base = (this.serverUrl || '').replace(/\/$/, '');
-            const jumpId = item?.SeriesId || item?.Id || item?.ItemId;
+            const jumpId = item?.JumpId || item?.SeriesId || item?.Id || item?.ItemId;
             const sid = item?.ServerId || this.serverId || '';
             if (!base || !jumpId) return '';
             const serverParam = sid ? `&serverId=${sid}` : '';

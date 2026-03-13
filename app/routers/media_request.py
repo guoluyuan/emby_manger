@@ -60,7 +60,7 @@ def _same_lan(ip_a: str, ip_b: str):
             return True
         if not (a.is_private and b.is_private):
             return False
-        net = ipaddress.ip_network(f\"{a}/24\", strict=False)
+        net = ipaddress.ip_network(f"{a}/24", strict=False)
         return b in net
     except:
         return False
@@ -257,7 +257,9 @@ def check_auth(request: Request):
             "status": "success", 
             "user": {**user, "expire_date": expire_date},
             "server_url": emby_url.rstrip('/'),
-            "server_id": server_id
+            "server_id": server_id,
+            "server_url_local": host,
+            "server_url_public": public_url
         }
     return {"status": "error"}
 
