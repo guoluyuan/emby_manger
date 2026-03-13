@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   emby-pulse:
-    image: zeyu8023/emby-stats:latest
+    image: guogai/emby_manger:latest
     container_name: emby-pulse
     restart: unless-stopped
     
