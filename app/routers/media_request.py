@@ -174,10 +174,21 @@ def check_auth(request: Request):
             except: pass
             
         emby_url = cfg.get("emby_public_url") or cfg.get("emby_external_url") or cfg.get("emby_host") or ""
+        server_id = ""
+        try:
+            host = (cfg.get("emby_host") or "").rstrip('/')
+            key = cfg.get("emby_api_key")
+            if host and key:
+                sys_res = requests.get(f"{host}/emby/System/Info?api_key={key}", timeout=5)
+                if sys_res.status_code == 200:
+                    server_id = sys_res.json().get("Id", "")
+        except: 
+            server_id = ""
         return {
             "status": "success", 
             "user": {**user, "expire_date": expire_date},
-            "server_url": emby_url.rstrip('/')
+            "server_url": emby_url.rstrip('/'),
+            "server_id": server_id
         }
     return {"status": "error"}
 
@@ -201,6 +212,8 @@ def get_item_info(item_id: str, request: Request):
             d = res.json()
             return {"status": "success", "data": {
                 "Id": d.get("Id"),
+                "SeriesId": d.get("SeriesId") or d.get("SeasonId"),
+                "ServerId": d.get("ServerId", ""),
                 "Name": d.get("Name", "未知"),
                 "Type": d.get("Type", ""),
                 "ProductionYear": d.get("ProductionYear", ""),

@@ -12,7 +12,7 @@ document.addEventListener('alpine:init', () => {
 
     Alpine.data('requestApp', () => ({
         scrolled: false, lastScrollTop: 0, isScrollingDown: false, isLoaded: false, isLoggedIn: false, isDarkMode: false,
-        userId: '', userName: '', expireDate: '未知', serverUrl: '', showServerUrl: false, loginForm: { username: '', password: '' }, isLoggingIn: false,
+        userId: '', userName: '', expireDate: '未知', serverUrl: '', serverId: '', showServerUrl: false, loginForm: { username: '', password: '' }, isLoggingIn: false,
         currentTab: 'explore', searchQuery: '', isSearching: false, searchResults: [], recommendResults: [], recommendRow1: [], recommendRow2: [], recommendRow3: [],
         serverDashboard: null, serverLatest: [], serverTopRated: [], serverGenres: [], serverTopMovies: [], serverTopSeries: [],
         showcaseModal: { open: false, isLoading: false, data: null }, queueModal: { open: false, activeTab: 'request' }, myQueue: [], myFeedbacks: [],
@@ -21,12 +21,12 @@ document.addEventListener('alpine:init', () => {
         toast: { show: false, message: '', type: 'success' }, feedbackModal: { open: false, itemName: '', posterPath: '', issueType: '缺少字幕', desc: '' }, feedbackIssues: ['缺少字幕', '字幕错位', '视频卡顿/花屏', '清晰度太低', '音轨无声/音画不同步', '其他问题'], isFeedbackSubmitting: false,
         posterStudio: { open: false, isLoading: false, isSaving: false, period: 'month', periodLabel: '本月 观影报告', data: null, useCoverBg: false, top1BgBase64: null, rankRows: [] },
 
-        async initTheme() { this.isDarkMode = document.documentElement.classList.contains('dark'); try { const res = await fetch('/api/requests/check'); const data = await res.json(); if (data.status === 'success') { this.isLoggedIn = true; this.userId = data.user.Id; this.userName = data.user.Name; this.expireDate = data.user.expire_date; this.serverUrl = data.server_url; this.loadServerData(); } } catch(e) {} this.isLoaded = true; },
+        async initTheme() { this.isDarkMode = document.documentElement.classList.contains('dark'); try { const res = await fetch('/api/requests/check'); const data = await res.json(); if (data.status === 'success') { this.isLoggedIn = true; this.userId = data.user.Id; this.userName = data.user.Name; this.expireDate = data.user.expire_date; this.serverUrl = data.server_url; this.serverId = data.server_id || ''; this.loadServerData(); } } catch(e) {} this.isLoaded = true; },
         handleScroll() { const st = window.pageYOffset || document.documentElement.scrollTop; this.scrolled = st > 50; this.isScrollingDown = st > this.lastScrollTop && st > 50; this.lastScrollTop = st <= 0 ? 0 : st; },
         toggleTheme() { this.isDarkMode = !this.isDarkMode; localStorage.setItem('ep_theme', this.isDarkMode ? 'dark' : 'light'); document.documentElement.classList.toggle('dark', this.isDarkMode); if (this.currentTab === 'profile' && this.statsLoaded) setTimeout(() => this.renderCharts(), 150); },
         showToast(msg, type = 'success') { this.toast = { show: true, message: msg, type }; setTimeout(() => this.toast.show = false, 3000); },
         async copyToClipboard(text) { try { await navigator.clipboard.writeText(text); } catch(e) { const input = document.createElement('input'); input.value = text; document.body.appendChild(input); input.select(); document.execCommand('copy'); document.body.removeChild(input); } },
-        async login() { if(!this.loginForm.username || !this.loginForm.password) return; this.isLoggingIn = true; try { const res = await fetch('/api/requests/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.loginForm) }); const data = await res.json(); if (data.status === 'success') { const checkRes = await fetch('/api/requests/check'); const checkData = await checkRes.json(); if (checkData.status === 'success') { this.userId = checkData.user.Id; this.userName = checkData.user.Name; this.expireDate = checkData.user.expire_date; this.serverUrl = checkData.server_url; } this.isLoggedIn = true; this.loadServerData(); this.showToast('登录成功'); } else { this.showToast(data.message, 'error'); } } catch(e) { this.showToast('网络错误', 'error'); } this.isLoggingIn = false; },
+        async login() { if(!this.loginForm.username || !this.loginForm.password) return; this.isLoggingIn = true; try { const res = await fetch('/api/requests/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.loginForm) }); const data = await res.json(); if (data.status === 'success') { const checkRes = await fetch('/api/requests/check'); const checkData = await checkRes.json(); if (checkData.status === 'success') { this.userId = checkData.user.Id; this.userName = checkData.user.Name; this.expireDate = checkData.user.expire_date; this.serverUrl = checkData.server_url; this.serverId = checkData.server_id || ''; } this.isLoggedIn = true; this.loadServerData(); this.showToast('登录成功'); } else { this.showToast(data.message, 'error'); } } catch(e) { this.showToast('网络错误', 'error'); } this.isLoggingIn = false; },
         async logout() { try { await fetch('/api/requests/logout', { method: 'POST' }); this.isLoggedIn = false; } catch (e) {} },
 
         async loadServerData() { 
@@ -84,9 +84,11 @@ document.addEventListener('alpine:init', () => {
         },
         getEmbyItemUrl(item) {
             const base = (this.serverUrl || '').replace(/\/$/, '');
-            const id = item?.Id || item?.ItemId;
-            if (!base || !id) return '';
-            return `${base}/web/index.html#!/item?id=${id}`;
+            const jumpId = item?.SeriesId || item?.Id || item?.ItemId;
+            const sid = item?.ServerId || this.serverId || '';
+            if (!base || !jumpId) return '';
+            const serverParam = sid ? `&serverId=${sid}` : '';
+            return `${base}/web/index.html#!/item?id=${jumpId}${serverParam}`;
         },
         openInEmby(item) {
             const url = this.getEmbyItemUrl(item);
