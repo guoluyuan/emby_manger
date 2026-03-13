@@ -41,7 +41,12 @@
                         <div class="text-[11px] font-bold text-slate-500 dark:text-zinc-500">本片已收录，快去观看吧</div>
                     </div>
                 </div>
-                <i class="fa-solid fa-circle-check text-brand-500 text-xl"></i>
+                <div class="flex items-center gap-2">
+                    <button @click="openInEmby(showcaseModal.data)" x-show="getEmbyItemUrl(showcaseModal.data)" class="px-3 py-2 rounded-xl bg-brand-500 text-white text-xs font-black shadow-sm hover:bg-brand-600 transition-colors">
+                        <i class="fa-solid fa-play mr-1"></i> 去 Emby 播放
+                    </button>
+                    <i class="fa-solid fa-circle-check text-brand-500 text-xl"></i>
+                </div>
             </div>
         </div>
     </div>

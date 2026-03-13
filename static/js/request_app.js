@@ -82,6 +82,17 @@ document.addEventListener('alpine:init', () => {
                 } 
             } catch(e) {} finally { this.showcaseModal.isLoading = false; } 
         },
+        getEmbyItemUrl(item) {
+            const base = (this.serverUrl || '').replace(/\/$/, '');
+            const id = item?.Id || item?.ItemId;
+            if (!base || !id) return '';
+            return `${base}/web/index.html#!/item?id=${id}`;
+        },
+        openInEmby(item) {
+            const url = this.getEmbyItemUrl(item);
+            if (!url) { this.showToast('未配置 Emby 访问地址', 'error'); return; }
+            window.open(url, '_blank');
+        },
        closeShowcaseModal() { this.showcaseModal.open = false; document.body.style.overflow = ''; },
         openQueueModal(tab) { this.queueModal.activeTab = tab; this.queueModal.open = true; document.body.style.overflow = 'hidden'; if(tab === 'request') this.loadQueue(); else this.loadMyFeedback(); },
         closeQueueModal() { this.queueModal.open = false; document.body.style.overflow = ''; },
