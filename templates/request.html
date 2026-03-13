@@ -14,7 +14,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="/static/js/alpine.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.bootcdn.net/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+    
     
     <script>
         tailwind.config = {
@@ -72,9 +72,15 @@
         </nav>
 
         <main class="pt-24 mx-auto px-4 pb-12 sm:pb-28 transition-all duration-300" :class="currentTab === 'profile' ? 'max-w-6xl' : 'max-w-7xl'">
-            <div x-show="currentTab === 'explore'"> {% include 'request/tab_explore.html' %} </div>
-            <div x-show="currentTab === 'request'"> {% include 'request/tab_search.html' %} </div>
-            <div x-show="currentTab === 'profile'"> {% include 'request/tab_profile.html' %} </div>
+            <template x-if="currentTab === 'explore'">
+                <div>{% include 'request/tab_explore.html' %}</div>
+            </template>
+            <template x-if="currentTab === 'request'">
+                <div>{% include 'request/tab_search.html' %}</div>
+            </template>
+            <template x-if="currentTab === 'profile'">
+                <div>{% include 'request/tab_profile.html' %}</div>
+            </template>
         </main>
 
         {% include 'request/nav_bottom.html' %}

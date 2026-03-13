@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from app.routers import dedupe
 from app.routers import notify_rules
 from app.routers import system_tools
@@ -128,6 +129,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# ------------------------------------------------------------------------------
+# 通用安全头 + 压缩
+# ------------------------------------------------------------------------------
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        return response
+
 # CSRF protection for session-authenticated requests
 class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -150,8 +161,29 @@ if not cors_origins:
     cors_origins = ["http://localhost", "http://127.0.0.1"]
 app.add_middleware(CORSMiddleware, allow_origins=cors_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+# 压缩 + 安全头放在外层
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
+try:
+    from brotli_asgi import BrotliMiddleware
+    app.add_middleware(BrotliMiddleware, quality=4)
+except Exception:
+    pass
+
 # 静态文件
-app.mount("/static", StaticFiles(directory="static"), name="static")
+class CacheControlStaticFiles(StaticFiles):
+    def __init__(self, *args, cache_control: str = "public, max-age=604800", **kwargs):
+        super().__init__(*args, **kwargs)
+        self.cache_control = cache_control
+
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200 and "Cache-Control" not in response.headers:
+            response.headers["Cache-Control"] = self.cache_control
+        return response
+
+app.mount("/static", CacheControlStaticFiles(directory="static"), name="static")
 
 # 注册路由
 app.include_router(views.router)

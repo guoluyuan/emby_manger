@@ -7,6 +7,8 @@ import logging
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import re
+import time
+from collections import deque
 
 # 初始化日志
 logger = logging.getLogger("uvicorn")
@@ -20,6 +22,29 @@ ext_session.mount('https://', HTTPAdapter(max_retries=retries, pool_connections=
 
 # 图片 ID 映射缓存
 smart_image_cache = {}
+smart_image_response_cache = {}
+smart_image_response_order = deque()
+SMART_IMAGE_CACHE_TTL = 3600
+SMART_IMAGE_CACHE_MAX = 200
+
+def _get_cached_smart_image(cache_key: str):
+    entry = smart_image_response_cache.get(cache_key)
+    if not entry:
+        return None
+    if entry["expires_at"] <= time.time():
+        smart_image_response_cache.pop(cache_key, None)
+        return None
+    return entry
+
+def _set_cached_smart_image(cache_key: str, content: bytes, content_type: str):
+    if cache_key in smart_image_response_cache:
+        smart_image_response_cache[cache_key] = {"content": content, "content_type": content_type, "expires_at": time.time() + SMART_IMAGE_CACHE_TTL}
+        return
+    if len(smart_image_response_order) >= SMART_IMAGE_CACHE_MAX:
+        oldest = smart_image_response_order.popleft()
+        smart_image_response_cache.pop(oldest, None)
+    smart_image_response_order.append(cache_key)
+    smart_image_response_cache[cache_key] = {"content": content, "content_type": content_type, "expires_at": time.time() + SMART_IMAGE_CACHE_TTL}
 
 def extract_season_number(name: str):
     """从名称中提取季号，例如 '唐朝诡事录 - 第 2 季' -> 2"""
@@ -75,12 +100,12 @@ def proxy_image(item_id: str, img_type: str):
         resp = media_api.get(f"/Items/{target_id}/Images/{img_type}", params=params, timeout=10, stream=True)
         
         if resp.status_code == 200:
-            return Response(content=resp.content, media_type=resp.headers.get("Content-Type", "image/jpeg"), headers={"Cache-Control": "public, max-age=3600"})
+            return Response(content=resp.content, media_type=resp.headers.get("Content-Type", "image/jpeg"), headers={"Cache-Control": "public, max-age=604800"})
         
         if resp.status_code == 404 and target_id != item_id:
             fallback_resp = media_api.get(f"/Items/{item_id}/Images/{img_type}", params=params, timeout=10, stream=True)
             if fallback_resp.status_code == 200:
-                 return Response(content=fallback_resp.content, media_type=fallback_resp.headers.get("Content-Type", "image/jpeg"), headers={"Cache-Control": "public, max-age=3600"})
+                 return Response(content=fallback_resp.content, media_type=fallback_resp.headers.get("Content-Type", "image/jpeg"), headers={"Cache-Control": "public, max-age=604800"})
     except Exception: pass
     return Response(status_code=404)
 
@@ -97,13 +122,22 @@ def proxy_smart_image(item_id: str, name: str = "", year: str = "", type: str = 
     
     if img_type.lower() == 'primary' and target_id == item_id:
         target_id = get_real_image_id_robust(target_id)
+    cache_key = f"{target_id}:{img_type.lower()}:{params.get('maxWidth','')}:{params.get('maxHeight','')}"
+    cached = _get_cached_smart_image(cache_key)
+    if cached:
+        return Response(
+            content=cached["content"],
+            media_type=cached["content_type"] or "image/jpeg",
+            headers={"Cache-Control": "public, max-age=604800"}
+        )
         
     # 2. 第 1 级防御：正常请求媒体库 (使用 media_api)
     primary_failed = False
     try:
         resp = media_api.get(f"/Items/{target_id}/Images/{img_type}", params=params, timeout=5, stream=True)
         if resp.status_code == 200:
-            return Response(content=resp.content, media_type=resp.headers.get("Content-Type", "image/jpeg"), headers={"Cache-Control": "public, max-age=86400"})
+            _set_cached_smart_image(cache_key, resp.content, resp.headers.get("Content-Type", "image/jpeg"))
+            return Response(content=resp.content, media_type=resp.headers.get("Content-Type", "image/jpeg"), headers={"Cache-Control": "public, max-age=604800"})
         if img_type.lower() == 'primary':
             primary_failed = True
     except requests.exceptions.RequestException as e: 
@@ -117,14 +151,16 @@ def proxy_smart_image(item_id: str, name: str = "", year: str = "", type: str = 
             bd_params = {"maxWidth": 1280, "quality": 80}
             bd_resp = media_api.get(f"/Items/{target_id}/Images/Backdrop", params=bd_params, timeout=5, stream=True)
             if bd_resp.status_code == 200:
-                return Response(content=bd_resp.content, media_type=bd_resp.headers.get("Content-Type", "image/jpeg"), headers={"Cache-Control": "public, max-age=86400"})
+                _set_cached_smart_image(cache_key, bd_resp.content, bd_resp.headers.get("Content-Type", "image/jpeg"))
+                return Response(content=bd_resp.content, media_type=bd_resp.headers.get("Content-Type", "image/jpeg"), headers={"Cache-Control": "public, max-age=604800"})
         except requests.exceptions.RequestException:
             pass
         try:
             th_params = {"maxWidth": 800, "quality": 80}
             th_resp = media_api.get(f"/Items/{target_id}/Images/Thumb", params=th_params, timeout=5, stream=True)
             if th_resp.status_code == 200:
-                return Response(content=th_resp.content, media_type=th_resp.headers.get("Content-Type", "image/jpeg"), headers={"Cache-Control": "public, max-age=86400"})
+                _set_cached_smart_image(cache_key, th_resp.content, th_resp.headers.get("Content-Type", "image/jpeg"))
+                return Response(content=th_resp.content, media_type=th_resp.headers.get("Content-Type", "image/jpeg"), headers={"Cache-Control": "public, max-age=604800"})
         except requests.exceptions.RequestException:
             pass
 

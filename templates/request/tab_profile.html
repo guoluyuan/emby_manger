@@ -9,7 +9,7 @@
             <div class="lg:col-span-1 glass-panel p-6 sm:p-8 rounded-3xl flex flex-col items-center justify-center gap-3 relative overflow-hidden text-center border-t border-white/40 dark:border-white/5 shadow-lg">
                 <div class="absolute inset-0 bg-gradient-to-b from-brand-500/5 to-transparent z-0"></div>
                 <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full shadow-xl overflow-hidden shrink-0 bg-slate-200 ring-4 ring-white dark:ring-[#0f0f0f] z-10 relative">
-                    <img :src="'/api/proxy/user_image/' + userId" class="w-full h-full object-cover" onerror="this.src='https://api.dicebear.com/9.x/notionists/png?seed=User'">
+                    <img :src="'/api/proxy/user_image/' + userId" loading="lazy" decoding="async" class="w-full h-full object-cover" onerror="this.src='https://api.dicebear.com/9.x/notionists/png?seed=User'">
                 </div>
                 <div class="z-10 mt-1">
                     <h3 class="text-2xl font-black text-slate-900 dark:text-white flex items-center justify-center gap-2">
@@ -46,7 +46,7 @@
             <div class="lg:col-span-2 flex flex-col gap-5">
                 <div class="glass-panel p-5 rounded-3xl flex gap-4 sm:gap-6 items-center relative overflow-hidden border-t border-white/40 dark:border-white/5 flex-1" x-show="userStats?.top_fav">
                     <div class="absolute inset-0 bg-cover bg-center opacity-10 dark:opacity-20 blur-2xl" :style="`background-image: url(/api/proxy/smart_image?item_id=${userStats?.top_fav?.ItemId}&type=Primary)`"></div>
-                    <img :src="`/api/proxy/smart_image?item_id=${userStats?.top_fav?.ItemId}&type=Primary`" class="w-24 h-36 rounded-xl shadow-lg object-cover relative z-10 ring-2 ring-white/50 dark:ring-white/10">
+                    <img :src="`/api/proxy/smart_image?item_id=${userStats?.top_fav?.ItemId}&type=Primary`" loading="lazy" decoding="async" class="w-24 h-36 rounded-xl shadow-lg object-cover relative z-10 ring-2 ring-white/50 dark:ring-white/10">
                     <div class="relative z-10 flex-1">
                         <div class="text-[11px] font-black text-rose-500 tracking-widest uppercase mb-1.5"><i class="fa-solid fa-heart mr-1 text-sm"></i> 执念最爱</div>
                         <h4 class="font-black text-xl text-slate-900 dark:text-white line-clamp-2 leading-tight mb-3" x-text="userStats?.top_fav?.ItemName || userStats?.top_fav?.Name"></h4>
@@ -112,7 +112,7 @@
                 <template x-for="log in (userStats?.logs || []).slice(0, 14)" :key="log.DateCreated || log.ItemId">
                     <div class="flex justify-between items-center bg-white/50 dark:bg-white/5 p-2.5 rounded-2xl border border-slate-100 dark:border-white/5 hover:bg-white dark:hover:bg-white/10 transition-colors group cursor-pointer" @click="openShowcaseModal(log.ItemId, {Name: log.ItemName || log.Name})">
                         
-                        <img :src="`/api/proxy/smart_image?item_id=${log.ItemId}&type=Primary`" 
+                        <img :src="`/api/proxy/smart_image?item_id=${log.ItemId}&type=Primary`" loading="lazy" decoding="async"
                              class="w-10 h-14 rounded-lg object-cover bg-slate-200 dark:bg-[#111] shrink-0 mr-3 shadow-sm" 
                              @error="window.fallbackPoster($el, log.ItemName || log.Name)">
                         

@@ -13,13 +13,14 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('requestApp', () => ({
         scrolled: false, lastScrollTop: 0, isScrollingDown: false, isLoaded: false, isLoggedIn: false, isDarkMode: false,
         userId: '', userName: '', expireDate: '未知', serverUrl: '', serverUrlLocal: '', serverUrlPublic: '', serverId: '', showServerUrl: false, loginForm: { username: '', password: '', captcha: '' }, captchaQuestion: '', isLoggingIn: false,
-        currentTab: 'explore', searchQuery: '', isSearching: false, searchResults: [], recommendResults: [], recommendRow1: [], recommendRow2: [], recommendRow3: [],
+        currentTab: 'explore', searchQuery: '', isSearching: false, searchResults: [], recommendResults: [], recommendRow1: [], recommendRow2: [], recommendRow3: [], recommendLoaded: false,
         serverDashboard: null, serverLatest: [], serverTopRated: [], serverGenres: [], serverTopMovies: [], serverTopSeries: [],
         showcaseModal: { open: false, isLoading: false, data: null }, queueModal: { open: false, activeTab: 'request' }, myQueue: [], myRequestMap: {}, myFeedbacks: [],
         userStats: null, userBadges: [], userTrend: null, isStatsLoading: false, statsLoaded: false, charts: { hour: null, device: null, client: null, trend: null },
         isModalOpen: false, activeItem: null, tvSeasons: [], isLoadingSeasons: false, isCheckingLocal: false, selectedSeasons: [], isSubmitting: false,
         toast: { show: false, message: '', type: 'success' }, feedbackModal: { open: false, itemName: '', posterPath: '', issueType: '缺少字幕', desc: '' }, feedbackIssues: ['缺少字幕', '字幕错位', '视频卡顿/花屏', '清晰度太低', '音轨无声/音画不同步', '其他问题'], isFeedbackSubmitting: false,
         posterStudio: { open: false, isLoading: false, isSaving: false, period: 'month', periodLabel: '本月 观影报告', data: null, useCoverBg: false, top1BgBase64: null, rankRows: [] },
+        html2canvasPromise: null,
 
         async initTheme() { this.isDarkMode = document.documentElement.classList.contains('dark'); try { const res = await fetch('/api/requests/check'); const data = await res.json(); if (data.status === 'success') { this.isLoggedIn = true; this.userId = data.user.Id; this.userName = data.user.Name; this.expireDate = data.user.expire_date; this.serverUrlLocal = data.server_url_local || ''; this.serverUrlPublic = data.server_url_public || ''; this.serverUrl = await this.pickBestServerUrl(); this.serverId = data.server_id || ''; this.loadServerData(); } } catch(e) {} this.isLoaded = true; this.refreshCaptcha(); },
         handleScroll() { const st = window.pageYOffset || document.documentElement.scrollTop; this.scrolled = st > 50; this.isScrollingDown = st > this.lastScrollTop && st > 50; this.lastScrollTop = st <= 0 ? 0 : st; },
@@ -76,7 +77,7 @@ document.addEventListener('alpine:init', () => {
                 if (topM.status === 'success') this.serverTopMovies = topM.data; 
                 if (topS.status === 'success') this.serverTopSeries = topS.data; if (topS.status !== 'success' || !topS.data || topS.data.length === 0) { try { const fallbackS = await fetch('/api/stats/top_movies?user_id=all&category=Episode&sort_by=count').then(r => r.json()); if (fallbackS.status === 'success') this.serverTopSeries = fallbackS.data.slice(0, 10); } catch(e) {} } 
             } catch(e) {} 
-            this.loadRecommendations();
+            if (this.currentTab === 'request' && !this.recommendLoaded) this.loadRecommendations();
         },
 
         async loadRecommendations() {
@@ -90,11 +91,12 @@ document.addEventListener('alpine:init', () => {
                     this.recommendRow1 = validItems.slice(0, third);
                     this.recommendRow2 = validItems.slice(third, third * 2);
                     this.recommendRow3 = validItems.slice(third * 2);
+                    this.recommendLoaded = true;
                 } 
             } catch(e) { console.log("无热门数据"); }
         },
 
-        switchTab(tab) { this.currentTab = tab; this.$nextTick(() => window.scrollTo(0, 0)); if (tab === 'profile') { if (!this.statsLoaded) this.loadProfileStats(); else setTimeout(() => this.renderCharts(), 150); } },
+        switchTab(tab) { this.currentTab = tab; this.$nextTick(() => window.scrollTo(0, 0)); if (tab === 'profile') { if (!this.statsLoaded) this.loadProfileStats(); else setTimeout(() => this.renderCharts(), 150); } if (tab === 'request' && !this.recommendLoaded) this.loadRecommendations(); },
 
         async openShowcaseModal(itemId, fallbackItem = null) { 
             const finalId = itemId || (fallbackItem ? fallbackItem.ItemId || fallbackItem.Id : ''); 
@@ -227,7 +229,20 @@ document.addEventListener('alpine:init', () => {
         async loadQueue() { try { const res = await fetch('/api/requests/my'); const data = await res.json(); if (data.status === 'success') { this.myQueue = data.data; this.buildMyRequestMap(data.data); } } catch (e) {} },
         async loadMyFeedback() { try { const res = await fetch('/api/requests/feedback/my'); const data = await res.json(); if (data.status === 'success') this.myFeedbacks = data.data; } catch (e) {} },
         
-        async openMyPosterStudio() { this.posterStudio.open = true; document.body.style.overflow = 'hidden'; this.setMyPosterTheme('#1a1a1a', 'white', '#eab308'); await this.setMyPosterPeriod('month'); },
+        ensureHtml2Canvas() {
+            if (window.html2canvas) return Promise.resolve();
+            if (this.html2canvasPromise) return this.html2canvasPromise;
+            this.html2canvasPromise = new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.bootcdn.net/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                script.async = true;
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error('html2canvas load failed'));
+                document.head.appendChild(script);
+            });
+            return this.html2canvasPromise;
+        },
+        async openMyPosterStudio() { this.posterStudio.open = true; document.body.style.overflow = 'hidden'; this.setMyPosterTheme('#1a1a1a', 'white', '#eab308'); this.ensureHtml2Canvas().catch(() => {}); await this.setMyPosterPeriod('month'); },
         closeMyPosterStudio() { this.posterStudio.open = false; document.body.style.overflow = ''; },
         setMyPosterTheme(bg, text, hl) { const canvas = document.getElementById('my-capture-target'); if(!canvas) return; canvas.style.setProperty('--p-theme-bg', bg); canvas.style.setProperty('--p-theme-text', text); canvas.style.setProperty('--p-theme-highlight', hl); this.posterStudio.useCoverBg = false; document.getElementById('my-poster-bg-img').style.opacity = '0'; if(text === '#333') { canvas.style.setProperty('--p-theme-pill-bg', '#e5e7eb'); canvas.style.setProperty('--p-theme-pill-text', '#1f2937'); canvas.style.setProperty('--p-theme-card', 'rgba(0,0,0,0.03)'); document.getElementById('my-poster-bg-gradient').style.background = 'transparent'; document.getElementById('my-p-footer').style.color = 'rgba(0,0,0,0.3)'; } else { canvas.style.setProperty('--p-theme-pill-bg', 'rgba(255,255,255,0.15)'); canvas.style.setProperty('--p-theme-pill-text', 'white'); canvas.style.setProperty('--p-theme-card', 'rgba(255,255,255,0.08)'); document.getElementById('my-poster-bg-gradient').style.background = 'linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.5))'; document.getElementById('my-p-footer').style.color = 'rgba(255,255,255,0.4)'; } },
         toggleMyCoverBg() { this.posterStudio.useCoverBg = !this.posterStudio.useCoverBg; const bgImg = document.getElementById('my-poster-bg-img'); const canvas = document.getElementById('my-capture-target'); if(!this.posterStudio.useCoverBg) { bgImg.style.opacity = '0'; if(canvas.style.getPropertyValue('--p-theme-text') === '#333') document.getElementById('my-poster-bg-gradient').style.background = 'transparent'; else document.getElementById('my-poster-bg-gradient').style.background = 'linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.5))'; } else { bgImg.style.opacity = '1'; canvas.style.setProperty('--p-theme-card', 'rgba(255,255,255,0.08)'); canvas.style.setProperty('--p-theme-pill-bg', 'rgba(255,255,255,0.15)'); canvas.style.setProperty('--p-theme-pill-text', 'white'); canvas.style.setProperty('--p-theme-text', 'white'); document.getElementById('my-poster-bg-gradient').style.background = 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.8) 100%)'; document.getElementById('my-p-footer').style.color = 'rgba(255,255,255,0.5)'; if(this.posterStudio.top1BgBase64) bgImg.style.backgroundImage = `url('${this.posterStudio.top1BgBase64}')`; } },
@@ -236,7 +251,7 @@ document.addEventListener('alpine:init', () => {
             this.posterStudio.rankRows = Array.from({ length: 7 }, (_, i) => ({ rank: i + 4, idx: i, item: list[i + 3] || null }));
             await this.$nextTick();
             for(let i=0; i<7; i++) { const imgEl = document.getElementById(`my-sm-img-${i}`); if(imgEl) { imgEl.removeAttribute('data-fallback-done'); imgEl.removeAttribute('src'); imgEl.style.objectFit = ""; imgEl.style.padding = ""; } }; const renderRank = async (rank, idx) => { if(list[idx]) { const realImg = document.getElementById(`my-rank${rank}-img`); if(!realImg) return; realImg.removeAttribute('data-fallback-done'); const b64 = await toBase64(`/api/proxy/smart_image?item_id=${list[idx].ItemId}&type=Primary`); if(b64) { realImg.src = b64; realImg.style.objectFit = "cover"; realImg.style.padding = "0"; if(rank === 1) { this.posterStudio.top1BgBase64 = await applyPhysicalBlur(b64); if(this.posterStudio.useCoverBg) document.getElementById('my-poster-bg-img').style.backgroundImage = `url('${this.posterStudio.top1BgBase64}')`; } } else { window.fallbackReportPoster(realImg, list[idx].ItemName); } } }; await Promise.all([renderRank(1, 0), renderRank(2, 1), renderRank(3, 2)]); const smPromises = []; const max = Math.min(list.length, 10); for(let i=3; i<max; i++) { smPromises.push((async () => { const b64 = await toBase64(`/api/proxy/smart_image?item_id=${list[i].ItemId}&type=Primary`); const imgEl = document.getElementById(`my-sm-img-${i-3}`); if(imgEl) { if(b64) { imgEl.src = b64; imgEl.style.objectFit = "cover"; } else window.fallbackReportPoster(imgEl, list[i].ItemName); } })()); } await Promise.all(smPromises); const area = document.getElementById('my-mood-area'); if(area) { area.innerHTML = ''; let html = ''; const mood = data.mood_data; if(mood) { if(mood.genres && mood.genres.length > 0) { const iconMap = {'剧情': '🎬', '喜剧': '😂', '动作': '⚔️', '科幻': '🛸', '悬疑': '🕵️‍♂️', '爱情': '❤️', '动画': '🦄', '恐怖': '👻', '犯罪': '🔪'}; let tagsHtml = ''; mood.genres.forEach(g => tagsHtml += `<div class="my-mood-tag-pill"><span>${iconMap[g]||'🏷️'}</span> <span>${g}</span></div>`); html += `<div class="my-mood-card"><div class="my-mood-title">观影基因重组</div><div class="my-mood-tags-container">${tagsHtml}</div></div>`; } if(mood.binge_day) html += `<div class="my-mood-card"><div class="my-mood-title">极度沉迷时刻</div><div class="my-mood-data-container"><div class="my-mood-data-box"><div class="my-mood-data-val">${mood.binge_day.date}</div><div class="my-mood-data-sub">这一天最疯狂</div></div><div class="my-mood-data-box"><div class="my-mood-data-val">${mood.binge_day.hours} H</div><div class="my-mood-data-sub">一口气看了</div></div></div></div>`; if(mood.late_night) html += `<div class="my-mood-card"><div class="my-mood-title">深夜刺客出没</div><div class="my-mood-data-container"><div class="my-mood-data-box" style="flex:1;"><div class="my-mood-data-val">凌晨 ${mood.late_night.time}</div><div class="my-mood-data-sub">正在看: ${mood.late_night.name}</div></div></div></div>`; } area.innerHTML = html; } } this.$nextTick(() => { const wrapper = document.getElementById('my-poster-preview-area'); const scaleWrapper = document.getElementById('my-scale-wrapper'); if(wrapper && scaleWrapper) { const scale = Math.min((wrapper.clientWidth - 40) / 400, 1); scaleWrapper.style.transform = `scale(${scale})`; } }); } catch(e) {} this.posterStudio.isLoading = false; },
-        async saveMyPoster() { this.posterStudio.isSaving = true; const scaleWrapper = document.getElementById('my-scale-wrapper'); const oldT = scaleWrapper.style.transform; document.getElementById('my-poster-preview-area').scrollTo(0, 0); scaleWrapper.style.transform = 'none'; await new Promise(r => setTimeout(r, 500)); try { const canvas = await html2canvas(document.getElementById('my-capture-target'), { scale: 2, useCORS: true, backgroundColor: null, scrollY: 0, scrollX: 0 }); const link = document.createElement('a'); link.download = `EmbyPulse_${this.userName}.png`; link.href = canvas.toDataURL(); link.click(); this.showToast('海报已保存！'); } catch(e) { this.showToast('生成失败', 'error'); } finally { scaleWrapper.style.transform = oldT; this.posterStudio.isSaving = false; } }
+        async saveMyPoster() { this.posterStudio.isSaving = true; const scaleWrapper = document.getElementById('my-scale-wrapper'); const oldT = scaleWrapper.style.transform; document.getElementById('my-poster-preview-area').scrollTo(0, 0); scaleWrapper.style.transform = 'none'; await new Promise(r => setTimeout(r, 500)); try { await this.ensureHtml2Canvas(); const canvas = await html2canvas(document.getElementById('my-capture-target'), { scale: 2, useCORS: true, backgroundColor: null, scrollY: 0, scrollX: 0 }); const link = document.createElement('a'); link.download = `EmbyPulse_${this.userName}.png`; link.href = canvas.toDataURL(); link.click(); this.showToast('海报已保存！'); } catch(e) { this.showToast('生成失败', 'error'); } finally { scaleWrapper.style.transform = oldT; this.posterStudio.isSaving = false; } }
     }));
 });
 

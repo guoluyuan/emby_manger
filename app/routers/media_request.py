@@ -26,6 +26,7 @@ from app.core.security import (
 router = APIRouter()
 
 _server_id_cache = {"value": "", "expires_at": 0}
+_trending_cache = {"data": [], "expires_at": 0}
 
 def _get_server_id_cached(host: str, key: str):
     now = int(time.time())
@@ -360,6 +361,9 @@ def get_tmdb_trending(request: Request):
     tmdb_key = cfg.get("tmdb_api_key")
     proxy = cfg.get("proxy_url"); proxies = {"https": proxy} if proxy else None
     try:
+        now = int(time.time())
+        if _trending_cache["data"] and _trending_cache["expires_at"] > now:
+            return JSONResponse(content={"status": "success", "data": _trending_cache["data"]}, headers={"Cache-Control": "public, max-age=600"})
         results = []
         for page in [1, 2]:
             res = requests.get(f"https://api.themoviedb.org/3/trending/all/week?api_key={tmdb_key}&language=zh-CN&page={page}", proxies=proxies, timeout=10).json()
@@ -375,7 +379,9 @@ def get_tmdb_trending(request: Request):
                         "vote_average": round(i.get('vote_average', 0), 1), 
                         "local_status": -1
                     })
-        return {"status": "success", "data": results}
+        _trending_cache["data"] = results
+        _trending_cache["expires_at"] = now + 600
+        return JSONResponse(content={"status": "success", "data": results}, headers={"Cache-Control": "public, max-age=600"})
     except Exception as e: 
         return {"status": "error", "message": str(e)}
 

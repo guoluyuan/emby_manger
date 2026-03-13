@@ -1,10 +1,13 @@
 import os
 import requests
+import ipaddress
+import urllib.parse
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from app.core.config import cfg
 from app.core.database import query_db
+from app.core.security import get_client_ip
 import logging
 import random
 
@@ -14,6 +17,39 @@ router = APIRouter()
 
 APP_VERSION = os.environ.get("APP_VERSION", "1.2.0.Dev.20260314.2")
 REQUEST_ASSET_VER = os.environ.get("REQUEST_ASSET_VER") or "20260314.2"
+
+def _extract_host_ip(url: str):
+    try:
+        parsed = urllib.parse.urlparse(url)
+        host = parsed.hostname
+        if not host:
+            return None
+        try:
+            return str(ipaddress.ip_address(host))
+        except ValueError:
+            import socket
+            try:
+                return socket.gethostbyname(host)
+            except:
+                return host
+    except:
+        return None
+
+def _same_lan(ip_a: str, ip_b: str):
+    try:
+        a = ipaddress.ip_address(ip_a)
+        b = ipaddress.ip_address(ip_b)
+        if a.version != b.version:
+            return False
+        if a.is_loopback:
+            # 访问 localhost 时，允许连接到内网 Emby
+            return b.is_loopback or b.is_private
+        if not (a.is_private and b.is_private):
+            return False
+        net = ipaddress.ip_network(f"{a}/24", strict=False)
+        return b in net
+    except:
+        return False
 
 def check_login(request: Request):
     user = request.session.get("user")
@@ -66,8 +102,12 @@ async def get_service_worker():
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     if not check_login(request): return RedirectResponse("/login")
-    emby_url = cfg.get("emby_public_url") or cfg.get("emby_public_host") or cfg.get("emby_host") or ""
-    if emby_url.endswith('/'): emby_url = emby_url[:-1]
+    host_url = (cfg.get("emby_host") or "").rstrip("/")
+    public_url = (cfg.get("emby_public_url") or cfg.get("emby_external_url") or cfg.get("emby_public_host") or "").rstrip("/")
+    client_ip = get_client_ip(request)
+    host_ip = _extract_host_ip(host_url) if host_url else None
+    use_local = bool(client_ip and host_ip and _same_lan(client_ip, host_ip))
+    emby_url = host_url if use_local else (public_url or host_url)
     server_id = ""
     try:
         sys_res = requests.get(f"{cfg.get('emby_host')}/emby/System/Info?api_key={cfg.get('emby_api_key')}", timeout=2)
