@@ -393,27 +393,26 @@
 
     <div id="sys-log-modal" class="fixed inset-0 z-[120] hidden opacity-0 transition-opacity duration-200">
         <div class="absolute inset-0 bg-black/60 backdrop-blur-md" onclick="closeLogModal()"></div>
-        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-4xl bg-[#1E1E1E] rounded-[16px] shadow-2xl border border-gray-700 overflow-hidden flex flex-col transform scale-95 transition-transform duration-200 h-[70vh]">
-            <div class="px-4 py-2.5 border-b border-gray-800 flex justify-between items-center bg-[#2D2D2D] shrink-0 select-none">
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-4xl bg-white dark:bg-apple-cardDark rounded-[24px] shadow-2xl border border-gray-200 dark:border-white/5 overflow-hidden flex flex-col transform scale-95 transition-transform duration-200 h-[75vh]">
+            <div class="px-5 py-3.5 border-b border-gray-100 dark:border-white/5 flex justify-between items-center bg-gray-50/50 dark:bg-black/20 shrink-0 select-none">
                 <div class="flex items-center gap-2 w-1/4">
-                    <div class="w-3 h-3 rounded-full bg-red-500 cursor-pointer hover:bg-red-400 transition-colors" onclick="closeLogModal()"></div>
-                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    <button onclick="closeLogModal()" class="w-3.5 h-3.5 rounded-full bg-red-400 hover:bg-red-500 transition-colors flex items-center justify-center border border-black/10 dark:border-transparent"></button>
+                    <div class="w-3.5 h-3.5 rounded-full bg-amber-400 border border-black/10 dark:border-transparent"></div>
+                    <div class="w-3.5 h-3.5 rounded-full bg-green-400 border border-black/10 dark:border-transparent"></div>
                 </div>
-                <div class="flex-1 text-center font-mono text-[12px] text-gray-400 font-bold tracking-wider">
-                    <i class="fa-solid fa-terminal mr-1"></i> pulse.log
+                <div class="flex-1 text-center font-mono text-[13px] font-bold text-gray-600 dark:text-gray-400">
+                    <i class="fa-solid fa-terminal mr-1"></i> 系统运行日志 (实时内存流)
                 </div>
                 <div class="w-1/4 flex justify-end items-center gap-2">
-                    <span class="text-[10px] font-mono font-bold text-gray-500">DEBUG 模式</span>
+                    <span class="text-[11px] font-bold text-gray-500">DEBUG 模式</span>
                     <label class="relative inline-flex items-center cursor-pointer" title="开启将输出更详细的请求与报错信息">
                         <input type="checkbox" id="debug-toggle-cb" class="sr-only peer" onchange="toggleDebugMode()">
-                        <div class="w-8 h-4 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-green-500 shadow-inner"></div>
+                        <div class="w-8 h-4 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-brand-500 shadow-inner"></div>
                     </label>
                 </div>
             </div>
-            
-            <div class="p-4 overflow-y-auto mac-scrollbar flex-1 font-mono text-[12px] leading-relaxed text-green-400/90 whitespace-pre-wrap break-all" id="log-terminal">
-                [SYSTEM] Initializing EmbyPulse Log Stream...
+            <div class="p-4 overflow-y-auto mac-scrollbar flex-1 font-mono text-[12px] md:text-[13px] leading-relaxed text-gray-700 dark:text-gray-300 bg-gray-50/30 dark:bg-black/10 whitespace-pre-wrap break-all" id="log-terminal">
+                [SYSTEM] 正在连接内存日志总线...
                 <span class="animate-pulse">_</span>
             </div>
         </div>
@@ -716,13 +715,12 @@
             }
         }
 
-        // 3. 运行日志控制台
+        // 3. 运行日志控制台 (从内存读取并自适应暗/亮色)
         let logInterval = null;
         function openLogModal() {
             const modal = document.getElementById('sys-log-modal'); const container = modal.querySelector('div:nth-child(2)');
             modal.classList.remove('hidden'); void modal.offsetWidth; modal.classList.remove('opacity-0'); container.classList.remove('scale-95');
             fetchLogs();
-            // 每 3 秒自动轮询刷新日志
             logInterval = setInterval(fetchLogs, 3000);
         }
         function closeLogModal() {
@@ -736,12 +734,9 @@
                 const json = await res.json();
                 const term = document.getElementById('log-terminal');
                 
-                // 判断当前是否滚动到底部（防止用户正在往上翻看日志时，被自动拉到底部）
                 const isScrolledToBottom = term.scrollHeight - term.clientHeight <= term.scrollTop + 50;
                 
                 if(json.success && json.data) {
-                    term.innerHTML = json.data.replace(/</g, "&lt;").replace(/>/g, "&gt;") + "\n<span class='animate-pulse'>_</span>";
-                } else if(json.data) {
                     term.innerHTML = json.data.replace(/</g, "&lt;").replace(/>/g, "&gt;") + "\n<span class='animate-pulse'>_</span>";
                 }
                 
