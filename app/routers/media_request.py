@@ -3,7 +3,10 @@ import requests
 import json
 import time
 import secrets
+import ipaddress
+import urllib.parse
 from fastapi import APIRouter, Request, Depends
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional, List
 
@@ -12,8 +15,55 @@ from app.core.config import cfg, REPORT_COVER_URL
 from app.core.database import DB_PATH, query_db, add_sys_notification
 from app.schemas.models import MediaRequestSubmitModel as BaseSubmitModel
 from app.services.bot_service import bot
+from app.core.security import (
+    get_client_ip,
+    get_lock_status,
+    record_failure,
+    reset_failures,
+    validate_captcha
+)
 
 router = APIRouter()
+
+_server_id_cache = {"value": "", "expires_at": 0}
+
+def _get_server_id_cached(host: str, key: str):
+    now = int(time.time())
+    if _server_id_cache["value"] and _server_id_cache["expires_at"] > now:
+        return _server_id_cache["value"]
+    if not host or not key:
+        return ""
+    try:
+        sys_res = requests.get(f"{host}/emby/System/Info?api_key={key}", timeout=5)
+        if sys_res.status_code == 200:
+            _server_id_cache["value"] = sys_res.json().get("Id", "")
+            _server_id_cache["expires_at"] = now + 300
+            return _server_id_cache["value"]
+    except:
+        pass
+    return ""
+
+def _extract_host_ip(url: str):
+    try:
+        parsed = urllib.parse.urlparse(url)
+        return parsed.hostname
+    except:
+        return None
+
+def _same_lan(ip_a: str, ip_b: str):
+    try:
+        a = ipaddress.ip_address(ip_a)
+        b = ipaddress.ip_address(ip_b)
+        if a.version != b.version:
+            return False
+        if a.is_loopback and b.is_loopback:
+            return True
+        if not (a.is_private and b.is_private):
+            return False
+        net = ipaddress.ip_network(f\"{a}/24\", strict=False)
+        return b in net
+    except:
+        return False
 
 def ensure_db_schema():
     conn = sqlite3.connect(DB_PATH)
@@ -129,7 +179,9 @@ class BulkAdminActionModel(BaseModel):
     reject_reason: Optional[str] = None
 
 class RequestLoginModel(BaseModel):
-    username: str; password: str
+    username: str
+    password: str
+    captcha: str
 
 class FeedbackSubmitModel(BaseModel):
     item_name: str
@@ -147,6 +199,21 @@ class BulkFeedbackActionModel(BaseModel):
 
 @router.post("/api/requests/auth")
 def request_system_login(data: RequestLoginModel, request: Request):
+    ip = get_client_ip(request)
+    locked, locked_until, _ = get_lock_status(ip, "request")
+    if locked:
+        remain_min = max(1, int((locked_until - int(time.time())) / 60) + 1)
+        return JSONResponse(status_code=429, content={"status": "error", "message": f"失败次数过多，已锁定 {remain_min} 分钟"})
+
+    ok, msg = validate_captcha(request, data.captcha)
+    if not ok:
+        locked_until, failed = record_failure(ip, "request", max_fail=3, lock_seconds=3600)
+        if locked_until and locked_until > int(time.time()):
+            remain_min = max(1, int((locked_until - int(time.time())) / 60) + 1)
+            return JSONResponse(status_code=429, content={"status": "error", "message": f"失败次数过多，已锁定 {remain_min} 分钟"})
+        remaining = max(0, 3 - failed)
+        return {"status": "error", "message": f"{msg}，剩余 {remaining} 次"}
+
     host = cfg.get("emby_host")
     if not host: return {"status": "error", "message": "未配置 Emby 服务器"}
     headers = {"X-Emby-Authorization": 'MediaBrowser Client="EmbyPulse", Device="Web", DeviceId="PulseRequestApp", Version="2.0"'}
@@ -156,8 +223,14 @@ def request_system_login(data: RequestLoginModel, request: Request):
             user_info = res.json().get("User", {})
             request.session["req_user"] = {"Id": user_info.get("Id"), "Name": user_info.get("Name")}
             request.session["csrf_token"] = secrets.token_urlsafe(32)
+            reset_failures(ip, "request")
             return {"status": "success"}
-        return {"status": "error", "message": "账号或密码错误"}
+        locked_until, failed = record_failure(ip, "request", max_fail=3, lock_seconds=3600)
+        if locked_until and locked_until > int(time.time()):
+            remain_min = max(1, int((locked_until - int(time.time())) / 60) + 1)
+            return JSONResponse(status_code=429, content={"status": "error", "message": f"失败次数过多，已锁定 {remain_min} 分钟"})
+        remaining = max(0, 3 - failed)
+        return {"status": "error", "message": f"账号或密码错误，剩余 {remaining} 次"}
     except Exception as e: return {"status": "error", "message": f"连接失败: {str(e)}"}
 
 @router.get("/api/requests/check")
@@ -173,17 +246,13 @@ def check_auth(request: Request):
                     expire_date = row[0]['expire_date']
             except: pass
             
-        emby_url = cfg.get("emby_public_url") or cfg.get("emby_external_url") or cfg.get("emby_host") or ""
-        server_id = ""
-        try:
-            host = (cfg.get("emby_host") or "").rstrip('/')
-            key = cfg.get("emby_api_key")
-            if host and key:
-                sys_res = requests.get(f"{host}/emby/System/Info?api_key={key}", timeout=5)
-                if sys_res.status_code == 200:
-                    server_id = sys_res.json().get("Id", "")
-        except: 
-            server_id = ""
+        host = (cfg.get("emby_host") or "").rstrip('/')
+        public_url = (cfg.get("emby_public_url") or cfg.get("emby_external_url") or "").rstrip('/')
+        client_ip = get_client_ip(request)
+        host_ip = _extract_host_ip(host) if host else None
+        use_local = bool(client_ip and host_ip and _same_lan(client_ip, host_ip))
+        emby_url = host if use_local else (public_url or host)
+        server_id = _get_server_id_cached(host, cfg.get("emby_api_key"))
         return {
             "status": "success", 
             "user": {**user, "expire_date": expire_date},

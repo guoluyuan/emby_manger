@@ -2,11 +2,20 @@ import sqlite3
 import requests
 import datetime
 import secrets
+import time
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from app.core.config import cfg
 from app.core.database import DB_PATH, query_db
 from app.schemas.models import LoginModel, UserRegisterModel
+from app.core.security import (
+    get_client_ip,
+    get_lock_status,
+    record_failure,
+    reset_failures,
+    generate_captcha,
+    validate_captcha
+)
 
 router = APIRouter()
 
@@ -29,6 +38,12 @@ def ensure_invitations_schema():
         print(f"Upgrade invitations table error: {e}")
 
 ensure_invitations_schema()
+
+
+@router.get("/api/captcha")
+async def api_captcha(request: Request):
+    data = generate_captcha(request)
+    return {"status": "success", **data}
 
 
 @router.post("/api/register")
@@ -121,6 +136,21 @@ async def api_register(data: UserRegisterModel):
 @router.post("/api/login")
 async def api_login(data: LoginModel, request: Request):
     try:
+        ip = get_client_ip(request)
+        locked, locked_until, _ = get_lock_status(ip, "admin")
+        if locked:
+            remain_min = max(1, int((locked_until - int(time.time())) / 60) + 1)
+            return JSONResponse(status_code=429, content={"status": "error", "message": f"失败次数过多，已锁定 {remain_min} 分钟"})
+
+        ok, msg = validate_captcha(request, data.captcha)
+        if not ok:
+            locked_until, failed = record_failure(ip, "admin", max_fail=3, lock_seconds=3600)
+            if locked_until and locked_until > int(time.time()):
+                remain_min = max(1, int((locked_until - int(time.time())) / 60) + 1)
+                return JSONResponse(status_code=429, content={"status": "error", "message": f"失败次数过多，已锁定 {remain_min} 分钟"})
+            remaining = max(0, 3 - failed)
+            return JSONResponse(content={"status": "error", "message": f"{msg}，剩余 {remaining} 次"})
+
         host = cfg.get("emby_host")
         if not host: 
             return JSONResponse(content={"status": "error", "message": "请先在网页完成首次配置"})
@@ -134,6 +164,7 @@ async def api_login(data: LoginModel, request: Request):
         if res.status_code == 200:
             user_info = res.json().get("User", {})
             if not user_info.get("Policy", {}).get("IsAdministrator", False):
+                record_failure(ip, "admin", max_fail=3, lock_seconds=3600)
                 return JSONResponse(content={"status": "error", "message": "权限不足：仅限 Emby 管理员登录"})
             
             request.session["user"] = {
@@ -143,9 +174,16 @@ async def api_login(data: LoginModel, request: Request):
                 "server_id": res.json().get("ServerId") 
             }
             request.session["csrf_token"] = secrets.token_urlsafe(32)
+            reset_failures(ip, "admin")
             return JSONResponse(content={"status": "success"})
         
-        elif res.status_code == 401: return JSONResponse(content={"status": "error", "message": "账号或密码错误"})
+        elif res.status_code == 401:
+            locked_until, failed = record_failure(ip, "admin", max_fail=3, lock_seconds=3600)
+            if locked_until and locked_until > int(time.time()):
+                remain_min = max(1, int((locked_until - int(time.time())) / 60) + 1)
+                return JSONResponse(status_code=429, content={"status": "error", "message": f"失败次数过多，已锁定 {remain_min} 分钟"})
+            remaining = max(0, 3 - failed)
+            return JSONResponse(content={"status": "error", "message": f"账号或密码错误，剩余 {remaining} 次"})
         else: return JSONResponse(content={"status": "error", "message": f"Emby 连接失败: {res.status_code}"})
             
     except Exception as e: return JSONResponse(content={"status": "error", "message": f"登录异常: {str(e)}"})

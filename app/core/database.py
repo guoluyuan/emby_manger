@@ -45,6 +45,9 @@ def init_db():
         # 👇 新增：系统全局通知表
         c.execute('''CREATE TABLE IF NOT EXISTS sys_notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, title TEXT, message TEXT, is_read INTEGER DEFAULT 0, action_url TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)''')
 
+        # 👇 新增：登录失败统计与锁定表
+        c.execute('''CREATE TABLE IF NOT EXISTS login_attempts (ip TEXT, scope TEXT, failed_count INTEGER DEFAULT 0, locked_until INTEGER DEFAULT 0, last_failed INTEGER DEFAULT 0, PRIMARY KEY (ip, scope))''')
+
         conn.commit()
         conn.close()
         print("✅ 数据库结构初始化完成.")

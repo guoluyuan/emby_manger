@@ -4,6 +4,7 @@ from typing import Optional, List
 class LoginModel(BaseModel):
     username: str
     password: str
+    captcha: str
 
 class SettingsModel(BaseModel):
     emby_host: str

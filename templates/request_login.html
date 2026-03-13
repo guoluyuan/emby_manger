@@ -53,8 +53,22 @@
                            class="w-full pl-11 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm dark:text-white transition-all">
                 </div>
             </div>
+            <div>
+                <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">验证码</label>
+                <div class="flex items-center gap-2 mb-2 text-xs text-gray-500 dark:text-gray-400">
+                    <span x-text="captchaQuestion || '点击刷新获取验证码'"></span>
+                    <button type="button" @click="refreshCaptcha()" class="px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-bold">刷新</button>
+                </div>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <input type="text" x-model="captcha" @keydown.enter="login()" placeholder="请输入验证码" 
+                           class="w-full pl-11 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm dark:text-white transition-all">
+                </div>
+            </div>
 
-            <button @click="login()" :disabled="isLoading || !username || !password" 
+            <button @click="login()" :disabled="isLoading || !username || !password || !captcha" 
                     class="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/30 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 <span x-show="isLoading" class="animate-spin w-5 h-5 border-2 border-white/30 border-t-white rounded-full"></span>
                 <span x-show="!isLoading">授权登录</span>
@@ -74,6 +88,8 @@
             Alpine.data('loginApp', () => ({
                 username: '',
                 password: '',
+                captcha: '',
+                captchaQuestion: '',
                 isLoading: false,
                 toast: { show: false, message: '', type: 'success' },
 
@@ -82,21 +98,29 @@
                     if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                         document.documentElement.classList.add('dark');
                     }
+                    this.refreshCaptcha();
                 },
 
                 showToast(msg, type = 'success') {
                     this.toast = { show: true, message: msg, type };
                     setTimeout(() => this.toast.show = false, 3000);
                 },
+                async refreshCaptcha() {
+                    try {
+                        const res = await fetch('/api/captcha');
+                        const data = await res.json();
+                        if (data.status === 'success') this.captchaQuestion = data.question;
+                    } catch (e) {}
+                },
 
                 async login() {
-                    if (!this.username || !this.password) return;
+                    if (!this.username || !this.password || !this.captcha) return;
                     this.isLoading = true;
                     try {
                         const res = await fetch('/api/requests/auth', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ username: this.username, password: this.password })
+                            body: JSON.stringify({ username: this.username, password: this.password, captcha: this.captcha })
                         });
                         const data = await res.json();
                         if (data.status === 'success') {
@@ -104,6 +128,8 @@
                             setTimeout(() => { window.location.href = '/request'; }, 800);
                         } else {
                             this.showToast(data.message || '登录失败', 'error');
+                            this.captcha = '';
+                            this.refreshCaptcha();
                         }
                     } catch (e) {
                         this.showToast('网络错误，请稍后再试', 'error');
