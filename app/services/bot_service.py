@@ -8,9 +8,10 @@ import urllib.parse
 import json 
 import re
 import ipaddress
+import sqlite3
 from collections import defaultdict
 from app.core.config import cfg, REPORT_COVER_URL, FALLBACK_IMAGE_URL
-from app.core.database import query_db, get_base_filter, add_sys_notification
+from app.core.database import query_db, get_base_filter, add_sys_notification, DB_PATH
 from app.services.report_service import report_gen, HAS_PIL
 from app.core.event_bus import bus
 
@@ -28,6 +29,24 @@ def get_admin_id():
             if users: return users[0]['Id']
     except: pass
     return None
+
+# 🔥 新增：初始化静音规则数据库
+def init_notify_rules_db():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS notify_mutes (
+            user_id TEXT,
+            event_type TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, event_type)
+        )''')
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Failed to create notify_mutes table: {e}")
+
+init_notify_rules_db()
 
 class SystemDaemon:
     def __init__(self):
@@ -287,6 +306,15 @@ class NotificationBot:
         bus.subscribe("notify.daily_report", self.on_daily_report)
         bus.subscribe("notify.risk.alert", self.on_risk_alert)
 
+    # 🔥 核心拦截器：判断是否在静音黑名单内
+    def _is_muted(self, user_id, event_type):
+        if not user_id: return False
+        try:
+            res = query_db("SELECT 1 FROM notify_mutes WHERE user_id = ? AND event_type = ?", (user_id, event_type))
+            return bool(res)
+        except:
+            return False
+
     def start(self):
         if self.running: return
         if not cfg.get("tg_bot_token") and not cfg.get("wecom_corpid"): return
@@ -439,6 +467,13 @@ class NotificationBot:
             user = data.get("User") or session
             
             user_name = user.get("Name") or user.get("UserName") or "未知用户"
+            user_id = user.get("Id") or session.get("UserId")
+            
+            # 🔥 拦截器：如果用户被静音了播放通知，直接抛弃不发
+            if self._is_muted(user_id, "playback"):
+                logger.info(f"🔇 [静音规则] 拦截了用户 {user_name} 的播放通知")
+                return
+
             title = item.get("Name") or "未知内容"
             ep_info = ""; raw_type = item.get("Type", "")
             type_map = {"Episode": "剧集", "Movie": "电影", "Audio": "音乐", "MusicVideo": "MV", "LiveTvProgram": "直播", "TvChannel": "频道"}
@@ -456,7 +491,6 @@ class NotificationBot:
             ip = session.get("RemoteEndPoint") or data.get("RemoteEndPoint") or "127.0.0.1"
             loc = self._get_location(ip)
             
-            # 多维度尝试抓取进度数据
             play_state = session.get("PlayState", {})
             playback_info = data.get("PlaybackInfo", {})
             
@@ -470,26 +504,21 @@ class NotificationBot:
 
             target_id = item.get("Id")
             
-            # 逆向反查补全 (防止部分三方播放器不上报时长)
             if target_id and (run_ticks <= 0 or pos_ticks <= 0):
                 try:
                     host = cfg.get("emby_host")
                     key = cfg.get("emby_api_key")
-                    
                     if run_ticks <= 0:
                         detail_res = requests.get(f"{host}/emby/Items/{target_id}?api_key={key}", timeout=2).json()
                         run_ticks = int(detail_res.get("RunTimeTicks") or 0)
-                        
                     if pos_ticks <= 0 and session.get("Id"):
                         sess_res = requests.get(f"{host}/emby/Sessions?api_key={key}", timeout=2).json()
                         for s in sess_res:
                             if s.get("Id") == session.get("Id"):
                                 pos_ticks = int(s.get("PlayState", {}).get("PositionTicks") or 0)
                                 break
-                except:
-                    pass
+                except: pass
             
-            # 🔥 进度条柔性降级处理：不显示 00:00:00
             if run_ticks <= 1:
                 progress_html = f"⏱️ <b>进度</b>：🟢 实时流/未知总时长"
             else:
@@ -534,12 +563,18 @@ class NotificationBot:
         try:
             user = data.get("User") or {}
             session = data.get("Session") or {}
+            user_id = user.get("Id") or data.get("UserId")
+            user_name = user.get("Name") or data.get("Title") or data.get("UserName") or "未知账号"
+            
+            # 🔥 拦截器：如果用户被静音了登录通知，直接抛弃不发
+            if self._is_muted(user_id, "login"):
+                logger.info(f"🔇 [静音规则] 拦截了用户 {user_name} 的登录通知")
+                return
+
             ip = session.get("RemoteEndPoint") or data.get("RemoteEndPoint") or "127.0.0.1"
             loc = self._get_location(ip)
             client = session.get("Client") or data.get("Client") or data.get("AppName") or "未知设备"
             dev_name = session.get("DeviceName") or data.get("DeviceName") or "未知终端"
-            user_name = user.get("Name") or data.get("Title") or data.get("UserName") or "未知账号"
-            user_id = user.get("Id") or data.get("UserId")
             
             msg = (f"🔐 <b>安全预警：账号登录</b>\n\n"
                    f"👤 <b>用户：</b>{user_name}\n"
@@ -663,13 +698,10 @@ class NotificationBot:
             return ip
         except: return ip
 
-    # 🔥 核心修复：斩草除根的正则净化大法！
     def _clean_location(self, loc):
         if not loc: return ""
         loc = re.sub(r'(中国|省|市|自治区|自治州|特别行政区|移动|联通|电信|铁通|教育网|广电|通信|数据中心|IDC)', ' ', loc)
-        # 直接使用排除法：将所有非汉字、非字母、非数字的异形符号（包含全角横杠、破折号）全部干掉！
         loc = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9\s]', ' ', loc)
-        # 合并多个空格，并去除首尾空格
         loc = re.sub(r'\s+', ' ', loc).strip() 
         return loc
 
