@@ -140,10 +140,10 @@
         </h3>
         <div x-data="dragScroll" @mousedown="start" @mouseleave="end" @mouseup="end" @mousemove="move" 
              class="flex overflow-x-auto hide-scrollbar gap-4 pb-6 pt-2 -mx-4 px-4 cursor-grab active:cursor-grabbing select-none">
-            <template x-for="(item, index) in serverTopSeries" :key="item.ItemId + '-' + item.ItemName">
+            <template x-for="(item, index) in serverTopSeries" :key="(item.JumpId || item.SeriesId || item.ItemId) + '-' + item.ItemName">
                 <div class="poster-card flex-none w-32 md:w-48 relative rounded-2xl overflow-hidden bg-slate-200 dark:bg-[#111] aspect-[2/3] ring-1 ring-black/5 dark:ring-white/5 group shadow-md" 
-                     @click="if(!isDragging) openShowcaseModal(item.ItemId, item)">
-                    <img :src="`/api/proxy/smart_image?item_id=${item.ItemId}&type=Primary`" 
+                     @click="if(!isDragging) openShowcaseModal(item.JumpId || item.SeriesId || item.ItemId, item)">
+                    <img :src="item.smart_poster || `/api/proxy/smart_image?item_id=${item.JumpId || item.SeriesId || item.ItemId}&type=Primary`" 
                          @error="window.fallbackPoster($el, item.ItemName)" 
                          class="w-full h-full object-cover pointer-events-none" loading="lazy">
                     <div class="absolute top-0 left-0 bg-black/60 text-white text-xs font-black px-2 py-1 rounded-br-lg backdrop-blur-md z-10" 
