@@ -2,6 +2,11 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
+.venv/
+logs/
+# 额外忽略可能产生的本地配置文件
+config.json
+app/config/*
 # 忽略配置文件夹里的内容，但保留文件夹本身
 config/*
 !config/.gitkeep
