@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 0.4s ease-out;
+  }
+}
+
+@keyframes fade-in {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@layer components {
+  .chart-wrapper {
+    position: relative;
+  }
+  .chart-wrapper canvas {
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .chart-wrapper .chart-skeleton {
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    background: linear-gradient(90deg, rgba(148,163,184,0.15) 0%, rgba(148,163,184,0.35) 50%, rgba(148,163,184,0.15) 100%);
+    animation: chart-shimmer 1.2s ease-in-out infinite;
+  }
+  .chart-wrapper.is-ready canvas {
+    opacity: 1;
+  }
+  .chart-wrapper.is-ready .chart-skeleton {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+@keyframes chart-shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}

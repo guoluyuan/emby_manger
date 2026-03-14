@@ -1,0 +1,11 @@
+{
+  "name": "emby_manger",
+  "private": true,
+  "devDependencies": {
+    "tailwindcss": "^3.4.13"
+  },
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.js -i ./static/css/tailwind-input.css -o ./static/css/admin.css --minify && tailwindcss -c tailwind.request.config.js -i ./static/css/tailwind-input.css -o ./static/css/request-tailwind.css --minify",
+    "watch:css": "tailwindcss -c tailwind.config.js -i ./static/css/tailwind-input.css -o ./static/css/admin.css --watch"
+  }
+}

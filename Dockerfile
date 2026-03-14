@@ -1,3 +1,15 @@
+FROM node:18-alpine AS assets
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY tailwind.config.js tailwind.request.config.js ./
+COPY static/css/tailwind-input.css static/css/tailwind-input.css
+COPY templates templates
+COPY static/js static/js
+
+RUN npm ci && npm run build:css
+
 # 使用官方 Python 轻量镜像
 FROM python:3.9-slim
 
@@ -18,6 +30,10 @@ ENV APP_VERSION=${APP_VERSION}
 
 # 2. 复制所有项目文件到容器 (这里改了 HTML 才会重新复制，但不会重新 pip install)
 COPY . .
+
+# 2.1 复制构建后的 CSS（避免 Docker 构建缺少样式）
+COPY --from=assets /app/static/css/admin.css /app/static/css/admin.css
+COPY --from=assets /app/static/css/request-tailwind.css /app/static/css/request-tailwind.css
 
 # 3. 创建配置和数据挂载点
 RUN mkdir -p /app/config /emby-data && chmod -R 777 /app/config /emby-data
