@@ -70,6 +70,17 @@ services:
       - DB_PATH=/emby-data/playback_reporting.db
 ```
 
+**常见报错（API 模式误用 / 本地模式未挂载）**
+
+- 若日志出现 `找不到文件: /emby-data/playback_reporting.db` 或播放数据一直为 0，说明你处于 `sqlite` 模式但未正确挂载数据库。
+- 解决办法：要么切换 `PLAYBACK_DATA_MODE=api`，要么正确挂载 Emby 数据目录并填写 `DB_PATH`。
+
+**如何确认 Playback Reporting 插件已启用**
+
+1. 进入 Emby 控制台 → 插件 → “Playback Reporting”。
+2. 确认插件已启用并处于运行状态。
+3. 若首次安装无历史数据，至少产生一次播放记录后再刷新页面。
+
 ### 1.3 部署注意事项（新手必读）
 
 1. **必须填写 Emby 地址，否则无法登录**
