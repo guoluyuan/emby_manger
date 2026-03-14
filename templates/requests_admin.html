@@ -76,7 +76,7 @@
                 <button @click="viewMode === 'request' ? loadData() : loadFeedback()" class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-gray-700 dark:text-gray-200 rounded-[14px] text-[13px] font-bold transition-colors shadow-sm border border-transparent dark:border-white/5 active:scale-95">
                     <i class="fa-solid fa-rotate-right" :class="isOperating ? 'animate-spin text-brand-500' : ''"></i> <span class="sm:hidden">刷新</span>
                 </button>
-                <a href="/request" target="_blank" class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-[14px] text-[13px] font-bold transition-all shadow-md shadow-emerald-500/20 active:scale-95 whitespace-nowrap">
+                <a href="#" @click.prevent="openUserPortal()" class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-[14px] text-[13px] font-bold transition-all shadow-md shadow-emerald-500/20 active:scale-95 whitespace-nowrap">
                     <i class="fa-solid fa-arrow-up-right-from-square"></i> 前往用户前台
                 </a>
             </div>
@@ -329,6 +329,8 @@
             toast: { show: false, message: '', type: 'success' },
             selectedKeys: [], 
             selectedFeedbacks: [], 
+            portalLanUrl: '',
+            portalPublicUrl: '',
             
             rejectModal: { open: false, items: [], reasonType: '未找到可用资源', customReason: '' },
             predefinedReasons: ['影片未上映', '剧集未开播', '未找到可用资源', '质量太差等待洗版', '其他原因...'],
@@ -338,6 +340,7 @@
                 if (urlParams.get('tab') === 'feedback') {
                     this.viewMode = 'feedback';
                 }
+                this.loadPortalConfig();
                 this.loadData();
                 this.loadFeedback();
                 setInterval(() => {
@@ -366,6 +369,58 @@
             showToast(msg, type = 'success') {
                 this.toast = { show: true, message: msg, type };
                 setTimeout(() => this.toast.show = false, 3000);
+            },
+
+            normalizeBaseUrl(url) {
+                const u = (url || '').trim();
+                if (!u) return '';
+                if (u.startsWith('http://') || u.startsWith('https://')) return u.replace(/\/$/, '');
+                return `http://${u}`.replace(/\/$/, '');
+            },
+
+            isPrivateHost(host) {
+                if (!host) return false;
+                if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+                if (/^10\./.test(host)) return true;
+                if (/^192\.168\./.test(host)) return true;
+                const m = host.match(/^172\.(\d+)\./);
+                if (m) { const n = parseInt(m[1], 10); if (n >= 16 && n <= 31) return true; }
+                return false;
+            },
+
+            buildFallbackPortalBase() {
+                const scheme = window.location.protocol || 'http:';
+                const host = window.location.hostname;
+                return `${scheme}//${host}:10308`;
+            },
+
+            resolvePortalBase() {
+                const isLan = this.isPrivateHost(window.location.hostname);
+                const lan = this.normalizeBaseUrl(this.portalLanUrl);
+                const pub = this.normalizeBaseUrl(this.portalPublicUrl);
+                if (isLan) return lan || this.buildFallbackPortalBase();
+                return pub;
+            },
+
+            openUserPortal() {
+                const base = this.resolvePortalBase();
+                if (!base) {
+                    this.showToast('未配置公网入口，请在系统设置 → 邀请链接填写', 'error');
+                    return;
+                }
+                const url = `${base.replace(/\/$/, '')}/request`;
+                window.open(url, '_blank');
+            },
+
+            async loadPortalConfig() {
+                try {
+                    const res = await fetch('/api/settings');
+                    const data = await res.json();
+                    if (data.status === 'success' && data.data) {
+                        this.portalPublicUrl = data.data.user_public_url || '';
+                        this.portalLanUrl = data.data.user_lan_url || '';
+                    }
+                } catch (e) {}
             },
 
             async loadData() {
