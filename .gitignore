@@ -12,3 +12,4 @@ config/*
 !config/.gitkeep
 # 忽略本地测试数据
 *.db
+emby-data/
