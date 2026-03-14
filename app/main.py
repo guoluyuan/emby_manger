@@ -2,11 +2,13 @@ import os
 import asyncio
 import threading
 import socket
+import hashlib
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
+from starlette.responses import Response
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.gzip import GZipMiddleware
@@ -61,6 +63,7 @@ async def user_portal_app(scope, receive, send):
             "/request_login",
             "/invite",
             "/static",
+            "/api/csrf",
             "/api/register",
             "/api/requests",
             "/api/stats",
@@ -147,6 +150,41 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         return response
 
+class CacheControlMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if "Cache-Control" not in response.headers:
+            content_type = response.headers.get("content-type", "")
+            if content_type.startswith("text/html"):
+                response.headers["Cache-Control"] = "no-store"
+            elif content_type.startswith("application/json"):
+                if request.method == "GET":
+                    response.headers["Cache-Control"] = "public, max-age=0, must-revalidate, stale-while-revalidate=60"
+                else:
+                    response.headers["Cache-Control"] = "no-store"
+        return response
+
+class ETagMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if request.method != "GET" or response.status_code != 200:
+            return response
+        if "ETag" in response.headers:
+            return response
+        content_type = response.headers.get("content-type", "")
+        if not content_type.startswith("application/json"):
+            return response
+        body = getattr(response, "body", None)
+        if body is None:
+            return response
+        etag = '"' + hashlib.sha256(body).hexdigest() + '"'
+        if request.headers.get("if-none-match") == etag:
+            not_modified = Response(status_code=304)
+            not_modified.headers["ETag"] = etag
+            return not_modified
+        response.headers["ETag"] = etag
+        return response
+
 # CSRF protection for session-authenticated requests
 class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -194,6 +232,8 @@ app.add_middleware(CORSMiddleware, allow_origins=cors_origins, allow_credentials
 
 # 压缩 + 安全头放在外层
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(ETagMiddleware)
+app.add_middleware(CacheControlMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
 try:
@@ -204,14 +244,19 @@ except Exception:
 
 # 静态文件
 class CacheControlStaticFiles(StaticFiles):
-    def __init__(self, *args, cache_control: str = "public, max-age=604800", **kwargs):
+    def __init__(self, *args, cache_control: str = "public, max-age=604800", cache_control_immutable: str = "public, max-age=31536000, immutable", **kwargs):
         super().__init__(*args, **kwargs)
         self.cache_control = cache_control
+        self.cache_control_immutable = cache_control_immutable
 
     async def get_response(self, path: str, scope):
         response = await super().get_response(path, scope)
         if response.status_code == 200 and "Cache-Control" not in response.headers:
-            response.headers["Cache-Control"] = self.cache_control
+            qs = (scope.get("query_string") or b"").decode("utf-8", "ignore")
+            if "v=" in qs or "ver=" in qs:
+                response.headers["Cache-Control"] = self.cache_control_immutable
+            else:
+                response.headers["Cache-Control"] = self.cache_control
         return response
 
 app.mount("/static", CacheControlStaticFiles(directory="static"), name="static")

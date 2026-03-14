@@ -24,6 +24,54 @@
         .apple-card:hover { transform: translateY(-2px); box-shadow: 0 12px 32px -8px rgba(0,0,0,0.08); }
         html.dark .apple-card:hover { box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.6); }
     }
+
+    /* === Performance tuning for heavy dashboards === */
+    #content-area {
+        contain: layout paint;
+    }
+    #content-area > * {
+        content-visibility: auto;
+        contain-intrinsic-size: 800px;
+    }
+    @media (max-width: 1024px) {
+        .apple-card {
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+        }
+        #content-area [class*="blur-"] {
+            filter: none !important;
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .animate-pulse,
+        .animate-ping,
+        .animate-spin,
+        .chart-skeleton {
+            animation: none !important;
+        }
+        * {
+            scroll-behavior: auto !important;
+        }
+    }
+    body.perf-mode #content-area .apple-card {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        box-shadow: none !important;
+    }
+    body.perf-mode #content-area [class*="blur-"] {
+        filter: none !important;
+        opacity: 0.2 !important;
+    }
+    body.perf-mode #content-area [class*="shadow"] {
+        box-shadow: none !important;
+    }
+    body.perf-mode #content-area [class*="bg-gradient"] {
+        background-image: none !important;
+    }
+    body.perf-mode #content-area * {
+        transition: none !important;
+        animation: none !important;
+    }
 </style>
 {% endblock %}
 
@@ -113,7 +161,7 @@
                 </h3>
                 <span id="biorhythm-word" class="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-800/50 shadow-sm">分析中...</span>
             </div>
-            <div class="relative h-48 md:h-56 w-full"><canvas id="hourChart"></canvas></div>
+            <div class="chart-wrapper relative h-48 md:h-56 w-full"><div class="chart-skeleton"></div><canvas id="hourChart"></canvas></div>
         </div>
 
         <div class="col-span-1 md:col-span-2 lg:col-span-4 apple-card flex flex-col justify-center">
@@ -141,7 +189,7 @@
                     <button onclick="switchChart('month')" class="chart-btn px-4 py-1.5 rounded-lg bg-white dark:bg-gray-600 shadow-sm text-blue-600 dark:text-blue-400 font-bold transition border border-transparent dark:border-white/10" id="btn-month">过去1年</button>
                 </div>
             </div>
-            <div class="relative h-56 md:h-72 w-full"><canvas id="trendChart"></canvas></div>
+            <div class="chart-wrapper relative h-56 md:h-72 w-full"><div class="chart-skeleton"></div><canvas id="trendChart"></canvas></div>
         </div>
 
         <div class="col-span-1 md:col-span-1 lg:col-span-6 apple-card flex flex-col">
@@ -150,7 +198,8 @@
                     <div class="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 flex items-center justify-center mr-3 shadow-sm"><i class="fa-solid fa-desktop text-sm"></i></div> 硬件设备分布
                 </h3>
             </div>
-            <div class="relative flex-1 w-full min-h-[220px] flex items-center justify-center">
+            <div class="chart-wrapper relative flex-1 w-full min-h-[220px] flex items-center justify-center">
+                <div class="chart-skeleton"></div>
                 <canvas id="deviceChart"></canvas>
             </div>
         </div>
@@ -161,7 +210,8 @@
                     <div class="w-8 h-8 rounded-lg bg-fuchsia-50 dark:bg-fuchsia-500/10 text-fuchsia-500 flex items-center justify-center mr-3 shadow-sm"><i class="fa-solid fa-clapperboard text-sm"></i></div> 播放软件偏好
                 </h3>
             </div>
-            <div class="relative flex-1 w-full min-h-[220px] flex items-center justify-center">
+            <div class="chart-wrapper relative flex-1 w-full min-h-[220px] flex items-center justify-center">
+                <div class="chart-skeleton"></div>
                 <canvas id="clientChart"></canvas>
             </div>
         </div>
@@ -194,12 +244,97 @@
 <script>
     let charts = { trend: null, hour: null, device: null, client: null };
     let currentChartDim = 'month';
+    let chartsReady = false;
+    let pendingTrendArgs = null;
+    let detailData = null;
+    const detailRendered = { hour: false, device: false, client: false };
+    const detailPending = { hour: false, device: false, client: false };
+    let detailsObserversInitialized = false;
+
+    async function ensureDetailsCharts() {
+        if (chartsReady) return;
+        try {
+            if (window.ensureAdminChartJs) await window.ensureAdminChartJs();
+            if (window.Chart) chartsReady = true;
+        } catch (e) { }
+        if (chartsReady) {
+            flushPendingCharts();
+            if (pendingTrendArgs) {
+                initTrendChart(pendingTrendArgs.userId, pendingTrendArgs.dim);
+                pendingTrendArgs = null;
+            }
+        }
+    }
+
+    function scheduleTrendChart(userId, dim) {
+        pendingTrendArgs = { userId, dim };
+        if (chartsReady && window.Chart) initTrendChart(userId, dim);
+    }
+
+    function flushPendingCharts() {
+        if (!detailData || !chartsReady || !window.Chart) return;
+        if (detailPending.hour && !detailRendered.hour) { renderHourChart(detailData.hourly); detailRendered.hour = true; }
+        if (detailPending.device && !detailRendered.device) { renderDeviceChart(detailData.devices); detailRendered.device = true; }
+        if (detailPending.client && !detailRendered.client) { renderClientChart(detailData.clients); detailRendered.client = true; }
+    }
+
+    function setupDetailChartObserver(id, key, renderFn) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const trigger = async () => {
+            await ensureDetailsCharts();
+            if (detailData && chartsReady && window.Chart) {
+                renderFn(detailData);
+                detailRendered[key] = true;
+            } else {
+                detailPending[key] = true;
+            }
+        };
+        const observer = new IntersectionObserver((entries) => {
+            if (entries.some(e => e.isIntersecting)) {
+                observer.disconnect();
+                trigger();
+            }
+        }, { rootMargin: '200px' });
+        observer.observe(el);
+        el.addEventListener('click', trigger, { once: true });
+    }
+
+    function setupTrendChartLazy() {
+        const el = document.getElementById('trendChart');
+        if (!el) return;
+        const trigger = async () => {
+            await ensureDetailsCharts();
+            if (pendingTrendArgs && chartsReady && window.Chart) {
+                initTrendChart(pendingTrendArgs.userId, pendingTrendArgs.dim);
+                pendingTrendArgs = null;
+            }
+        };
+        const observer = new IntersectionObserver((entries) => {
+            if (entries.some(e => e.isIntersecting)) {
+                observer.disconnect();
+                trigger();
+            }
+        }, { rootMargin: '200px' });
+        observer.observe(el);
+        el.addEventListener('click', trigger, { once: true });
+    }
+
+    function setupDetailsChartsLazy() {
+        if (detailsObserversInitialized) return;
+        detailsObserversInitialized = true;
+        setupTrendChartLazy();
+        setupDetailChartObserver('hourChart', 'hour', (d) => renderHourChart(d.hourly));
+        setupDetailChartObserver('deviceChart', 'device', (d) => renderDeviceChart(d.devices));
+        setupDetailChartObserver('clientChart', 'client', (d) => renderClientChart(d.clients));
+    }
 
     function getUrlParams() {
         return new URLSearchParams(window.location.search).get('uid') || new URLSearchParams(window.location.search).get('user_id');
     }
 
     async function init() {
+        setupDetailsChartsLazy();
         await loadUsers();
         const targetUid = getUrlParams();
         if (targetUid) {
@@ -234,6 +369,11 @@
         const content = document.getElementById('content-area');
         
         loading.classList.remove('hidden'); content.classList.add('hidden');
+        detailData = null;
+        detailRendered.hour = false; detailRendered.device = false; detailRendered.client = false;
+        detailPending.hour = false; detailPending.device = false; detailPending.client = false;
+        detailsObserversInitialized = false;
+        setupDetailsChartsLazy();
 
         try {
             const avatarContainer = document.getElementById('hero-avatar-container');
@@ -259,10 +399,12 @@
 
             await fetchUserDetails(userId === 'all' ? null : userId);
             await fetchBadges(userId === 'all' ? null : userId);
-            await initTrendChart(userId === 'all' ? null : userId, currentChartDim);
-
-            loading.classList.add('hidden'); content.classList.remove('hidden');
+            scheduleTrendChart(userId === 'all' ? null : userId, currentChartDim);
         } catch (e) {}
+        finally {
+            loading.classList.add('hidden');
+            content.classList.remove('hidden');
+        }
     }
 
     function switchChart(dim) {
@@ -273,10 +415,11 @@
             else { btn.className = "chart-btn px-4 py-1.5 rounded-lg transition text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-semibold border border-transparent"; }
         });
         const uid = document.getElementById('user-select').value;
-        initTrendChart(uid === 'all' ? null : uid, dim);
+        scheduleTrendChart(uid === 'all' ? null : uid, dim);
     }
 
     async function initTrendChart(userId, dimension = 'month') {
+        if (!window.Chart) return;
         const ctx = document.getElementById('trendChart').getContext('2d');
         if(charts.trend) charts.trend.destroy();
         
@@ -301,6 +444,7 @@
                     scales: { y: { beginAtZero: true, grid: { color: gridColor }, border:{display:false}, ticks:{color: textColor, font:{size:11}} }, x: { grid: { display: false }, ticks: { color: textColor, font: {family: 'monospace'}, maxRotation: 0 } } } 
                 }
             });
+                if (window.markAdminChartReady) window.markAdminChartReady('trendChart');
         } catch(e) {}
     }
 
@@ -335,9 +479,9 @@
                 document.getElementById('hero-avg').innerText = Math.round(d.overview.avg_duration / 60);
                 document.getElementById('hero-days').innerText = d.overview.account_age_days;
 
-                renderHourChart(d.hourly);
-                renderDeviceChart(d.devices); 
-                renderClientChart(d.clients); 
+                detailData = d;
+                flushPendingCharts();
+
                 renderPreference(d.preference);
                 renderTopFav(d.top_fav);
                 renderLogs(d.logs);
@@ -346,6 +490,7 @@
     }
 
     function renderHourChart(dataObj) {
+        if (!window.Chart) return;
         const ctx = document.getElementById('hourChart').getContext('2d');
         if(charts.hour) charts.hour.destroy();
         
@@ -378,6 +523,7 @@
                 scales: { y: { display: false }, x: { grid: { display: false }, ticks: { color: textColor, font: {family: 'monospace', size: 10}, maxRotation: 0, maxTicksLimit: 12 } } }
             }
         });
+            if (window.markAdminChartReady) window.markAdminChartReady('hourChart');
     }
 
     function renderPreference(pref) {
@@ -422,72 +568,84 @@
     }
 
     function renderDeviceChart(dataList) {
+        if (!window.Chart) return;
         const ctx = document.getElementById('deviceChart').getContext('2d'); if(charts.device) charts.device.destroy();
         if(!dataList || dataList.length === 0) return;
 
         let labels = [], values = [], others = 0;
-        dataList.forEach((d, i) => { if(i < 5) { labels.push(d.Device); values.push(d.Plays); } else { others += d.Plays; } });
+        dataList.forEach((d, i) => {
+            const label = ((d.Device ?? '') + '').trim() || '未知设备';
+            if(i < 5) { labels.push(label); values.push(d.Plays); } else { others += d.Plays; }
+        });
         if(others > 0) { labels.push('其他'); values.push(others); }
-        
+
         const isDark = document.documentElement.classList.contains('dark');
         const textColor = isDark ? '#9ca3af' : '#6b7280'; const borderColor = isDark ? '#1C1C1E' : '#ffffff';
         const macaronColors = ['#10b981', '#3b82f6', '#8b5cf6', '#6366f1', '#14b8a6', '#64748b'];
 
         charts.device = new Chart(ctx, {
-            type: 'doughnut', data: { labels: labels, datasets: [{ data: values, backgroundColor: macaronColors, borderWidth: 3, borderColor: borderColor, borderRadius: 8, hoverOffset: 6 }] },
-            options: { responsive: true, maintainAspectRatio: false, cutout: '72%', plugins: { legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true, font:{size: 12, weight:'bold'}, color: textColor } } } }
+            type: 'pie', data: { labels: labels, datasets: [{ data: values, backgroundColor: macaronColors, borderWidth: 3, borderColor: borderColor, borderRadius: 8, hoverOffset: 6 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true, font:{size: 12, weight:'bold', family:'system-ui, -apple-system, \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif'}, color: textColor } } } }
         });
+            if (window.markAdminChartReady) window.markAdminChartReady('deviceChart');
     }
 
     function renderClientChart(dataList) {
+        if (!window.Chart) return;
         const ctx = document.getElementById('clientChart').getContext('2d'); if(charts.client) charts.client.destroy();
         if(!dataList || dataList.length === 0) return;
 
         let labels = [], values = [], others = 0;
-        dataList.forEach((d, i) => { if(i < 5) { labels.push(d.Client); values.push(d.Plays); } else { others += d.Plays; } });
+        dataList.forEach((d, i) => {
+            const label = ((d.Client ?? '') + '').trim() || '未知软件';
+            if(i < 5) { labels.push(label); values.push(d.Plays); } else { others += d.Plays; }
+        });
         if(others > 0) { labels.push('其他'); values.push(others); }
-        
+
         const isDark = document.documentElement.classList.contains('dark');
         const textColor = isDark ? '#9ca3af' : '#6b7280'; const borderColor = isDark ? '#1C1C1E' : '#ffffff';
         const macaronColors = ['#f43f5e', '#f59e0b', '#ec4899', '#f97316', '#d946ef', '#64748b'];
 
         charts.client = new Chart(ctx, {
-            type: 'doughnut', data: { labels: labels, datasets: [{ data: values, backgroundColor: macaronColors, borderWidth: 3, borderColor: borderColor, borderRadius: 8, hoverOffset: 6 }] },
-            options: { responsive: true, maintainAspectRatio: false, cutout: '72%', plugins: { legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true, font:{size: 12, weight:'bold'}, color: textColor } } } }
+            type: 'pie', data: { labels: labels, datasets: [{ data: values, backgroundColor: macaronColors, borderWidth: 3, borderColor: borderColor, borderRadius: 8, hoverOffset: 6 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true, font:{size: 12, weight:'bold', family:'system-ui, -apple-system, \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif'}, color: textColor } } } }
         });
+            if (window.markAdminChartReady) window.markAdminChartReady('clientChart');
+    }
+
+    function buildLogRow(log, index) {
+        let dateStr = log.DateCreated; if (dateStr && dateStr.includes(' ')) dateStr = dateStr.replace(' ', 'T');
+        const date = new Date(dateStr).toLocaleString('zh-CN', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'});
+
+        let deviceIcon = 'fa-mobile-screen'; const d = (log.Device || '').toLowerCase();
+        if(d.includes('browser') || d.includes('chrome') || d.includes('web')) deviceIcon = 'fa-globe';
+        else if(d.includes('tv')) deviceIcon = 'fa-tv';
+        else if(d.includes('apple') || d.includes('mac') || d.includes('ios') || d.includes('infuse')) deviceIcon = 'fa-apple';
+
+        const bgClass = index % 2 === 0 ? 'bg-transparent' : 'bg-gray-50/50 dark:bg-[#2C2C2E]/30';
+
+        return `<tr class="${bgClass} hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-colors group border-b border-gray-100/50 dark:border-white/5">
+                  <td class="px-6 py-4 font-mono text-[12px] text-gray-500 whitespace-nowrap group-hover:text-indigo-500 transition-colors">${date}</td>
+                  <td class="px-6 py-4 font-bold text-gray-700 dark:text-gray-300 text-[13px]">${log.UserName}</td>
+                  <td class="px-6 py-4 font-bold text-gray-900 dark:text-gray-100 max-w-[200px] truncate text-[13px]" title="${log.ItemName}">${log.ItemName}</td>
+                  <td class="px-6 py-4 text-[11px]">
+                      <span class="bg-white dark:bg-[#2C2C2E] text-gray-600 dark:text-gray-400 px-2 py-1 rounded-md font-mono border border-gray-200/80 dark:border-white/5 flex items-center w-fit gap-1.5 font-bold shadow-sm">
+                          <i class="fa-solid ${deviceIcon}"></i> <span class="truncate max-w-[120px]">${log.Device}</span>
+                      </span>
+                  </td>
+                  <td class="px-6 py-4 text-right font-mono font-black text-indigo-600 dark:text-indigo-400 text-[13px]">${Math.round(log.PlayDuration/60)}m</td>
+              </tr>`;
     }
 
     function renderLogs(logs) {
         const tbody = document.getElementById('logs-table-body');
-        if (!logs || logs.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-12 text-center text-gray-400 font-medium"><i class="fa-solid fa-ghost mr-2"></i>暂无播放记录</td></tr>'; return; }
+        if (!logs || logs.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-12 text-center text-gray-400 font-medium"><i class="fa-solid fa-ghost mr-2"></i>暂无记录</td></tr>'; return; }
 
         let html = '';
-        logs.forEach((log, index) => {
-            let dateStr = log.DateCreated; if (dateStr && dateStr.includes(' ')) dateStr = dateStr.replace(' ', 'T');
-            const date = new Date(dateStr).toLocaleString('zh-CN', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'});
-
-            let deviceIcon = 'fa-mobile-screen'; const d = (log.Device || '').toLowerCase();
-            if(d.includes('browser') || d.includes('chrome') || d.includes('web')) deviceIcon = 'fa-globe';
-            else if(d.includes('tv')) deviceIcon = 'fa-tv';
-            else if(d.includes('apple') || d.includes('mac') || d.includes('ios') || d.includes('infuse')) deviceIcon = 'fa-apple';
-
-            const bgClass = index % 2 === 0 ? 'bg-transparent' : 'bg-gray-50/50 dark:bg-[#2C2C2E]/30';
-
-            html += `<tr class="${bgClass} hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-colors group border-b border-gray-100/50 dark:border-white/5">
-                <td class="px-6 py-4 font-mono text-[12px] text-gray-500 whitespace-nowrap group-hover:text-indigo-500 transition-colors">${date}</td>
-                <td class="px-6 py-4 font-bold text-gray-700 dark:text-gray-300 text-[13px]">${log.UserName}</td>
-                <td class="px-6 py-4 font-bold text-gray-900 dark:text-gray-100 max-w-[200px] truncate text-[13px]" title="${log.ItemName}">${log.ItemName}</td>
-                <td class="px-6 py-4 text-[11px]">
-                    <span class="bg-white dark:bg-[#2C2C2E] text-gray-600 dark:text-gray-400 px-2 py-1 rounded-md font-mono border border-gray-200/80 dark:border-white/5 flex items-center w-fit gap-1.5 font-bold shadow-sm">
-                        <i class="fa-solid ${deviceIcon}"></i> <span class="truncate max-w-[120px]">${log.Device}</span>
-                    </span>
-                </td>
-                <td class="px-6 py-4 text-right font-mono font-black text-indigo-600 dark:text-indigo-400 text-[13px]">${Math.round(log.PlayDuration/60)}m</td>
-            </tr>`;
-        });
+        logs.forEach((log, i) => { html += buildLogRow(log, i); });
         tbody.innerHTML = html;
     }
-    
+
     init();
 </script>
 {% endblock %}

@@ -8,20 +8,12 @@
     <link rel="manifest" href="/request_manifest.json">
     <link rel="apple-touch-icon" href="/static/img/logo-app-2.png?v=20260309">
     
+    <link rel="stylesheet" href="/static/css/request-tailwind.css?v={{ request_asset_ver }}">
     <link rel="stylesheet" href="/static/css/request.css?v={{ request_asset_ver }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="/static/js/alpine.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    
-    
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: { extend: { colors: { brand: { 50: '#f0fdfa', 100: '#ccfbf1', 500: '#14b8a6', 600: '#0d9488', 900: '#134e4a' } } } }
-        }
-    </script>
+        <script defer src="/static/js/alpine.min.js"></script>
+    <script>window.REQUEST_ASSET_VER = "{{ request_asset_ver }}";</script>
     
     <script src="/static/js/request_app.js?v={{ request_asset_ver }}"></script>
 </head>
@@ -43,7 +35,7 @@
         <nav class="fixed top-0 w-full z-40 glass-panel border-b border-slate-200/50 dark:border-white/5 rounded-none transition-all duration-300" :class="scrolled ? 'shadow-md dark:shadow-white/5' : ''">
             <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
                 <div class="flex items-center gap-2 sm:gap-3 shrink-0">
-                    <img src="/static/img/logo-app-2.png" class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg shadow-sm shrink-0 object-contain bg-white dark:bg-transparent">
+                    <img src="/static/img/logo-app-2.avif?v={{ request_asset_ver }}" onerror="if(!this.dataset.fallback){this.dataset.fallback='webp';this.src='/static/img/logo-app-2.webp?v={{ request_asset_ver }}';} else if(this.dataset.fallback==='webp'){this.dataset.fallback='png';this.src='/static/img/logo-app-2.png?v={{ request_asset_ver }}';} else {this.onerror=null;}" class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg shadow-sm shrink-0 object-contain bg-white dark:bg-transparent">
                     <h1 class="text-base sm:text-lg font-bold tracking-wide text-slate-800 dark:text-zinc-100 whitespace-nowrap">用户社区</h1>
                 </div>
                 
@@ -111,8 +103,8 @@
                     return true;
                 }
             };
-            const ensureCsrf = async () => {
-                if (csrfToken) return csrfToken;
+            const ensureCsrf = async (force = false) => {
+                if (csrfToken && !force) return csrfToken;
                 try {
                     const res = await _fetch('/api/csrf');
                     const json = await res.json();
@@ -122,7 +114,9 @@
             };
             window.fetch = async (input, init = {}) => {
                 const method = (init.method || (input instanceof Request ? input.method : 'GET') || 'GET').toUpperCase();
-                if (['POST','PUT','PATCH','DELETE'].includes(method) && isSameOrigin(input)) {
+                const sameOrigin = isSameOrigin(input);
+                const isWrite = ['POST','PUT','PATCH','DELETE'].includes(method);
+                if (isWrite && sameOrigin) {
                     await ensureCsrf();
                     if (csrfToken) {
                         const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined) || {});
@@ -130,7 +124,24 @@
                         init.headers = headers;
                     }
                 }
-                return _fetch(input, init);
+                const res = await _fetch(input, init);
+                if (isWrite && sameOrigin && res.status === 403 && !init.__csrfRetried) {
+                    try {
+                        const data = await res.clone().json();
+                        if (data && data.message === 'CSRF token invalid') {
+                            csrfToken = null;
+                            await ensureCsrf(true);
+                            const retryInit = { ...init, __csrfRetried: true };
+                            if (csrfToken) {
+                                const headers = new Headers(retryInit.headers || (input instanceof Request ? input.headers : undefined) || {});
+                                headers.set('X-CSRF-Token', csrfToken);
+                                retryInit.headers = headers;
+                            }
+                            return _fetch(input, retryInit);
+                        }
+                    } catch {}
+                }
+                return res;
             };
         })();
     </script>

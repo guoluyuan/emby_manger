@@ -1,11 +1,49 @@
 /* ============================================================
    EmbyPulse 玩家社区 - 核心逻辑驱动 (高容错稳定版 + 全选修复)
-   ============================================================ */
-async function toBase64(url) { try { const res = await fetch(url); if (!res.ok) throw new Error(`HTTP ${res.status}`); const blob = await res.blob(); return new Promise((resolve) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result); reader.readAsDataURL(blob); }); } catch (e) { return null; } }
-async function applyPhysicalBlur(base64Url) { return new Promise((resolve) => { const img = new Image(); img.onload = () => { const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d'); canvas.width = 400; canvas.height = 800; ctx.filter = 'blur(40px) brightness(0.4)'; const scale = Math.max(canvas.width / img.width, canvas.height / img.height); ctx.drawImage(img, (canvas.width / 2) - (img.width / 2) * scale, (canvas.height / 2) - (img.height / 2) * scale, img.width * scale, img.height * scale); resolve(canvas.toDataURL('image/jpeg', 0.8)); }; img.onerror = () => resolve(base64Url); img.src = base64Url; }); }
+   =========================================================== */
+const __requestAssetVer = (window.REQUEST_ASSET_VER ? `?v=${window.REQUEST_ASSET_VER}` : '');
+const __logoApp2Avif = `/static/img/logo-app-2.avif${__requestAssetVer}`;
+const __logoApp2Webp = `/static/img/logo-app-2.webp${__requestAssetVer}`;
+const __logoApp2Png = `/static/img/logo-app-2.png${__requestAssetVer}`;
+
+window.LOGO_APP2_ASSETS = { avif: __logoApp2Avif, webp: __logoApp2Webp, png: __logoApp2Png };
+window.logoApp2Fallback = function(img) {
+    if (!img) return;
+    const state = img.dataset.fallback || '';
+    if (state === '') { img.dataset.fallback = 'webp'; img.src = __logoApp2Webp; return; }
+    if (state === 'webp') { img.dataset.fallback = 'png'; img.src = __logoApp2Png; return; }
+    img.onerror = null;
+};
+window.markRequestChartReady = function(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const wrap = el.closest('.chart-wrapper');
+    if (wrap) wrap.classList.add('is-ready');
+};
+
+
+
+window.ensureRequestChartJs = (() => {
+    let promise = null;
+    return () => {
+        if (window.Chart) return Promise.resolve();
+        if (promise) return promise;
+        promise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+            script.async = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error('chart.js load failed'));
+            document.head.appendChild(script);
+        });
+        return promise;
+    };
+})();
+async function toBase64(url) { try { const res = await fetch(url); if (!res.ok) throw new Error(`HTTP ${res.status}`); const blob = await res.blob(); return new Promise((resolve) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result); reader.readAsDataURL(blob); }); this.chartRendered.hour = true; } catch (e) { return null; } }
+async function applyPhysicalBlur(base64Url) { return new Promise((resolve) => { const img = new Image(); img.onload = () => { const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d'); canvas.width = 400; canvas.height = 800; ctx.filter = 'blur(40px) brightness(0.4)'; const scale = Math.max(canvas.width / img.width, canvas.height / img.height); ctx.drawImage(img, (canvas.width / 2) - (img.width / 2) * scale, (canvas.height / 2) - (img.height / 2) * scale, img.width * scale, img.height * scale); resolve(canvas.toDataURL('image/jpeg', 0.8)); }; img.onerror = () => resolve(base64Url); img.src = base64Url; }); this.chartRendered.trend = true; }
 window.tmdbCache = {};
-window.fallbackPoster = async function(img, title) { if (img.getAttribute('data-fallback-done')) return; img.setAttribute('data-fallback-done', 'true'); img.src = '/static/img/logo-app-2.png'; img.classList.add('opacity-30', 'object-contain', 'p-4'); if (!title || title === 'undefined' || title === 'null') return; try { const res = await fetch(`/api/requests/search?query=${encodeURIComponent(title)}`); const data = await res.json(); if (data.status === 'success' && data.data.length > 0) { const match = data.data.find(d => d.poster_path) || data.data[0]; if (match.poster_path) { img.src = match.poster_path; img.classList.remove('opacity-30', 'object-contain', 'p-4'); img.classList.add('object-cover'); } } } catch(e) {} };
-window.fallbackReportPoster = async function(imgEl, title) { if(imgEl.getAttribute('data-fallback-done')) return; imgEl.setAttribute('data-fallback-done', 'true'); imgEl.src = '/static/img/logo-app-2.png'; imgEl.style.objectFit = "contain"; imgEl.style.padding = "20px"; try { const res = await fetch(`/api/requests/search?query=${encodeURIComponent(title)}`); const data = await res.json(); if (data.status === 'success' && data.data.length > 0) { const match = data.data.find(d => d.poster_path) || data.data[0]; if (match.poster_path) { const b64 = await toBase64(match.poster_path); if(b64) { imgEl.src = b64; imgEl.style.objectFit = "cover"; imgEl.style.padding = "0"; } } } } catch(e) {} };
+window.fallbackPoster = async function(img, title) { if (img.getAttribute('data-fallback-done')) return; img.setAttribute('data-fallback-done', 'true'); img.dataset.fallback = ''; img.onerror = () => window.logoApp2Fallback(img); img.src = __logoApp2Avif; img.classList.add('opacity-30', 'object-contain', 'p-4'); if (!title || title === 'undefined' || title === 'null') return; try { const res = await fetch(`/api/requests/search?query=${encodeURIComponent(title)}`); const data = await res.json(); if (data.status === 'success' && data.data.length > 0) { const match = data.data.find(d => d.poster_path) || data.data[0]; if (match.poster_path) { img.src = match.poster_path; img.classList.remove('opacity-30', 'object-contain', 'p-4'); img.classList.add('object-cover'); } } } catch(e) {} };
+window.fallbackReportPoster = async function(imgEl, title) { if(imgEl.getAttribute('data-fallback-done')) return; imgEl.setAttribute('data-fallback-done', 'true'); imgEl.dataset.fallback = ''; imgEl.onerror = () => window.logoApp2Fallback(imgEl); imgEl.src = __logoApp2Avif; imgEl.style.objectFit = "contain"; imgEl.style.padding = "20px"; try { const res = await fetch(`/api/requests/search?query=${encodeURIComponent(title)}`); const data = await res.json(); if (data.status === 'success' && data.data.length > 0) { const match = data.data.find(d => d.poster_path) || data.data[0]; if (match.poster_path) { const b64 = await toBase64(match.poster_path); if(b64) { imgEl.src = b64; imgEl.style.objectFit = "cover"; imgEl.style.padding = "0"; } } } } catch(e) {} };
 
 document.addEventListener('alpine:init', () => {
     Alpine.data('dragScroll', () => ({ isDown: false, isDragging: false, startX: 0, scrollLeft: 0, start(e) { this.isDown = true; this.isDragging = false; this.startX = e.pageX - this.$el.offsetLeft; this.scrollLeft = this.$el.scrollLeft; }, end() { this.isDown = false; setTimeout(() => { this.isDragging = false; }, 50); }, move(e) { if (!this.isDown) return; this.isDragging = true; e.preventDefault(); const walk = (e.pageX - this.$el.offsetLeft - this.startX) * 1.5; this.$el.scrollLeft = this.scrollLeft - walk; } }));
@@ -17,6 +55,9 @@ document.addEventListener('alpine:init', () => {
         serverDashboard: null, serverLatest: [], serverTopRated: [], serverGenres: [], serverTopMovies: [], serverTopSeries: [],
         showcaseModal: { open: false, isLoading: false, data: null }, queueModal: { open: false, activeTab: 'request' }, myQueue: [], myRequestMap: {}, myFeedbacks: [],
         userStats: null, userBadges: [], userTrend: null, isStatsLoading: false, statsLoaded: false, charts: { hour: null, device: null, client: null, trend: null },
+        chartVisibility: { hour: false, trend: false, device: false, client: false },
+        chartRendered: { hour: false, trend: false, device: false, client: false },
+        profileObserversInitialized: false,
         isModalOpen: false, activeItem: null, tvSeasons: [], isLoadingSeasons: false, isCheckingLocal: false, selectedSeasons: [], isSubmitting: false,
         toast: { show: false, message: '', type: 'success' }, feedbackModal: { open: false, itemName: '', posterPath: '', issueType: '缺少字幕', desc: '' }, feedbackIssues: ['缺少字幕', '字幕错位', '视频卡顿/花屏', '清晰度太低', '音轨无声/音画不同步', '其他问题'], isFeedbackSubmitting: false,
         posterStudio: { open: false, isLoading: false, isSaving: false, period: 'month', periodLabel: '本月 观影报告', data: null, useCoverBg: false, top1BgBase64: null, rankRows: [] },
@@ -24,7 +65,7 @@ document.addEventListener('alpine:init', () => {
 
         async initTheme() { this.isDarkMode = document.documentElement.classList.contains('dark'); try { const res = await fetch('/api/requests/check'); const data = await res.json(); if (data.status === 'success') { this.isLoggedIn = true; this.userId = data.user.Id; this.userName = data.user.Name; this.expireDate = data.user.expire_date; this.serverUrlLocal = data.server_url_local || ''; this.serverUrlPublic = data.server_url_public || ''; this.serverUrl = await this.pickBestServerUrl(); this.serverId = data.server_id || ''; this.loadServerData(); } } catch(e) {} this.isLoaded = true; this.refreshCaptcha(); },
         handleScroll() { const st = window.pageYOffset || document.documentElement.scrollTop; this.scrolled = st > 50; this.isScrollingDown = st > this.lastScrollTop && st > 50; this.lastScrollTop = st <= 0 ? 0 : st; },
-        toggleTheme() { this.isDarkMode = !this.isDarkMode; localStorage.setItem('ep_theme', this.isDarkMode ? 'dark' : 'light'); document.documentElement.classList.toggle('dark', this.isDarkMode); if (this.currentTab === 'profile' && this.statsLoaded) setTimeout(() => this.renderCharts(), 150); },
+        toggleTheme() { this.isDarkMode = !this.isDarkMode; localStorage.setItem('ep_theme', this.isDarkMode ? 'dark' : 'light'); document.documentElement.classList.toggle('dark', this.isDarkMode); if (this.currentTab === 'profile' && this.statsLoaded) { this.chartRendered = { hour: false, trend: false, device: false, client: false }; setTimeout(() => this.renderCharts(), 150); } },
         showToast(msg, type = 'success') { this.toast = { show: true, message: msg, type }; setTimeout(() => this.toast.show = false, 3000); },
         async copyToClipboard(text) { try { await navigator.clipboard.writeText(text); } catch(e) { const input = document.createElement('input'); input.value = text; document.body.appendChild(input); input.select(); document.execCommand('copy'); document.body.removeChild(input); } },
         async login() { if(!this.loginForm.username || !this.loginForm.password || !this.loginForm.captcha) return; this.isLoggingIn = true; try { const res = await fetch('/api/requests/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.loginForm) }); const data = await res.json(); if (data.status === 'success') { const checkRes = await fetch('/api/requests/check'); const checkData = await checkRes.json(); if (checkData.status === 'success') { this.userId = checkData.user.Id; this.userName = checkData.user.Name; this.expireDate = checkData.user.expire_date; this.serverUrlLocal = checkData.server_url_local || ''; this.serverUrlPublic = checkData.server_url_public || ''; this.serverUrl = await this.pickBestServerUrl(); this.serverId = checkData.server_id || ''; } this.isLoggedIn = true; this.loadServerData(); this.showToast('登录成功'); } else { this.showToast(data.message, 'error'); this.loginForm.captcha = ''; this.refreshCaptcha(); } } catch(e) { this.showToast('网络错误', 'error'); } this.isLoggingIn = false; },
@@ -96,7 +137,49 @@ document.addEventListener('alpine:init', () => {
             } catch(e) { console.log("无热门数据"); }
         },
 
-        switchTab(tab) { this.currentTab = tab; this.$nextTick(() => window.scrollTo(0, 0)); if (tab === 'profile') { if (!this.statsLoaded) this.loadProfileStats(); else setTimeout(() => this.renderCharts(), 150); } if (tab === 'request' && !this.recommendLoaded) this.loadRecommendations(); },
+        switchTab(tab) { 
+            this.currentTab = tab; 
+            this.$nextTick(() => window.scrollTo(0, 0)); 
+            if (tab === 'profile') { 
+                // Profile tab uses x-if, DOM gets recreated. Reset chart state to ensure re-render.
+                try { if (this.charts.hour) this.charts.hour.destroy(); } catch(e) {}
+                try { if (this.charts.trend) this.charts.trend.destroy(); } catch(e) {}
+                try { if (this.charts.device) this.charts.device.destroy(); } catch(e) {}
+                try { if (this.charts.client) this.charts.client.destroy(); } catch(e) {}
+                this.chartRendered = { hour: false, trend: false, device: false, client: false };
+                this.chartVisibility = { hour: false, trend: false, device: false, client: false };
+                this.profileObserversInitialized = false;
+                this.setupProfileChartObservers(); 
+                if (!this.statsLoaded) this.loadProfileStats(); 
+                else setTimeout(() => this.renderCharts(), 150);
+                // rAF 双重兜底：防止 DOM 重建后首次渲染未命中
+                requestAnimationFrame(() => requestAnimationFrame(() => this.renderCharts()));
+            } 
+            if (tab === 'request' && !this.recommendLoaded) this.loadRecommendations(); 
+        },
+
+        setupProfileChartObservers() {
+            if (this.profileObserversInitialized) return;
+            const self = this;
+            const setup = (id, key) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const trigger = () => { self.chartVisibility[key] = true; self.renderCharts(); };
+                const observer = new IntersectionObserver((entries) => {
+                    if (entries.some(e => e.isIntersecting)) {
+                        observer.disconnect();
+                        trigger();
+                    }
+                }, { rootMargin: '200px' });
+                observer.observe(el);
+                el.addEventListener('click', trigger, { once: true });
+            };
+            setup('profileHourChart', 'hour');
+            setup('profileTrendChart', 'trend');
+            setup('profileDeviceChart', 'device');
+            setup('profileClientChart', 'client');
+            this.profileObserversInitialized = true;
+        },
 
         async openShowcaseModal(itemId, fallbackItem = null) { 
             const finalId = itemId || (fallbackItem ? fallbackItem.ItemId || fallbackItem.Id : ''); 
@@ -137,38 +220,41 @@ document.addEventListener('alpine:init', () => {
         async submitFeedback() { this.isFeedbackSubmitting = true; try { const res = await fetch('/api/requests/feedback/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_name: this.feedbackModal.itemName, issue_type: this.feedbackModal.issueType, description: this.feedbackModal.desc, poster_path: this.feedbackModal.posterPath }) }); const text = await res.text(); let data = {}; try { data = JSON.parse(text); } catch(e) { data = { message: text }; } if (res.ok && (data.status === 'success' || !data.detail)) { this.showToast(data.message || '反馈成功'); this.feedbackModal.open = false; this.openQueueModal('feedback'); } else { this.showToast(data.message || data.detail || '报错失败', 'error'); } } catch(e) { this.showToast('网络错误', 'error'); } finally { this.isFeedbackSubmitting = false; } },
         async searchMedia() { if (!this.searchQuery.trim()) return; this.isSearching = true; if (this.currentTab !== 'request') this.currentTab = 'request'; window.scrollTo(0, 0); try { const res = await fetch(`/api/requests/search?query=${encodeURIComponent(this.searchQuery)}`); const data = await res.json(); if (data.status === 'success') { this.searchResults = data.data; if (data.data.length === 0) this.showToast('未找到结果', 'error'); } } catch (e) { this.showToast('网络错误', 'error'); } finally { this.isSearching = false; } },
 
-        async loadProfileStats() { if (this.statsLoaded || !this.userId) return; this.isStatsLoading = true; try { const [stats, badges, trend] = await Promise.all([ fetch(`/api/stats/user_details?user_id=${this.userId}`).then(r => r.json()), fetch(`/api/stats/badges?user_id=${this.userId}`).then(r => r.json()), fetch(`/api/stats/trend?dimension=day&user_id=${this.userId}`).then(r => r.json()) ]); if (stats.status === 'success') this.userStats = stats.data; if (badges.status === 'success') this.userBadges = badges.data; if (trend.status === 'success') this.userTrend = trend.data; this.statsLoaded = true; this.renderCharts(); } catch(e) {} this.isStatsLoading = false; },
+        async loadProfileStats() { if (this.statsLoaded || !this.userId) return; this.isStatsLoading = true; try { const [stats, badges, trend] = await Promise.all([ fetch(`/api/stats/user_details?user_id=${this.userId}`).then(r => r.json()), fetch(`/api/stats/badges?user_id=${this.userId}`).then(r => r.json()), fetch(`/api/stats/trend?dimension=day&user_id=${this.userId}`).then(r => r.json()) ]); if (stats.status === 'success') this.userStats = stats.data; if (badges.status === 'success') this.userBadges = badges.data; if (trend.status === 'success') this.userTrend = trend.data; this.statsLoaded = true; this.chartRendered = { hour: false, trend: false, device: false, client: false }; this.renderCharts(); } catch(e) {} this.isStatsLoading = false; },
 
         renderCharts() {
             this.$nextTick(() => {
-                try {
-                    if (!window.Chart || !this.userStats) return;
+                if (!this.userStats) return;
+                window.ensureRequestChartJs().then(() => {
+                    try {
                     const isDark = this.isDarkMode; const textColor = isDark ? '#a1a1aa' : '#64748b'; 
                     const macaronColors = ['#10b981', '#3b82f6', '#8b5cf6', '#6366f1', '#14b8a6', '#64748b'];
                     const warmColors = ['#f43f5e', '#f59e0b', '#ec4899', '#f97316', '#d946ef', '#64748b'];
+                    const forceRender = !this.chartVisibility.hour && !this.chartVisibility.trend && !this.chartVisibility.device && !this.chartVisibility.client;
                     
                     const hourlyData = this.userStats.hourly || {};
-                    if (document.getElementById('profileHourChart')) { if (this.charts.hour) this.charts.hour.destroy(); const ctx = document.getElementById('profileHourChart').getContext('2d'); let labels = [], values = []; for(let i=0; i<24; i++) { labels.push(String(i).padStart(2, '0')); values.push(hourlyData[String(i).padStart(2, '0')] || 0); } this.charts.hour = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ data: values, backgroundColor: isDark ? '#818cf8' : '#6366f1', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: textColor, font: {size: 9} } }, y: { display: false } } } }); }
+                    if ((this.chartVisibility.hour || forceRender) && !this.chartRendered.hour && document.getElementById('profileHourChart')) { if (this.charts.hour) this.charts.hour.destroy(); const ctx = document.getElementById('profileHourChart').getContext('2d'); let labels = [], values = []; for(let i=0; i<24; i++) { labels.push(String(i).padStart(2, '0')); values.push(hourlyData[String(i).padStart(2, '0')] || 0); } this.charts.hour = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ data: values, backgroundColor: isDark ? '#818cf8' : '#6366f1', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: textColor, font: {size: 9} } }, y: { display: false } } } }); this.chartRendered.hour = true; if (window.markRequestChartReady) window.markRequestChartReady('profileHourChart'); }
                     
                     const trendData = this.userTrend || {};
-                    if (document.getElementById('profileTrendChart') && Object.keys(trendData).length > 0) { if (this.charts.trend) this.charts.trend.destroy(); const ctx = document.getElementById('profileTrendChart').getContext('2d'); const labels = Object.keys(trendData).map(k => k.substring(5)); const values = Object.values(trendData).map(v => Math.round(v/3600)); this.charts.trend = new Chart(ctx, { type: 'line', data: { labels, datasets: [{ data: values, borderColor: isDark ? '#38bdf8' : '#0ea5e9', backgroundColor: isDark ? 'rgba(56,189,248,0.15)' : 'rgba(14,165,233,0.15)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: textColor, maxTicksLimit: 6, font: {size: 9} } }, y: { display: false } } } }); }
+                    if ((this.chartVisibility.trend || forceRender) && !this.chartRendered.trend && document.getElementById('profileTrendChart') && Object.keys(trendData).length > 0) { if (this.charts.trend) this.charts.trend.destroy(); const ctx = document.getElementById('profileTrendChart').getContext('2d'); const labels = Object.keys(trendData).map(k => k.substring(5)); const values = Object.values(trendData).map(v => Math.round(v/3600)); this.charts.trend = new Chart(ctx, { type: 'line', data: { labels, datasets: [{ data: values, borderColor: isDark ? '#38bdf8' : '#0ea5e9', backgroundColor: isDark ? 'rgba(56,189,248,0.15)' : 'rgba(14,165,233,0.15)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: textColor, maxTicksLimit: 6, font: {size: 9} } }, y: { display: false } } } }); this.chartRendered.trend = true; if (window.markRequestChartReady) window.markRequestChartReady('profileTrendChart'); }
                     
                     const devices = this.userStats.devices || [];
-                    if (document.getElementById('profileDeviceChart') && devices.length > 0) {
+                    if ((this.chartVisibility.device || forceRender) && !this.chartRendered.device && document.getElementById('profileDeviceChart') && devices.length > 0) {
                         if (this.charts.device) this.charts.device.destroy(); const ctx = document.getElementById('profileDeviceChart').getContext('2d'); let labels = [], values = [], others = 0;
                         devices.forEach((d, i) => { let name = d.Device || d.device || d.name || d.Client || '未知'; let val = d.Plays || d.count || 0; if(i<4){ labels.push(name); values.push(val); } else { others += val; } });
                         if(others > 0){ labels.push('其他'); values.push(others); }
-                        this.charts.device = new Chart(ctx, { type: 'doughnut', data: { labels, datasets: [{ data: values, backgroundColor: macaronColors, borderWidth: 2, borderColor: isDark ? '#000' : '#fff' }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'right', labels: { boxWidth: 6, font: {size: 9}, color: textColor } } } } });
+                        this.charts.device = new Chart(ctx, { type: 'doughnut', data: { labels, datasets: [{ data: values, backgroundColor: macaronColors, borderWidth: 2, borderColor: isDark ? '#000' : '#fff' }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'right', labels: { boxWidth: 6, font: {size: 9}, color: textColor } } } } }); this.chartRendered.device = true; if (window.markRequestChartReady) window.markRequestChartReady('profileDeviceChart');
                     }
                     
                     const clients = this.userStats.clients || [];
-                    if (document.getElementById('profileClientChart') && clients.length > 0) {
+                    if ((this.chartVisibility.client || forceRender) && !this.chartRendered.client && document.getElementById('profileClientChart') && clients.length > 0) {
                         if (this.charts.client) this.charts.client.destroy(); const ctx = document.getElementById('profileClientChart').getContext('2d'); let labels = [], values = [], others = 0;
                         clients.forEach((c, i) => { let name = c.Client || c.client || c.name || '未知'; let val = c.Plays || c.count || 0; if(i<4){ labels.push(name); values.push(val); } else { others += val; } });
                         if(others > 0){ labels.push('其他'); values.push(others); }
-                        this.charts.client = new Chart(ctx, { type: 'doughnut', data: { labels, datasets: [{ data: values, backgroundColor: warmColors, borderWidth: 2, borderColor: isDark ? '#000' : '#fff' }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'right', labels: { boxWidth: 6, font: {size: 9}, color: textColor } } } } });
+                        this.charts.client = new Chart(ctx, { type: 'doughnut', data: { labels, datasets: [{ data: values, backgroundColor: warmColors, borderWidth: 2, borderColor: isDark ? '#000' : '#fff' }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'right', labels: { boxWidth: 6, font: {size: 9}, color: textColor } } } } }); this.chartRendered.client = true; if (window.markRequestChartReady) window.markRequestChartReady('profileClientChart');
                     }
                 } catch (e) { console.error("图表数据异常保护", e); }
+            });
             });
         },
 
