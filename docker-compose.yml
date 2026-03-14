@@ -15,4 +15,5 @@ services:
     
     environment:
       - TZ=Asia/Shanghai
+      - PLAYBACK_DATA_MODE=sqlite # api 或 sqlite
       - DB_PATH=/emby-data/playback_reporting.db

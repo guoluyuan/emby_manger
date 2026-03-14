@@ -35,6 +35,8 @@
 - `DB_PATH`：本地模式下 Playback Reporting 数据库文件路径
 - `hidden_users`：需要在大盘中隐藏的用户 ID 列表
 
+提示：Docker 部署可用环境变量 `PLAYBACK_DATA_MODE=api|sqlite` 直接指定模式，适合快速切换。
+
 ### 🧩 模式选择（小白必看）
 
 **API 模式（推荐：无法挂载数据库时）**

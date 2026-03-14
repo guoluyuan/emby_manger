@@ -38,6 +38,12 @@ THEMES = {
     "white":      {"bg": (255, 255, 255), "text": (51, 51, 51), "card": (0, 0, 0, 10), "highlight": (234, 179, 8)}
 }
 
+def _get_playback_mode_from_env():
+    env_mode = os.getenv("PLAYBACK_DATA_MODE", "").strip().lower()
+    if env_mode in ("api", "sqlite"):
+        return env_mode
+    return "sqlite"
+
 DEFAULT_CONFIG = {
     "emby_host": os.getenv("EMBY_HOST", "http://127.0.0.1:8096").rstrip('/'),
     "emby_api_key": os.getenv("EMBY_API_KEY", "").strip(),
@@ -64,7 +70,8 @@ DEFAULT_CONFIG = {
     "pulse_url": "",
     "server_type": "emby",
     "secret_key": "",
-    "cors_origins": []
+    "cors_origins": [],
+    "playback_data_mode": _get_playback_mode_from_env()
 }
 
 class ConfigManager:
@@ -107,6 +114,11 @@ class ConfigManager:
 
 cfg = ConfigManager()
 templates = Jinja2Templates(directory="templates")
+
+# Allow env to override playback mode for containerized deployments.
+env_playback_mode = os.getenv("PLAYBACK_DATA_MODE", "").strip().lower()
+if env_playback_mode in ("api", "sqlite") and cfg.get("playback_data_mode") != env_playback_mode:
+    cfg.set("playback_data_mode", env_playback_mode)
 
 # Ensure critical secrets are not left at insecure defaults.
 env_secret = os.getenv("SECRET_KEY", "").strip()

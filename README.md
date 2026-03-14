@@ -143,10 +143,16 @@ services:
       - /path/to/emby/data:/emby-data # API 模式下可不挂载数据库
     environment:
       - TZ=Asia/Shanghai
-      - DB_PATH=/emby-data/playback_reporting.db #API模式下可以不写，本地模式必填
+      - PLAYBACK_DATA_MODE=api # api 或 sqlite
+      - DB_PATH=/emby-data/playback_reporting.db # sqlite 模式必填
 ```
 
 首次安装后，请访问 `http://localhost:10307/` 在网页中填写 Emby 地址与 API Key（无需写入 `docker-compose.yml`）。
+
+**模式选择说明**
+
+- `PLAYBACK_DATA_MODE=api`：API 模式，不强制挂载数据库文件；可移除 `DB_PATH` 和 `emby-data` 挂载。
+- `PLAYBACK_DATA_MODE=sqlite`：本地模式，必须挂载 Emby 数据目录并正确填写 `DB_PATH`。
 
 ### 本地部署（非 Docker）
 
