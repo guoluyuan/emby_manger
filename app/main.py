@@ -188,6 +188,10 @@ class ETagMiddleware(BaseHTTPMiddleware):
 # CSRF protection for session-authenticated requests
 class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        # Public or pre-auth endpoints should not require CSRF
+        path = request.url.path
+        if path in ("/api/login", "/api/requests/auth", "/api/setup", "/api/register"):
+            return await call_next(request)
         if request.method in ("POST", "PUT", "PATCH", "DELETE"):
             session = request.session if hasattr(request, "session") else {}
             if session and (session.get("user") or session.get("req_user")):
