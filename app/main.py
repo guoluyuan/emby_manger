@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.gzip import GZipMiddleware
@@ -46,6 +46,7 @@ async def user_portal_app(scope, receive, send):
                 return
 
     elif scope["type"] == "http":
+        scope["user_portal"] = True
         path = scope.get("path", "")
         
         # 强制送去求片中心
@@ -53,15 +54,20 @@ async def user_portal_app(scope, receive, send):
             scope["path"] = "/request"
             scope["raw_path"] = b"/request"
             
-        # 铁血隔离白名单：放行求片页面、静态资源、以及所有受密码保护的底层 API
-        allowed = (
-            "/request", 
-            "/request_login", 
-            "/static", 
-            "/favicon.ico",
-            "/api"
+        # 铁血隔离白名单：仅放行用户端必需路径，避免后台接口泄露
+        allowed_prefixes = (
+            "/request",
+            "/request_login",
+            "/invite",
+            "/static",
+            "/api/requests",
+            "/api/stats",
+            "/api/proxy",
+            "/api/captcha",
+            "/api/wallpaper"
         )
-        if not scope["path"].startswith(allowed):
+        allowed_exact = ("/favicon.ico", "/manifest.json", "/request_manifest.json", "/sw.js")
+        if not (path in allowed_exact or path.startswith(allowed_prefixes)):
             async def send_404():
                 await send({"type": "http.response.start", "status": 404, "headers": [(b"content-type", b"text/html; charset=utf-8")]})
                 await send({"type": "http.response.body", "body": "<h1>404 Not Found</h1><p>非法越界，后台管理界面已被物理阻断。</p>".encode("utf-8")})
@@ -150,7 +156,30 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     return JSONResponse(status_code=403, content={"status": "error", "message": "CSRF token invalid"})
         return await call_next(request)
 
+# Split admin/user portals by port: block user pages on admin port (10307).
+class AdminPortalSplitMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, user_port: int = 10308):
+        super().__init__(app)
+        self.user_port = user_port
+        self.block_paths = ("/request", "/request_login", "/request_manifest.json")
+
+    async def dispatch(self, request: Request, call_next):
+        if not request.scope.get("user_portal"):
+            path = request.url.path
+            if path in self.block_paths or path.startswith("/request/") or path.startswith("/invite/") or path == "/invite":
+                host = request.url.hostname
+                if not host:
+                    raw_host = (request.headers.get("host") or "").split(":")[0]
+                    host = raw_host if raw_host else None
+                if host:
+                    target = f"{request.url.scheme}://{host}:{self.user_port}{path}"
+                    if request.url.query:
+                        target += f"?{request.url.query}"
+                    return RedirectResponse(url=target, status_code=307)
+        return await call_next(request)
+
 # 中间件
+app.add_middleware(AdminPortalSplitMiddleware)
 app.add_middleware(CSRFMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, max_age=86400*7)
 cors_env = os.getenv("CORS_ORIGINS", "")

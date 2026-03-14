@@ -432,6 +432,29 @@
                 <label class="block text-[11px] font-bold text-gray-500 mb-2 uppercase">权限继承源 (全量克隆)</label>
                 <select id="invite-template" class="w-full px-4 py-3 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50 dark:bg-black/20 outline-none text-[13px] focus:ring-2 focus:ring-emerald-500 shadow-sm cursor-pointer"></select>
             </div>
+            <div>
+                <label class="block text-[11px] font-bold text-gray-500 mb-2 uppercase">邀请码链接类型</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200/80 dark:border-white/10 bg-white dark:bg-black/20 cursor-pointer text-[12px] font-bold text-gray-700 dark:text-gray-200">
+                        <input type="radio" name="invite-link-mode" value="lan" onchange="setInviteLinkMode('lan')" class="w-4 h-4 text-emerald-500 rounded">
+                        局域网链接
+                    </label>
+                    <label class="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200/80 dark:border-white/10 bg-white dark:bg-black/20 cursor-pointer text-[12px] font-bold text-gray-700 dark:text-gray-200">
+                        <input type="radio" name="invite-link-mode" value="public" onchange="setInviteLinkMode('public')" class="w-4 h-4 text-emerald-500 rounded">
+                        公网链接
+                    </label>
+                </div>
+            </div>
+            <div>
+                <label class="block text-[11px] font-bold text-gray-500 mb-2 uppercase">局域网访问地址 (可选)</label>
+                <input type="text" id="invite-base-lan" onblur="saveInvitePrefs()" placeholder="http://192.168.x.x:10308" class="w-full px-4 py-3 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50 dark:bg-black/20 outline-none text-[13px] focus:ring-2 focus:ring-emerald-500 shadow-sm">
+                <div class="text-[10px] text-gray-400 mt-1.5">留空则自动使用当前访问地址并替换为 10308 端口</div>
+            </div>
+            <div>
+                <label class="block text-[11px] font-bold text-gray-500 mb-2 uppercase">公网访问地址 (选填)</label>
+                <input type="text" id="invite-base-public" onblur="saveInvitePrefs()" placeholder="https://user.xxx.ltd" class="w-full px-4 py-3 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50 dark:bg-black/20 outline-none text-[13px] focus:ring-2 focus:ring-emerald-500 shadow-sm">
+                <div class="text-[10px] text-gray-400 mt-1.5">仅在选择公网链接时使用，可留空但生成前会提示填写</div>
+            </div>
             <div class="flex justify-end gap-3 mt-8">
                 <button onclick="closeInviteModal()" class="px-5 py-2.5 bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#3A3A3C] rounded-xl font-bold text-[13px] transition-colors">取消</button>
                 <button onclick="generateInvite(event)" class="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 transition text-white rounded-xl font-bold text-[13px] shadow-md active:scale-95">生成链接</button>
@@ -497,13 +520,86 @@ let selectedUsers = new Set();
 let currentFilter = 'all';
 let invitesList = [];
 let selectedInvites = new Set();
+let inviteLinkMode = localStorage.getItem('inviteLinkMode') || 'lan';
+let inviteBaseLan = localStorage.getItem('inviteBaseLan') || '';
+let inviteBasePublic = localStorage.getItem('inviteBasePublic') || '';
 
 let currentApplyTemplate = null;
 
 document.addEventListener('DOMContentLoaded', function() { 
     loadLibraries(); 
     loadUsers(); 
+    syncInviteInputs();
 });
+
+function normalizeBaseUrl(url) {
+    return (url || '').trim().replace(/\/+$/, '');
+}
+
+function guessLanBase() {
+    const proto = window.location.protocol;
+    const host = window.location.hostname || 'localhost';
+    let port = window.location.port;
+    if (!port || port === '10307' || port === '10308') {
+        port = '10308';
+    }
+    return `${proto}//${host}:${port}`;
+}
+
+function guessPublicBase() {
+    if (inviteBasePublic) return inviteBasePublic;
+    const host = window.location.hostname || '';
+    if (host.startsWith('admin.')) {
+        return `${window.location.protocol}//user.${host.slice(6)}`;
+    }
+    return '';
+}
+
+function setInviteLinkMode(mode) {
+    inviteLinkMode = mode || 'lan';
+    localStorage.setItem('inviteLinkMode', inviteLinkMode);
+}
+
+function saveInvitePrefs() {
+    const lanInput = document.getElementById('invite-base-lan');
+    const pubInput = document.getElementById('invite-base-public');
+    if (lanInput && lanInput.value) {
+        inviteBaseLan = normalizeBaseUrl(lanInput.value);
+        localStorage.setItem('inviteBaseLan', inviteBaseLan);
+    }
+    if (pubInput && pubInput.value) {
+        inviteBasePublic = normalizeBaseUrl(pubInput.value);
+        localStorage.setItem('inviteBasePublic', inviteBasePublic);
+    }
+    const checked = document.querySelector('input[name="invite-link-mode"]:checked');
+    if (checked) {
+        setInviteLinkMode(checked.value);
+    }
+}
+
+function syncInviteInputs() {
+    const lanInput = document.getElementById('invite-base-lan');
+    const pubInput = document.getElementById('invite-base-public');
+    if (lanInput && !lanInput.value) lanInput.value = inviteBaseLan || guessLanBase();
+    if (pubInput && !pubInput.value) pubInput.value = inviteBasePublic || guessPublicBase();
+    document.querySelectorAll('input[name="invite-link-mode"]').forEach(i => {
+        i.checked = (i.value === inviteLinkMode);
+    });
+}
+
+function getInviteBase(mode) {
+    const lanInput = document.getElementById('invite-base-lan');
+    const pubInput = document.getElementById('invite-base-public');
+    const lanVal = normalizeBaseUrl(lanInput ? lanInput.value : inviteBaseLan) || normalizeBaseUrl(inviteBaseLan) || normalizeBaseUrl(guessLanBase());
+    const pubVal = normalizeBaseUrl(pubInput ? pubInput.value : inviteBasePublic) || normalizeBaseUrl(inviteBasePublic) || normalizeBaseUrl(guessPublicBase());
+    return mode === 'public' ? pubVal : lanVal;
+}
+
+function buildInviteLink(code, modeOverride = null) {
+    const mode = modeOverride || inviteLinkMode || 'lan';
+    const base = getInviteBase(mode) || normalizeBaseUrl(window.location.origin);
+    return `${base}/invite/${code}`;
+}
 
 async function openInviteManageModal() {
     const modal = document.getElementById('invite-manage-modal');
@@ -553,7 +649,7 @@ function renderInvites() {
         
         const daysText = inv.days == -1 ? '永久' : `${inv.days} 天`;
         const dateStr = inv.created_at ? new Date(inv.created_at).toLocaleString('zh-CN', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'}) : '未知';
-        const fullLink = window.location.origin + '/invite/' + inv.code;
+        const fullLink = buildInviteLink(inv.code);
 
         html += `
             <tr class="border-b border-gray-50 dark:border-white/5 hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors">
@@ -899,6 +995,13 @@ async function generateInvite(e) {
     const count = parseInt(document.getElementById('invite-count').value) || 1; 
     const templateId = document.getElementById('invite-template').value;
     const submitBtn = e.target; 
+    const mode = (document.querySelector('input[name="invite-link-mode"]:checked') || {}).value || 'lan';
+    const base = getInviteBase(mode);
+    if (!base) {
+        alert(mode === 'public' ? '请填写公网访问地址' : '请填写局域网访问地址');
+        return;
+    }
+    saveInvitePrefs();
     submitBtn.disabled = true; 
     submitBtn.innerHTML = '生成中...';
     try {
@@ -912,7 +1015,7 @@ async function generateInvite(e) {
             const container = document.getElementById('invite-links-container'); 
             container.innerHTML = ""; 
             json.codes.forEach(c => { 
-                const link = window.location.origin + '/invite/' + c; 
+                const link = buildInviteLink(c, mode); 
                 container.innerHTML += `
                     <div class="flex items-center gap-2 bg-white dark:bg-[#2C2C2E] p-2.5 rounded-xl border border-gray-100 dark:border-white/5 shadow-sm">
                         <span class="flex-1 truncate font-mono text-[11px] select-all">${link}</span>
@@ -1185,6 +1288,7 @@ function openInviteModal() {
     document.getElementById('custom-duration').value = ''; 
     selectDuration(30); 
     populateTemplates('invite-template'); 
+    syncInviteInputs();
     setTimeout(() => { modal.classList.add('flex'); }, 10); 
 }
 

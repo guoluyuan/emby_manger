@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Request
 import requests
 import threading
 import concurrent.futures
@@ -8,12 +8,15 @@ import json
 import urllib.parse
 import re
 import time
+import ipaddress
+import socket
 
 from app.core.config import cfg
 from app.core.database import query_db
 from app.routers.search import get_emby_sys_info, is_new_emby_router
 # 🔥 引入核心适配器
 from app.core.media_adapter import media_api
+from app.core.security import get_client_ip
 
 router = APIRouter(prefix="/api/gaps", tags=["gaps"])
 
@@ -28,6 +31,91 @@ def update_progress(item_name=None):
 def _get_proxies():
     proxy = cfg.get("proxy_url")
     return {"http": proxy, "https": proxy} if proxy else None
+
+def _extract_host_ip(url: str):
+    try:
+        parsed = urllib.parse.urlparse(url)
+        host = parsed.hostname
+        if not host:
+            return None
+        try:
+            return str(ipaddress.ip_address(host))
+        except ValueError:
+            try:
+                return socket.gethostbyname(host)
+            except:
+                return host
+    except:
+        return None
+
+def _same_lan(ip_a: str, ip_b: str):
+    try:
+        a = ipaddress.ip_address(ip_a)
+        b = ipaddress.ip_address(ip_b)
+        # Allow localhost (IPv4/IPv6) to treat private hosts as LAN
+        if a.is_loopback:
+            return b.is_loopback or b.is_private
+        if b.is_loopback:
+            return a.is_loopback or a.is_private
+        if a.version != b.version:
+            return False
+        if not (a.is_private and b.is_private):
+            return False
+        net = ipaddress.ip_network(f"{a}/24", strict=False)
+        return b in net
+    except:
+        return False
+
+def _extract_server_id_from_url(url: str):
+    try:
+        if not url:
+            return ""
+        parsed = urllib.parse.urlparse(url)
+        def _from_qs(qs: str):
+            q = urllib.parse.parse_qs(qs)
+            vals = q.get("serverId") or q.get("serverid") or []
+            return vals[0] if vals else ""
+        sid = _from_qs(parsed.query)
+        if sid:
+            return sid
+        frag = parsed.fragment or ""
+        if frag:
+            frag_qs = frag.split("?", 1)[1] if "?" in frag else frag
+            sid = _from_qs(frag_qs)
+            if sid:
+                return sid
+            m = re.search(r"(?:serverId|serverid)=([^&]+)", frag)
+            if m:
+                return m.group(1)
+        m = re.search(r"(?:serverId|serverid)=([^&]+)", url)
+        if m:
+            return m.group(1)
+        return ""
+    except:
+        return ""
+
+def _infer_use_new_route(url: str):
+    try:
+        return False if "details.html" in (url or "") else True
+    except:
+        return True
+
+def _build_emby_item_url(base_url: str, series_id: str, server_id: str, use_new_route: bool):
+    base = (base_url or "").rstrip("/")
+    if use_new_route:
+        return f"{base}/web/index.html#!/item?id={series_id}&serverId={server_id}"
+    return f"{base}/web/index.html#!/item/details.html?id={series_id}&serverId={server_id}"
+
+def _is_lan_access_host(hostname: str):
+    try:
+        if not hostname:
+            return False
+        if hostname.lower() in ("localhost",):
+            return True
+        ip = ipaddress.ip_address(hostname)
+        return ip.is_private or ip.is_loopback or ip.is_link_local
+    except:
+        return False
 
 def get_admin_user_id():
     try:
@@ -74,7 +162,17 @@ def process_single_series(series, lock_map, host, tmdb_key, proxies, today, glob
     if series_gaps:
         public_host = (cfg.get("emby_public_url") or cfg.get("emby_external_url") or cfg.get("emby_public_host") or host).rstrip('/')
         emby_url = f"{public_host}/web/index.html#!/item?id={series_id}&serverId={server_id}" if use_new_route else f"{public_host}/web/index.html#!/item/details.html?id={series_id}&serverId={server_id}"
-        return {"series_id": series_id, "series_name": series_name, "tmdb_id": tmdb_id, "tmdb_status": tmdb_status, "poster": f"/api/library/image/{series_id}?type=Primary&width=300", "emby_url": emby_url, "gaps": series_gaps}
+        return {
+            "series_id": series_id,
+            "series_name": series_name,
+            "tmdb_id": tmdb_id,
+            "tmdb_status": tmdb_status,
+            "poster": f"/api/library/image/{series_id}?type=Primary&width=300",
+            "emby_url": emby_url,
+            "server_id": server_id,
+            "use_new_route": use_new_route,
+            "gaps": series_gaps
+        }
     else:
         if tmdb_status in ["Ended", "Canceled"]:
             try: query_db("INSERT OR IGNORE INTO gap_perfect_series (series_id, tmdb_id, series_name) VALUES (?, ?, ?)", (series_id, tmdb_id, series_name))
@@ -146,7 +244,7 @@ def start_scan(bg_tasks: BackgroundTasks):
     return {"status": "success"}
 
 @router.get("/scan/progress")
-def get_progress():
+def get_progress(request: Request):
     with state_lock:
         if not scan_state["is_scanning"]:
             if not scan_state["results"]:
@@ -159,7 +257,37 @@ def get_progress():
                 ignore_ids = set([r['series_id'] for r in ignores]) if ignores else set()
                 scan_state["results"] = [s for s in scan_state["results"] if s.get('series_id') not in ignore_ids]
             except: pass
-        return {"status": "success", "data": scan_state}
+        base_data = {k: v for k, v in scan_state.items() if k != "results"}
+        results_copy = [dict(s) for s in (scan_state.get("results") or [])]
+
+    host_url = (cfg.get("emby_host") or "").rstrip("/")
+    public_url = (cfg.get("emby_public_url") or cfg.get("emby_external_url") or cfg.get("emby_public_host") or "").rstrip("/")
+    access_host = ""
+    try:
+        access_host = (request.url.hostname or "").strip()
+    except:
+        access_host = ""
+    if not access_host:
+        try:
+            raw_host = (request.headers.get("host") or "").strip()
+            access_host = raw_host.split(":")[0] if raw_host else ""
+        except:
+            access_host = ""
+    use_local = _is_lan_access_host(access_host)
+    base_url = host_url if use_local else (public_url or host_url)
+
+    results_out = []
+    for s in results_copy:
+        series_id = s.get("series_id")
+        if series_id:
+            server_id = s.get("server_id") or _extract_server_id_from_url(s.get("emby_url", ""))
+            use_new_route = s.get("use_new_route")
+            if use_new_route is None:
+                use_new_route = _infer_use_new_route(s.get("emby_url", ""))
+            s["emby_url"] = _build_emby_item_url(base_url, series_id, server_id, use_new_route)
+        results_out.append(s)
+
+    return {"status": "success", "data": {**base_data, "results": results_out}}
 
 def run_verify_task():
     try:
