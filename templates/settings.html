@@ -136,6 +136,23 @@
                     <p class="mt-1 text-[10px] text-gray-400">可选：用于外网跳转播放；系统会在内网/外网间智能切换</p>
                 </div>
                 <div>
+                    <label class="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider pl-1">邀请链接 - 局域网入口</label>
+                    <input type="text" id="user_lan_url" class="w-full px-4 py-3 rounded-xl border border-transparent bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-[13px] font-mono text-gray-800 dark:text-gray-100 focus:bg-white dark:focus:bg-black/30 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-400" placeholder="http://192.168.x.x:10308">
+                    <p class="mt-1 text-[10px] text-gray-400">用于生成局域网邀请码链接，可留空</p>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider pl-1">邀请链接 - 公网入口</label>
+                    <input type="text" id="user_public_url" class="w-full px-4 py-3 rounded-xl border border-transparent bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-[13px] font-mono text-gray-800 dark:text-gray-100 focus:bg-white dark:focus:bg-black/30 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-400" placeholder="https://user.xxx.ltd">
+                    <p class="mt-1 text-[10px] text-gray-400">用于生成公网邀请码链接，可留空</p>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider pl-1">默认邀请码模板用户</label>
+                    <select id="default-invite-template" class="w-full px-4 py-3 rounded-xl border border-transparent bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-[13px] text-gray-800 dark:text-gray-100 focus:bg-white dark:focus:bg-black/30 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all shadow-sm cursor-pointer">
+                        <option value="">不指定</option>
+                    </select>
+                    <p class="mt-1 text-[10px] text-gray-400">用于生成邀请码时的默认模板用户（可选）</p>
+                </div>
+                <div>
                     <label class="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider pl-1">客户端引导链接 (可选)</label>
                     <input type="text" id="client_download_url" class="w-full px-4 py-3 rounded-xl border border-transparent bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-[13px] font-mono text-gray-800 dark:text-gray-100 focus:bg-white dark:focus:bg-black/30 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all placeholder-gray-400" placeholder="https://emby.media/download.html">
                 </div>
@@ -337,11 +354,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if(uJson.status === 'success') {
         allUsers = uJson.data;
         const sel = document.getElementById('user-selector');
+        const tplSel = document.getElementById('default-invite-template');
         allUsers.forEach(u => {
             const opt = document.createElement('option');
             opt.value = u.UserId;
             opt.textContent = u.UserName;
             sel.appendChild(opt);
+            if (tplSel && !u.IsAdmin) {
+                const opt2 = document.createElement('option');
+                opt2.value = u.UserId;
+                opt2.textContent = u.UserName;
+                tplSel.appendChild(opt2);
+            }
         });
     }
     loadSettings();
@@ -359,6 +383,10 @@ async function loadSettings() {
         document.getElementById('cors_origins').value = (d.cors_origins || []).join(', ');
         document.getElementById('webhook_token').value = d.webhook_token || '';
         document.getElementById('emby_public_url').value = d.emby_public_url || '';
+        document.getElementById('user_lan_url').value = d.user_lan_url || '';
+        document.getElementById('user_public_url').value = d.user_public_url || '';
+        const tplSel = document.getElementById('default-invite-template');
+        if (tplSel) tplSel.value = d.default_invite_template_user_id || '';
         document.getElementById('welcome_message').value = d.welcome_message || '';
         document.getElementById('client_download_url').value = d.client_download_url || '';
         document.getElementById('moviepilot_url').value = d.moviepilot_url || '';
@@ -457,6 +485,9 @@ async function saveSettings() {
         webhook_token: document.getElementById('webhook_token').value,
         hidden_users: hiddenUsers,
         emby_public_url: document.getElementById('emby_public_url').value,
+        user_lan_url: document.getElementById('user_lan_url').value,
+        user_public_url: document.getElementById('user_public_url').value,
+        default_invite_template_user_id: document.getElementById('default-invite-template').value,
         welcome_message: document.getElementById('welcome_message').value,
         client_download_url: document.getElementById('client_download_url').value,
         moviepilot_url: document.getElementById('moviepilot_url').value,

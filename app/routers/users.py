@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, Response, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Optional, List
 from app.core.config import cfg
+from app.core.policy import clone_policy
 from app.core.database import query_db
 from app.core.media_adapter import media_api
 import requests
@@ -108,26 +109,10 @@ class InviteBatchModelLocal(BaseModel):
     codes: List[str]
     action: str
 
-# ==========================================
-# 🔥 核心引擎：全量策略快照克隆器
-# ==========================================
-# 修复2: 移除了 'IsHidden' (隐藏用户)，允许它作为杂项策略被正常克隆！
-DANGEROUS_POLICY_KEYS = {'IsAdministrator', 'IsDisabled', 'LoginAttemptsBeforeLockout'}
-LIBRARY_POLICY_KEYS = {'EnableAllFolders', 'EnabledFolders', 'ExcludedSubFolders', 'BlockedMediaFolders', 'BlockedChannels', 'EnableAllChannels', 'EnabledChannels'}
-PARENTAL_POLICY_KEYS = {'MaxParentalRating', 'BlockUnratedItems', 'BlockedTags', 'AllowedTags'}
-
-def clone_policy(target_policy: dict, src_policy: dict, copy_lib: bool, copy_pol: bool, copy_par: bool):
-    """深拷贝策略对象，支持分类映射。无需枚举，兼容未来所有 Emby 新权限字段！"""
-    for k, v in src_policy.items():
-        if k in DANGEROUS_POLICY_KEYS:
-            continue
-        is_lib = k in LIBRARY_POLICY_KEYS
-        is_par = k in PARENTAL_POLICY_KEYS
-        is_pol = not is_lib and not is_par  # 未知的新字段全部归入基础策略
-        
-        if (copy_lib and is_lib) or (copy_par and is_par) or (copy_pol and is_pol):
-            target_policy[k] = v
-    return target_policy
+"""
+核心引擎：全量策略快照克隆器
+已迁移至 app.core.policy.clone_policy
+"""
 
 def check_expired_users():
     try:
@@ -261,11 +246,27 @@ def api_gen_invite(data: InviteGenModelLocal, request: Request):
     if not request.session.get("user"): return {"status": "error"}
     try:
         count = data.count if data.count and data.count > 0 else 1
+        template_id = data.template_user_id
+        if not template_id:
+            template_id = cfg.get("default_invite_template_user_id") or None
+        if not template_id:
+            return {"status": "error", "message": "必须选择模板用户（系统默认模板未设置）"}
+        if template_id:
+            try:
+                t_res = media_api.get(f"/Users/{template_id}", timeout=5)
+                if t_res.status_code == 200:
+                    t_user = t_res.json()
+                    if t_user.get("Policy", {}).get("IsAdministrator", False):
+                        return {"status": "error", "message": "模板用户不能是管理员，请更换"}
+                else:
+                    return {"status": "error", "message": "模板用户不存在或无法访问"}
+            except Exception:
+                return {"status": "error", "message": "模板用户校验失败"}
         codes = []
         created_at = datetime.datetime.now().isoformat()
         for _ in range(count):
-            code = secrets.token_hex(3)
-            query_db("INSERT INTO invitations (code, days, created_at, template_user_id) VALUES (?, ?, ?, ?)", (code, data.days, created_at, data.template_user_id))
+            code = secrets.token_hex(8)
+            query_db("INSERT INTO invitations (code, days, created_at, template_user_id) VALUES (?, ?, ?, ?)", (code, data.days, created_at, template_id))
             codes.append(code)
         return {"status": "success", "codes": codes}
     except Exception as e: return {"status": "error", "message": str(e)}
@@ -449,7 +450,12 @@ def api_get_users(request: Request):
         res = media_api.get("/Users", timeout=5)
         if res.status_code == 200:
             hidden = cfg.get("hidden_users") or []
-            data = [{"UserId": u['Id'], "UserName": u['Name'], "IsHidden": u['Id'] in hidden} for u in res.json()]
+            data = [{
+                "UserId": u['Id'],
+                "UserName": u['Name'],
+                "IsHidden": u['Id'] in hidden,
+                "IsAdmin": bool(u.get("Policy", {}).get("IsAdministrator", False))
+            } for u in res.json()]
             data.sort(key=lambda x: x['UserName'])
             return {"status": "success", "data": data}
         return {"status": "success", "data": []}

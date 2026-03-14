@@ -14,6 +14,9 @@ class SettingsModel(BaseModel):
     webhook_token: Optional[str] = ""
     hidden_users: List[str] = []
     emby_public_url: Optional[str] = ""  
+    user_public_url: Optional[str] = ""
+    user_lan_url: Optional[str] = ""
+    default_invite_template_user_id: Optional[str] = ""
     welcome_message: Optional[str] = ""  
     client_download_url: Optional[str] = ""
     moviepilot_url: Optional[str] = ""

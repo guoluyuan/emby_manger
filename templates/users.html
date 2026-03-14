@@ -446,18 +446,28 @@
                 </div>
             </div>
             <div>
-                <label class="block text-[11px] font-bold text-gray-500 mb-2 uppercase">局域网访问地址 (可选)</label>
-                <input type="text" id="invite-base-lan" onblur="saveInvitePrefs()" placeholder="http://192.168.x.x:10308" class="w-full px-4 py-3 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50 dark:bg-black/20 outline-none text-[13px] focus:ring-2 focus:ring-emerald-500 shadow-sm">
-                <div class="text-[10px] text-gray-400 mt-1.5">留空则自动使用当前访问地址并替换为 10308 端口</div>
+                <label class="block text-[11px] font-bold text-gray-500 mb-2 uppercase">局域网访问地址</label>
+                <input type="text" id="invite-base-lan" onblur="saveInvitePrefs()" placeholder="http://localhost:10308" class="w-full px-4 py-3 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50 dark:bg-black/20 outline-none text-[13px] focus:ring-2 focus:ring-emerald-500 shadow-sm">
+                <div id="invite-lan-required" class="text-[10px] text-red-500 mt-1 hidden">请填写局域网访问地址（默认 http://localhost:10308）</div>
+                <div class="flex justify-end mt-2">
+                    <button type="button" id="invite-lan-test-btn" onclick="testInviteUrl(this, 'invite-base-lan')" class="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-slate-600 dark:text-slate-300 rounded-lg text-[11px] font-bold transition border border-gray-200/60 dark:border-white/10">
+                        测试连通
+                    </button>
+                </div>
             </div>
             <div>
-                <label class="block text-[11px] font-bold text-gray-500 mb-2 uppercase">公网访问地址 (选填)</label>
+                <label class="block text-[11px] font-bold text-gray-500 mb-2 uppercase">公网访问地址</label>
                 <input type="text" id="invite-base-public" onblur="saveInvitePrefs()" placeholder="https://user.xxx.ltd" class="w-full px-4 py-3 rounded-xl border border-gray-200/80 dark:border-white/10 bg-gray-50 dark:bg-black/20 outline-none text-[13px] focus:ring-2 focus:ring-emerald-500 shadow-sm">
-                <div class="text-[10px] text-gray-400 mt-1.5">仅在选择公网链接时使用，可留空但生成前会提示填写</div>
+                <div id="invite-public-required" class="text-[10px] text-red-500 mt-1 hidden">公网模式必须填写此地址</div>
+                <div class="flex justify-end mt-2">
+                    <button type="button" id="invite-public-test-btn" onclick="testInviteUrl(this, 'invite-base-public')" class="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-slate-600 dark:text-slate-300 rounded-lg text-[11px] font-bold transition border border-gray-200/60 dark:border-white/10">
+                        测试连通
+                    </button>
+                </div>
             </div>
             <div class="flex justify-end gap-3 mt-8">
                 <button onclick="closeInviteModal()" class="px-5 py-2.5 bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#3A3A3C] rounded-xl font-bold text-[13px] transition-colors">取消</button>
-                <button onclick="generateInvite(event)" class="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 transition text-white rounded-xl font-bold text-[13px] shadow-md active:scale-95">生成链接</button>
+                <button id="invite-generate-btn" onclick="generateInvite(event)" class="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 transition text-white rounded-xl font-bold text-[13px] shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">生成链接</button>
             </div>
         </div>
         <div id="invite-result-step" class="hidden space-y-4">
@@ -521,43 +531,43 @@ let currentFilter = 'all';
 let invitesList = [];
 let selectedInvites = new Set();
 let inviteLinkMode = localStorage.getItem('inviteLinkMode') || 'lan';
-let inviteBaseLan = localStorage.getItem('inviteBaseLan') || '';
-let inviteBasePublic = localStorage.getItem('inviteBasePublic') || '';
+let inviteBaseLan = '';
+let inviteBasePublic = '';
+let inviteEventsBound = false;
+let inviteTestTimers = { lan: null, public: null };
+let defaultInviteTemplateId = '';
 
 let currentApplyTemplate = null;
 
 document.addEventListener('DOMContentLoaded', function() { 
     loadLibraries(); 
     loadUsers(); 
-    syncInviteInputs();
+    loadInviteConfig();
 });
 
 function normalizeBaseUrl(url) {
     return (url || '').trim().replace(/\/+$/, '');
 }
 
-function guessLanBase() {
-    const proto = window.location.protocol;
-    const host = window.location.hostname || 'localhost';
-    let port = window.location.port;
-    if (!port || port === '10307' || port === '10308') {
-        port = '10308';
-    }
-    return `${proto}//${host}:${port}`;
-}
-
-function guessPublicBase() {
-    if (inviteBasePublic) return inviteBasePublic;
-    const host = window.location.hostname || '';
-    if (host.startsWith('admin.')) {
-        return `${window.location.protocol}//user.${host.slice(6)}`;
-    }
-    return '';
+async function loadInviteConfig() {
+    try {
+        const res = await fetch('/api/settings');
+        const json = await res.json();
+        if (json.status === 'success' && json.data) {
+            const lan = normalizeBaseUrl(json.data.user_lan_url || '');
+            const pub = normalizeBaseUrl(json.data.user_public_url || '');
+            defaultInviteTemplateId = json.data.default_invite_template_user_id || '';
+            inviteBaseLan = lan;
+            inviteBasePublic = pub;
+        }
+    } catch (e) {}
+    syncInviteInputs();
 }
 
 function setInviteLinkMode(mode) {
     inviteLinkMode = mode || 'lan';
     localStorage.setItem('inviteLinkMode', inviteLinkMode);
+    updateInviteGenerateState();
 }
 
 function saveInvitePrefs() {
@@ -565,34 +575,159 @@ function saveInvitePrefs() {
     const pubInput = document.getElementById('invite-base-public');
     if (lanInput && lanInput.value) {
         inviteBaseLan = normalizeBaseUrl(lanInput.value);
-        localStorage.setItem('inviteBaseLan', inviteBaseLan);
     }
     if (pubInput && pubInput.value) {
         inviteBasePublic = normalizeBaseUrl(pubInput.value);
-        localStorage.setItem('inviteBasePublic', inviteBasePublic);
     }
     const checked = document.querySelector('input[name="invite-link-mode"]:checked');
     if (checked) {
         setInviteLinkMode(checked.value);
     }
+    updateInviteGenerateState();
 }
 
 function syncInviteInputs() {
     const lanInput = document.getElementById('invite-base-lan');
     const pubInput = document.getElementById('invite-base-public');
-    if (lanInput && !lanInput.value) lanInput.value = inviteBaseLan || guessLanBase();
-    if (pubInput && !pubInput.value) pubInput.value = inviteBasePublic || guessPublicBase();
+    if (lanInput) lanInput.value = inviteBaseLan || "http://localhost:10308";
+    if (pubInput) pubInput.value = inviteBasePublic || "";
     document.querySelectorAll('input[name="invite-link-mode"]').forEach(i => {
         i.checked = (i.value === inviteLinkMode);
     });
+    bindInviteInputEvents();
+    updateInviteGenerateState();
 }
 
 function getInviteBase(mode) {
     const lanInput = document.getElementById('invite-base-lan');
     const pubInput = document.getElementById('invite-base-public');
-    const lanVal = normalizeBaseUrl(lanInput ? lanInput.value : inviteBaseLan) || normalizeBaseUrl(inviteBaseLan) || normalizeBaseUrl(guessLanBase());
-    const pubVal = normalizeBaseUrl(pubInput ? pubInput.value : inviteBasePublic) || normalizeBaseUrl(inviteBasePublic) || normalizeBaseUrl(guessPublicBase());
+    const lanVal = normalizeBaseUrl(lanInput ? lanInput.value : inviteBaseLan) || normalizeBaseUrl(inviteBaseLan);
+    const pubVal = normalizeBaseUrl(pubInput ? pubInput.value : inviteBasePublic) || normalizeBaseUrl(inviteBasePublic);
     return mode === 'public' ? pubVal : lanVal;
+}
+
+function bindInviteInputEvents() {
+    if (inviteEventsBound) return;
+    inviteEventsBound = true;
+    const lanInput = document.getElementById('invite-base-lan');
+    const pubInput = document.getElementById('invite-base-public');
+    if (lanInput) lanInput.addEventListener('input', () => { resetInviteTestButton('invite-lan-test-btn'); updateInviteGenerateState(); scheduleInviteAutoTest('lan', 'invite-base-lan', 'invite-lan-test-btn'); });
+    if (pubInput) pubInput.addEventListener('input', () => { resetInviteTestButton('invite-public-test-btn'); updateInviteGenerateState(); scheduleInviteAutoTest('public', 'invite-base-public', 'invite-public-test-btn'); });
+    document.querySelectorAll('input[name="invite-link-mode"]').forEach(i => {
+        i.addEventListener('change', updateInviteGenerateState);
+    });
+}
+
+function updateInviteGenerateState() {
+    const lanInput = document.getElementById('invite-base-lan');
+    const pubInput = document.getElementById('invite-base-public');
+    const lanVal = normalizeBaseUrl(lanInput ? lanInput.value : inviteBaseLan);
+    const pubVal = normalizeBaseUrl(pubInput ? pubInput.value : inviteBasePublic);
+    const checked = document.querySelector('input[name="invite-link-mode"]:checked');
+    const mode = (checked && checked.value) ? checked.value : (inviteLinkMode || 'lan');
+
+    const lanOk = !!lanVal;
+    const pubOk = !!pubVal;
+
+    const lanMsg = document.getElementById('invite-lan-required');
+    const pubMsg = document.getElementById('invite-public-required');
+    if (lanMsg) lanMsg.classList.toggle('hidden', !(mode === 'lan' && !lanOk));
+    if (pubMsg) pubMsg.classList.toggle('hidden', !(mode === 'public' && !pubOk));
+
+    const btn = document.getElementById('invite-generate-btn');
+    if (btn) {
+        btn.disabled = (mode === 'public') ? !pubOk : !lanOk;
+    }
+}
+
+function resetInviteTestButton(btnId) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.dataset.state = 'idle';
+    btn.innerHTML = '测试连通';
+    btn.style.backgroundColor = '';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+    btn.classList.remove('bg-emerald-500', 'hover:bg-emerald-600', 'text-white', 'border-emerald-500/40');
+    btn.classList.remove('bg-red-500', 'hover:bg-red-600', 'border-red-500/40', 'text-white');
+    btn.classList.add('bg-slate-50', 'hover:bg-slate-100', 'text-slate-600', 'border-gray-200/60');
+    btn.disabled = false;
+}
+
+function setInviteTestButtonState(btn, state) {
+    if (!btn) return;
+    btn.dataset.state = state;
+    btn.classList.remove('bg-slate-50', 'hover:bg-slate-100', 'text-slate-600', 'border-gray-200/60');
+    btn.classList.remove('bg-emerald-500', 'hover:bg-emerald-600', 'border-emerald-500/40', 'text-white');
+    btn.classList.remove('bg-red-500', 'hover:bg-red-600', 'border-red-500/40', 'text-white');
+    if (state === 'ok') {
+        btn.innerHTML = '连接正常';
+        btn.classList.add('bg-emerald-500', 'hover:bg-emerald-600', 'text-white', 'border-emerald-500/40');
+        btn.style.backgroundColor = '#10b981';
+        btn.style.color = '#ffffff';
+        btn.style.borderColor = '#10b981';
+        btn.disabled = false;
+    } else if (state === 'fail') {
+        btn.innerHTML = '连接异常';
+        btn.classList.add('bg-red-500', 'hover:bg-red-600', 'text-white', 'border-red-500/40');
+        btn.style.backgroundColor = '#ef4444';
+        btn.style.color = '#ffffff';
+        btn.style.borderColor = '#ef4444';
+        btn.disabled = false;
+    } else {
+        btn.innerHTML = '测试中...';
+        btn.classList.add('bg-slate-50', 'text-slate-600', 'border-gray-200/60');
+        btn.style.backgroundColor = '#f8fafc';
+        btn.style.color = '#475569';
+        btn.style.borderColor = '#e2e8f0';
+        btn.disabled = true;
+    }
+}
+
+function scheduleInviteAutoTest(kind, inputId, btnId) {
+    const input = document.getElementById(inputId);
+    const btn = document.getElementById(btnId);
+    const value = normalizeBaseUrl(input ? input.value : '');
+    if (inviteTestTimers[kind]) {
+        clearTimeout(inviteTestTimers[kind]);
+        inviteTestTimers[kind] = null;
+    }
+    if (!value) {
+        resetInviteTestButton(btnId);
+        return;
+    }
+    inviteTestTimers[kind] = setTimeout(() => {
+        testInviteUrl(btn, inputId);
+    }, 600);
+}
+
+async function testInviteUrl(btn, inputId) {
+    const input = document.getElementById(inputId);
+    const url = normalizeBaseUrl(input ? input.value : '');
+    if (!url) {
+        setInviteTestButtonState(btn, 'fail');
+        return;
+    }
+    setInviteTestButtonState(btn, 'loading');
+    try {
+        const mode = inputId === 'invite-base-public' ? 'public' : 'lan';
+        const res = await fetch('/api/settings/test_invite_url', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ url, mode })
+        });
+        const json = await res.json();
+        if (json.status === 'success') {
+            btn.title = json.message || '连接正常';
+            setInviteTestButtonState(btn, 'ok');
+        } else {
+            btn.title = json.message || '连接异常';
+            setInviteTestButtonState(btn, 'fail');
+        }
+    } catch (e) {
+        btn.title = '连接异常';
+        setInviteTestButtonState(btn, 'fail');
+    }
 }
 
 function buildInviteLink(code, modeOverride = null) {
@@ -957,12 +1092,19 @@ function populateTemplates(selectId, excludeUserId = null) {
     const sel = document.getElementById(selectId); 
     sel.innerHTML = '<option value="">默认模板 (全库)</option>';
     users.forEach(user => { 
+        if (user.IsAdmin) return;
         if (excludeUserId && user.Id === excludeUserId) return; 
         const option = document.createElement('option'); 
         option.value = user.Id; 
         option.textContent = user.Name; 
         sel.appendChild(option); 
     });
+    if (selectId === 'invite-template') {
+        if (sel.options.length > 0) sel.options[0].textContent = '系统默认模板';
+        if (defaultInviteTemplateId) {
+            sel.value = defaultInviteTemplateId;
+        }
+    }
     if (selectId === 'new-template') toggleNewTemplateOpts();
 }
 
@@ -996,6 +1138,10 @@ async function generateInvite(e) {
     const templateId = document.getElementById('invite-template').value;
     const submitBtn = e.target; 
     const mode = (document.querySelector('input[name="invite-link-mode"]:checked') || {}).value || 'lan';
+    if (!templateId) {
+        alert('请先选择模板用户（系统默认模板未设置）');
+        return;
+    }
     const base = getInviteBase(mode);
     if (!base) {
         alert(mode === 'public' ? '请填写公网访问地址' : '请填写局域网访问地址');
@@ -1280,7 +1426,7 @@ async function submitNewUser() {
     btn.textContent = "立即创建";
 }
 
-function openInviteModal() { 
+async function openInviteModal() { 
     const modal = document.getElementById('invite-modal'); 
     modal.classList.remove('hidden'); 
     document.getElementById('invite-form-step').classList.remove('hidden'); 
@@ -1288,7 +1434,7 @@ function openInviteModal() {
     document.getElementById('custom-duration').value = ''; 
     selectDuration(30); 
     populateTemplates('invite-template'); 
-    syncInviteInputs();
+    await loadInviteConfig();
     setTimeout(() => { modal.classList.add('flex'); }, 10); 
 }
 

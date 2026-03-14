@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from app.core.config import cfg
 from app.core.database import DB_PATH, query_db
 from app.schemas.models import LoginModel, UserRegisterModel
+from app.core.policy import clone_policy
 from app.core.security import (
     get_client_ip,
     get_lock_status,
@@ -87,23 +88,10 @@ async def api_register(data: UserRegisterModel):
                 src_res = requests.get(f"{host}/emby/Users/{template_id}?api_key={key}", timeout=5)
                 if src_res.status_code == 200:
                     src_policy = src_res.json().get('Policy', {})
-                    
-                    policy['EnableAllFolders'] = src_policy.get('EnableAllFolders', True)
-                    policy['EnabledFolders'] = src_policy.get('EnabledFolders', [])
-                    policy['ExcludedSubFolders'] = src_policy.get('ExcludedSubFolders', [])
-                    
-                    # 🔥 同步所有连带的子权限
-                    policy['EnableContentDownloading'] = src_policy.get('EnableContentDownloading', True)
-                    policy['EnableSyncTranscoding'] = src_policy.get('EnableSyncTranscoding', True) 
-                    
-                    policy['EnableVideoPlaybackTranscoding'] = src_policy.get('EnableVideoPlaybackTranscoding', True)
-                    policy['EnablePlaybackRemuxing'] = src_policy.get('EnablePlaybackRemuxing', True)
-                    
-                    policy['EnableAudioPlaybackTranscoding'] = src_policy.get('EnableAudioPlaybackTranscoding', True)
-                    
-                    if 'MaxParentalRating' in src_policy:
-                        policy['MaxParentalRating'] = src_policy['MaxParentalRating']
-            except: pass
+                    # 🔥 统一使用全量策略克隆器（包含 IsHidden* 等字段）
+                    policy = clone_policy(policy, src_policy, True, True, True)
+            except:
+                pass
             
         requests.post(f"{host}/emby/Users/{new_id}/Policy?api_key={key}", json=policy)
 

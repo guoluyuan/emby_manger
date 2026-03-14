@@ -53,6 +53,7 @@ async def user_portal_app(scope, receive, send):
         if path == "/":
             scope["path"] = "/request"
             scope["raw_path"] = b"/request"
+            path = "/request"
             
         # 铁血隔离白名单：仅放行用户端必需路径，避免后台接口泄露
         allowed_prefixes = (
@@ -60,6 +61,7 @@ async def user_portal_app(scope, receive, send):
             "/request_login",
             "/invite",
             "/static",
+            "/api/register",
             "/api/requests",
             "/api/stats",
             "/api/proxy",

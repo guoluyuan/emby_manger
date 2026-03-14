@@ -2,6 +2,9 @@ from fastapi import APIRouter, Request
 from app.schemas.models import SettingsModel, SetupModel
 from app.core.config import cfg, save_config
 import requests
+import ipaddress
+import socket
+import urllib.parse
 
 router = APIRouter()
 
@@ -12,6 +15,34 @@ def normalize_host(host: str) -> str:
     if not h.startswith("http://") and not h.startswith("https://"):
         h = "http://" + h
     return h.rstrip("/")
+
+def _normalize_url_with_default(url: str, default_scheme: str) -> str:
+    u = (url or "").strip()
+    if not u:
+        return ""
+    parsed = urllib.parse.urlparse(u)
+    if not parsed.scheme:
+        u = f"{default_scheme}://{u}"
+    return u
+
+def _resolve_host_ips(host: str):
+    try:
+        infos = socket.getaddrinfo(host, None)
+        ips = []
+        for info in infos:
+            ip_str = info[4][0]
+            if ip_str not in ips:
+                ips.append(ip_str)
+        return ips
+    except Exception:
+        return []
+
+def _is_private_ip(ip_str: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        return ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved
+    except Exception:
+        return False
 
 def is_configured() -> bool:
     host = (cfg.get("emby_host") or "").strip()
@@ -64,6 +95,9 @@ def api_get_settings(request: Request):
             "hidden_users": cfg.get("hidden_users") or [],
             "cors_origins": cfg.get("cors_origins") or [],
             "emby_public_url": cfg.get("emby_public_url", ""),
+            "user_public_url": cfg.get("user_public_url", ""),
+            "user_lan_url": cfg.get("user_lan_url", ""),
+            "default_invite_template_user_id": cfg.get("default_invite_template_user_id", ""),
             "welcome_message": cfg.get("welcome_message", ""),
             "client_download_url": cfg.get("client_download_url", ""),
             "moviepilot_url": cfg.get("moviepilot_url", ""),
@@ -99,6 +133,9 @@ def api_update_settings(data: SettingsModel, request: Request):
     cfg["hidden_users"] = data.hidden_users
     cfg["cors_origins"] = data.cors_origins or []
     cfg["emby_public_url"] = data.emby_public_url
+    cfg["user_public_url"] = getattr(data, "user_public_url", "")
+    cfg["user_lan_url"] = getattr(data, "user_lan_url", "")
+    cfg["default_invite_template_user_id"] = getattr(data, "default_invite_template_user_id", "")
     cfg["welcome_message"] = data.welcome_message
     cfg["client_download_url"] = data.client_download_url
     cfg["moviepilot_url"] = data.moviepilot_url
@@ -139,6 +176,81 @@ async def test_moviepilot(request: Request):
         elif res.status_code in [401, 403]: return {"status": "error", "message": "❌ Token 认证失败"}
         else: return {"status": "success", "message": f"⚠️ 服务器连通(状态码: {res.status_code})"}
     except: return {"status": "error", "message": f"❌ 无法连接到 MoviePilot"}
+
+@router.post("/api/settings/test_invite_url")
+async def test_invite_url(request: Request):
+    if not request.session.get("user"): return {"status": "error", "message": "权限不足"}
+    data = await request.json()
+    mode = (data.get("mode") or "").strip().lower()
+    raw_url = data.get("url", "")
+    if mode not in ("public", "lan"):
+        return {"status": "error", "message": "无效的测试类型"}
+    default_scheme = "https" if mode == "public" else "http"
+    base = _normalize_url_with_default(raw_url, default_scheme).rstrip("/")
+    parsed = urllib.parse.urlparse(base)
+    if not parsed.scheme or not parsed.hostname:
+        return {"status": "error", "message": "请填写正确的访问地址"}
+    if mode == "public" and parsed.scheme != "https":
+        return {"status": "error", "message": "公网地址必须使用 https"}
+    if mode == "lan" and parsed.scheme not in ("http", "https"):
+        return {"status": "error", "message": "局域网地址仅支持 http/https"}
+
+    cfg_url = cfg.get("user_public_url") if mode == "public" else cfg.get("user_lan_url")
+    if cfg_url:
+        cfg_parsed = urllib.parse.urlparse(_normalize_url_with_default(cfg_url, default_scheme))
+        if cfg_parsed.hostname and cfg_parsed.hostname.lower() != parsed.hostname.lower():
+            return {"status": "error", "message": "地址与系统配置不一致，请先在系统设置中保存"}
+
+    host = parsed.hostname
+    ips = []
+    any_private = False
+    all_private = False
+    any_public = False
+
+    # IP 直连
+    try:
+        ip_literal = ipaddress.ip_address(host)
+        ips = [host]
+        any_private = _is_private_ip(host)
+        all_private = any_private
+        any_public = not any_private
+    except Exception:
+        if host.lower() in ("localhost",):
+            ips = ["127.0.0.1"]
+            any_private = True
+            all_private = True
+            any_public = False
+        else:
+            ips = _resolve_host_ips(host)
+            if ips:
+                any_private = any(_is_private_ip(ip) for ip in ips)
+                all_private = all(_is_private_ip(ip) for ip in ips)
+                any_public = any(not _is_private_ip(ip) for ip in ips)
+            else:
+                # 公网模式允许继续尝试（避免 DNS 误判）；局域网仍要求可解析
+                if mode == "lan":
+                    return {"status": "error", "message": "无法解析域名"}
+
+    if mode == "public":
+        if not any_public and all_private:
+            # 若与系统配置的公网入口一致，则放行（用于内网解析/分流场景）
+            if not (cfg_url and urllib.parse.urlparse(_normalize_url_with_default(cfg_url, "https")).hostname and
+                    urllib.parse.urlparse(_normalize_url_with_default(cfg_url, "https")).hostname.lower() == host.lower()):
+                return {"status": "error", "message": "公网地址解析为内网 IP，已拒绝"}
+    else:
+        if not all_private:
+            return {"status": "error", "message": "局域网地址必须是内网 IP 或 localhost"}
+
+    if not base:
+        return {"status": "error", "message": "请填写访问地址"}
+    target = f"{base}/request"
+    try:
+        res = requests.get(target, timeout=5, allow_redirects=True, headers={"User-Agent": "EmbyPulse Invite Test"})
+        if res.status_code == 200:
+            return {"status": "success", "message": "连接成功，可正常访问"}
+        return {"status": "error", "message": f"连接失败: HTTP {res.status_code}"}
+    except Exception as e:
+        return {"status": "error", "message": f"连接失败: {e}"}
 
 @router.post("/api/settings/fix_db")
 def api_fix_db(request: Request):
