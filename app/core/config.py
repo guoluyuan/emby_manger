@@ -121,7 +121,7 @@ if not cfg.get("webhook_token") or cfg.get("webhook_token") == "embypulse":
     cfg.set("webhook_token", secrets.token_urlsafe(24))
 
 PORT = 10307
-DB_PATH = os.getenv("DB_PATH", "/emby-data/playback_reporting.db")
+DB_PATH = os.getenv("DB_PATH", "./emby-data/playback_reporting.db")
 
 def save_config():
     cfg.save()
