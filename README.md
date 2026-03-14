@@ -154,6 +154,44 @@ services:
 - `PLAYBACK_DATA_MODE=api`：API 模式，不强制挂载数据库文件；可移除 `DB_PATH` 和 `emby-data` 挂载。
 - `PLAYBACK_DATA_MODE=sqlite`：本地模式，必须挂载 Emby 数据目录并正确填写 `DB_PATH`。
 
+**双模式示例（直接拷贝用）**
+
+API 模式：
+
+```yaml
+version: '3.8'
+services:
+  emby-pulse:
+    image: mp740429299/emby_manger:latest
+    container_name: emby-manger
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./config:/app/config
+    environment:
+      - TZ=Asia/Shanghai
+      - PLAYBACK_DATA_MODE=api
+```
+
+本地模式（sqlite）：
+
+```yaml
+version: '3.8'
+services:
+  emby-pulse:
+    image: mp740429299/emby_manger:latest
+    container_name: emby-manger
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./config:/app/config
+      - /path/to/emby/data:/emby-data:ro
+    environment:
+      - TZ=Asia/Shanghai
+      - PLAYBACK_DATA_MODE=sqlite
+      - DB_PATH=/emby-data/playback_reporting.db
+```
+
 ### 本地部署（非 Docker）
 
 1. 安装 Python 与 pip（建议使用系统自带或官方安装包）
