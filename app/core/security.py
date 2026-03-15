@@ -98,7 +98,7 @@ def reset_failures(ip: str, scope: str):
     conn.close()
 
 
-def _load_captcha_font(size: int = 34) -> Optional["ImageFont.ImageFont"]:
+def _load_captcha_font(size: int = 38) -> Optional["ImageFont.ImageFont"]:
     if not _HAS_PIL:
         return None
     try:
@@ -112,6 +112,11 @@ def _load_captcha_font(size: int = 34) -> Optional["ImageFont.ImageFont"]:
         if FONT_PATH:
             candidates.append(FONT_PATH)
         candidates.extend([
+            "C:\\Windows\\Fonts\\arial.ttf",
+            "C:\\Windows\\Fonts\\Arial.ttf",
+            "C:\\Windows\\Fonts\\msyh.ttc",
+            "C:\\Windows\\Fonts\\msyhbd.ttc",
+            "C:\\Windows\\Fonts\\simhei.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
             "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
@@ -126,24 +131,24 @@ def _load_captcha_font(size: int = 34) -> Optional["ImageFont.ImageFont"]:
     except Exception:
         return ImageFont.load_default()
 
-def _build_captcha_image(code: str, width: int = 180, height: int = 56) -> Optional[bytes]:
+def _build_captcha_image(code: str, width: int = 140, height: int = 44) -> Optional[bytes]:
     if not _HAS_PIL:
         return None
     img = Image.new("RGB", (width, height), (255, 255, 255))
     draw = ImageDraw.Draw(img)
     # 背景噪点
-    for _ in range(120):
+    for _ in range(80):
         x = random.randint(0, width - 1)
         y = random.randint(0, height - 1)
         draw.point((x, y), fill=(random.randint(160, 220), random.randint(160, 220), random.randint(160, 220)))
     # 干扰线
-    for _ in range(4):
+    for _ in range(2):
         x1 = random.randint(0, width)
         y1 = random.randint(0, height)
         x2 = random.randint(0, width)
         y2 = random.randint(0, height)
-        draw.line((x1, y1, x2, y2), fill=(random.randint(80, 160), random.randint(80, 160), random.randint(80, 160)), width=2)
-    font = _load_captcha_font(34)
+        draw.line((x1, y1, x2, y2), fill=(random.randint(80, 160), random.randint(80, 160), random.randint(80, 160)), width=1)
+    font = _load_captcha_font(38)
     # 文字
     spacing = width // (len(code) + 1)
     for i, ch in enumerate(code):
@@ -154,8 +159,8 @@ def _build_captcha_image(code: str, width: int = 180, height: int = 56) -> Optio
         except Exception:
             ch_w, ch_h = font.getsize(ch)
         x = spacing * (i + 1) - (ch_w // 2) + random.randint(-2, 2)
-        y = max(4, (height - ch_h) // 2 + random.randint(-3, 3))
-        draw.text((x, y), ch, font=font, fill=(random.randint(20, 80), random.randint(20, 80), random.randint(20, 80)))
+        y = max(2, (height - ch_h) // 2 + random.randint(-2, 2))
+        draw.text((x, y), ch, font=font, fill=(random.randint(10, 70), random.randint(10, 70), random.randint(10, 70)))
     img = img.filter(ImageFilter.SMOOTH)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
@@ -164,7 +169,7 @@ def _build_captcha_image(code: str, width: int = 180, height: int = 56) -> Optio
 def generate_captcha(request, ttl_seconds: int = 300):
     # 字母 + 数字验证码（避开易混淆字符）
     alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-    code = "".join(secrets.choice(alphabet) for _ in range(5))
+    code = "".join(secrets.choice(alphabet) for _ in range(4))
     request.session["captcha_answer"] = code
     request.session["captcha_expires"] = int(time.time()) + ttl_seconds
 
