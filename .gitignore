@@ -13,5 +13,6 @@ config/*
 # 忽略本地测试数据
 *.db
 emby-data/
+emby_*.png
 
 node_modules/
