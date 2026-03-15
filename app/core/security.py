@@ -1,4 +1,5 @@
 import sqlite3
+import os
 import time
 import random
 import base64
@@ -7,7 +8,7 @@ import secrets
 from typing import Optional
 import secrets
 import string
-from app.core.config import DB_PATH, FONT_DIR
+from app.core.config import DB_PATH, FONT_DIR, FONT_PATH
 
 try:
     from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -101,12 +102,26 @@ def _load_captcha_font(size: int = 34) -> Optional["ImageFont.ImageFont"]:
     if not _HAS_PIL:
         return None
     try:
+        candidates = []
         if FONT_DIR:
-            for name in ("arial.ttf", "Arial.ttf", "DejaVuSans.ttf"):
-                try:
-                    return ImageFont.truetype(f"{FONT_DIR}/{name}", size)
-                except Exception:
-                    continue
+            candidates.extend([
+                os.path.join(FONT_DIR, "arial.ttf"),
+                os.path.join(FONT_DIR, "Arial.ttf"),
+                os.path.join(FONT_DIR, "DejaVuSans.ttf"),
+            ])
+        if FONT_PATH:
+            candidates.append(FONT_PATH)
+        candidates.extend([
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+        ])
+        for path in candidates:
+            try:
+                if path and os.path.exists(path):
+                    return ImageFont.truetype(path, size)
+            except Exception:
+                continue
         return ImageFont.load_default()
     except Exception:
         return ImageFont.load_default()

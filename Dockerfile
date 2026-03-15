@@ -20,6 +20,11 @@ WORKDIR /app
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
+# 安装基础字体，确保验证码/图片字体可用
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 # 1. 先复制依赖文件并安装 (只要 requirements.txt 不变，这里就会完美命中缓存，瞬间跳过！)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
