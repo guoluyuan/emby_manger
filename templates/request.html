@@ -13,7 +13,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
         <script defer src="/static/js/alpine.min.js"></script>
-    <script>window.REQUEST_ASSET_VER = "{{ request_asset_ver }}";</script>
+    <script>
+        window.REQUEST_ASSET_VER = "{{ request_asset_ver }}";
+        window.REQUEST_LOGIN_BG_PC = {{ request_login_bg_pc | default('') | tojson }};
+        window.REQUEST_LOGIN_BG_MOBILE = {{ request_login_bg_mobile | default('') | tojson }};
+        window.REQUEST_LOGIN_BG_BLUR = {{ request_login_bg_blur | default(10) | tojson }};
+    </script>
     
     <script src="/static/js/request_app.js?v={{ request_asset_ver }}"></script>
 </head>
@@ -21,7 +26,10 @@
 <body class="antialiased min-h-screen relative overflow-x-hidden transition-colors duration-500 bg-slate-50 text-slate-800 dark:bg-black dark:text-zinc-100" 
       x-data="requestApp()" x-init="initTheme()" @scroll.window="handleScroll()">
     
-    <div class="fixed inset-0 z-[-1] overflow-hidden pointer-events-none">
+    <img id="login-bg" class="fixed inset-0 z-[-2] w-full h-full object-cover object-center pointer-events-none opacity-0 transition-opacity duration-700" alt="">
+    <div id="login-bg-overlay" class="fixed inset-0 z-[-1] pointer-events-none hidden" style="background: rgba(0,0,0,0.10);"></div>
+
+    <div id="base-bg" class="fixed inset-0 z-[-1] overflow-hidden pointer-events-none">
         <div class="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] rounded-full blur-3xl opacity-60 dark:opacity-10 transition-colors duration-1000"
              :class="isDarkMode ? 'bg-indigo-900/30' : 'bg-teal-200/60'"></div>
         <div class="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full blur-3xl opacity-60 dark:opacity-10 transition-colors duration-1000"
@@ -47,7 +55,7 @@
                         <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> 心愿工坊
                     </div>
                     <div x-show="currentTab === 'profile'" class="px-3 py-1 bg-white/80 dark:bg-black/80 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-full shadow-sm text-xs font-bold text-brand-600 dark:text-brand-400 flex items-center gap-1.5 cursor-pointer" @click="window.scrollTo(0, 0)">
-                        <img :src="'/api/proxy/user_image/' + userId" class="w-4 h-4 rounded-full object-cover">
+                        <img :src="userId ? ('/api/proxy/user_image/' + userId) : '/static/img/logo-app-2.png'" class="w-4 h-4 rounded-full object-cover">
                         <span x-text="userName"></span>
                     </div>
                 </div>

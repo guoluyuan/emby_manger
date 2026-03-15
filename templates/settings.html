@@ -165,6 +165,45 @@
 
         <div class="apple-card flex flex-col h-full p-5 md:p-6">
             <h3 class="text-[15px] font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center shrink-0">
+                <div class="w-8 h-8 rounded-lg bg-sky-50 dark:bg-sky-500/10 text-sky-500 flex items-center justify-center mr-3 shadow-sm"><i class="fa-solid fa-image text-sm"></i></div> 
+                登录背景设置
+            </h3>
+            <div class="flex-1 flex flex-col justify-start space-y-5">
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider pl-1">管理员登录背景 - PC</label>
+                    <input type="text" id="admin_login_bg_pc" class="w-full px-4 py-3 rounded-xl border border-transparent bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-[13px] font-mono text-gray-800 dark:text-gray-100 focus:bg-white dark:focus:bg-black/30 focus:ring-2 focus:ring-sky-500/50 outline-none transition-all placeholder-gray-400" placeholder="https://example.com/admin-pc.jpg">
+                    <p class="mt-1 text-[10px] text-gray-400">PC 推荐 1920x1080</p>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider pl-1">管理员登录背景 - 移动端</label>
+                    <input type="text" id="admin_login_bg_mobile" class="w-full px-4 py-3 rounded-xl border border-transparent bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-[13px] font-mono text-gray-800 dark:text-gray-100 focus:bg-white dark:focus:bg-black/30 focus:ring-2 focus:ring-sky-500/50 outline-none transition-all placeholder-gray-400" placeholder="https://example.com/admin-mobile.jpg">
+                    <p class="mt-1 text-[10px] text-gray-400">移动端推荐 1080x1920</p>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider pl-1">管理员登录背景模糊 (0-30px)</label>
+                    <input type="number" id="admin_login_bg_blur" min="0" max="30" step="1" class="w-full px-4 py-3 rounded-xl border border-transparent bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-[13px] font-mono text-gray-800 dark:text-gray-100 focus:bg-white dark:focus:bg-black/30 focus:ring-2 focus:ring-sky-500/50 outline-none transition-all placeholder-gray-400" placeholder="12">
+                    <p class="mt-1 text-[10px] text-gray-400">建议 6-16，数值越大越模糊</p>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider pl-1">用户登录背景 - PC</label>
+                    <input type="text" id="request_login_bg_pc" class="w-full px-4 py-3 rounded-xl border border-transparent bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-[13px] font-mono text-gray-800 dark:text-gray-100 focus:bg-white dark:focus:bg-black/30 focus:ring-2 focus:ring-sky-500/50 outline-none transition-all placeholder-gray-400" placeholder="https://example.com/user-pc.jpg">
+                    <p class="mt-1 text-[10px] text-gray-400">用户社区登录页 PC 背景</p>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider pl-1">用户登录背景 - 移动端</label>
+                    <input type="text" id="request_login_bg_mobile" class="w-full px-4 py-3 rounded-xl border border-transparent bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-[13px] font-mono text-gray-800 dark:text-gray-100 focus:bg-white dark:focus:bg-black/30 focus:ring-2 focus:ring-sky-500/50 outline-none transition-all placeholder-gray-400" placeholder="https://example.com/user-mobile.jpg">
+                    <p class="mt-1 text-[10px] text-gray-400">用户社区登录页 移动端背景</p>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider pl-1">用户登录背景模糊 (0-30px)</label>
+                    <input type="number" id="request_login_bg_blur" min="0" max="30" step="1" class="w-full px-4 py-3 rounded-xl border border-transparent bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-[13px] font-mono text-gray-800 dark:text-gray-100 focus:bg-white dark:focus:bg-black/30 focus:ring-2 focus:ring-sky-500/50 outline-none transition-all placeholder-gray-400" placeholder="10">
+                    <p class="mt-1 text-[10px] text-gray-400">建议 6-16，数值越大越模糊</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="apple-card flex flex-col h-full p-5 md:p-6">
+            <h3 class="text-[15px] font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center shrink-0">
                 <div class="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-500/10 text-purple-500 flex items-center justify-center mr-3 shadow-sm"><i class="fa-solid fa-bolt text-sm"></i></div> 
                 MoviePilot 自动化联控
             </h3>
@@ -385,6 +424,12 @@ async function loadSettings() {
         document.getElementById('emby_public_url').value = d.emby_public_url || '';
         document.getElementById('user_lan_url').value = d.user_lan_url || '';
         document.getElementById('user_public_url').value = d.user_public_url || '';
+        document.getElementById('admin_login_bg_pc').value = d.admin_login_bg_pc || '';
+        document.getElementById('admin_login_bg_mobile').value = d.admin_login_bg_mobile || '';
+        document.getElementById('admin_login_bg_blur').value = (d.admin_login_bg_blur ?? 12);
+        document.getElementById('request_login_bg_pc').value = d.request_login_bg_pc || '';
+        document.getElementById('request_login_bg_mobile').value = d.request_login_bg_mobile || '';
+        document.getElementById('request_login_bg_blur').value = (d.request_login_bg_blur ?? 10);
         const tplSel = document.getElementById('default-invite-template');
         if (tplSel) tplSel.value = d.default_invite_template_user_id || '';
         document.getElementById('welcome_message').value = d.welcome_message || '';
@@ -487,6 +532,12 @@ async function saveSettings() {
         emby_public_url: document.getElementById('emby_public_url').value,
         user_lan_url: document.getElementById('user_lan_url').value,
         user_public_url: document.getElementById('user_public_url').value,
+        admin_login_bg_pc: document.getElementById('admin_login_bg_pc').value,
+        admin_login_bg_mobile: document.getElementById('admin_login_bg_mobile').value,
+        admin_login_bg_blur: Number(document.getElementById('admin_login_bg_blur').value || 12),
+        request_login_bg_pc: document.getElementById('request_login_bg_pc').value,
+        request_login_bg_mobile: document.getElementById('request_login_bg_mobile').value,
+        request_login_bg_blur: Number(document.getElementById('request_login_bg_blur').value || 10),
         default_invite_template_user_id: document.getElementById('default-invite-template').value,
         welcome_message: document.getElementById('welcome_message').value,
         client_download_url: document.getElementById('client_download_url').value,

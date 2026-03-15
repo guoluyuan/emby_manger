@@ -71,6 +71,14 @@ DEFAULT_CONFIG = {
     "emby_public_url": "", 
     "user_public_url": "",
     "user_lan_url": "",
+    "admin_login_bg_url": "",
+    "request_login_bg_url": "",
+    "admin_login_bg_pc": "",
+    "admin_login_bg_mobile": "",
+    "request_login_bg_pc": "",
+    "request_login_bg_mobile": "",
+    "admin_login_bg_blur": 12,
+    "request_login_bg_blur": 10,
     "default_invite_template_user_id": "",
     "welcome_message": "",
     "client_download_url": "",
@@ -154,6 +162,7 @@ if _db_dir and not os.path.exists(_db_dir):
 if DB_PATH and not os.path.exists(DB_PATH):
     try:
         open(DB_PATH, "a").close()
+        print(f"ℹ️ [数据库] 当前不存在数据库文件，已自动创建: {DB_PATH}")
     except Exception as e:
         print(f"⚠️ [数据库] 自动创建数据库文件失败: {DB_PATH} ({e})")
 
@@ -165,14 +174,19 @@ def save_config():
 def _auto_select_playback_mode():
     env_mode = os.getenv("PLAYBACK_DATA_MODE", "").strip().lower()
     if env_mode in ("api", "sqlite"):
+        print(f"ℹ️ [播放数据] 已检测到环境变量 PLAYBACK_DATA_MODE={env_mode}，使用指定模式。")
         return
     current = cfg.get("playback_data_mode", "sqlite")
     db_exists = os.path.isfile(DB_PATH)
     if current == "sqlite" and not db_exists:
         cfg.set("playback_data_mode", "api")
+        print("⚠️ [播放数据] 未找到 PlaybackReporting.db，自动切换为 API 穿透模式。")
     elif current == "sqlite" and db_exists:
-        pass
+        print("✅ [播放数据] 已检测到 PlaybackReporting.db，使用 SQLite 直读模式。")
     elif current == "api":
-        pass
+        msg = "ℹ️ [播放数据] 使用 API 穿透模式。"
+        if db_exists:
+            msg += "（检测到 PlaybackReporting.db，但保持 API 模式）"
+        print(msg)
 
 _auto_select_playback_mode()

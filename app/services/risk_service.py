@@ -136,6 +136,7 @@ def scan_playbacks_and_alert():
                     })
                 else:
                     # 防抖命中不再输出日志
+                    pass
                     
         _alerted_sessions.clear()
         _alerted_sessions.update(current_alert_fingerprints)
@@ -175,4 +176,4 @@ def start_risk_monitor():
     bus.subscribe("notify.risk.alert", _on_risk_alert_for_web)
     
     threading.Thread(target=_risk_monitor_loop, daemon=True, name="RiskMonitorThread").start()
-    # 启动日志已去除，避免控制台噪音
+    logger.info("👁️ [风险管控] 零延迟天眼系统已启动 (事件驱动 + 60s兜底)")

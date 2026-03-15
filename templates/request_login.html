@@ -4,26 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>登录 - EmbyPulse 求片中心</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: { extend: { colors: { gray: { 850: '#1f2937', 900: '#111827', 950: '#030712' } } } }
-        }
-    </script>
+    <link rel="stylesheet" href="/static/css/request-tailwind.css?v={{ request_asset_ver | default('') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         [x-cloak] { display: none !important; }
         .glass-panel { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
         html.dark .glass-panel { background: rgba(17, 24, 39, 0.8); }
+        .login-glass { background: rgba(255,255,255,0.50); backdrop-filter: blur(16px) saturate(120%); -webkit-backdrop-filter: blur(16px) saturate(120%); border: 1px solid rgba(255,255,255,0.35); }
+        html.dark .login-glass { background: rgba(17,17,17,0.55); border: 1px solid rgba(255,255,255,0.08); }
+        .bg-poster {
+            position: fixed; inset: 0; z-index: -1;
+            background-size: cover; background-position: center;
+            transition: opacity 1.5s ease-in-out;
+            opacity: 0;
+        }
+        .bg-overlay {
+            position: fixed; inset: 0; z-index: 0;
+            background: rgba(0,0,0,0.15);
+        }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-950 text-gray-800 dark:text-gray-200 min-h-screen flex items-center justify-center transition-colors duration-300 relative overflow-hidden" x-data="loginApp()" x-init="init()">
-    
-    <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/20 dark:bg-blue-600/10 rounded-full blur-3xl"></div>
-    <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/20 dark:bg-purple-600/10 rounded-full blur-3xl"></div>
+    <div id="bg-img" class="bg-poster"></div>
+    <div id="bg-overlay" class="bg-overlay hidden"></div>
 
-    <div class="relative w-full max-w-md p-8 glass-panel rounded-3xl border border-gray-200 dark:border-gray-800 shadow-2xl z-10 mx-4">
+    <div id="login-deco-a" class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/20 dark:bg-blue-600/10 rounded-full blur-3xl"></div>
+    <div id="login-deco-b" class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/20 dark:bg-purple-600/10 rounded-full blur-3xl"></div>
+
+    <div class="relative w-full max-w-md p-8 glass-panel login-glass rounded-3xl border border-gray-200 dark:border-gray-800 shadow-2xl z-10 mx-4">
         
         <div class="text-center mb-8">
             <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl mx-auto flex items-center justify-center text-white font-bold text-3xl shadow-lg shadow-blue-500/30 mb-4">P</div>
@@ -56,7 +64,7 @@
             <div>
                 <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">验证码</label>
                 <div class="flex items-center gap-2 mb-2 text-xs text-gray-500 dark:text-gray-400">
-                    <span x-text="captchaQuestion || '点击刷新获取验证码'"></span>
+                    <img :src="captchaImage" alt="captcha" class="h-10 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/50">
                     <button type="button" @click="refreshCaptcha()" class="px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-bold">刷新</button>
                 </div>
                 <div class="relative">
@@ -89,7 +97,7 @@
                 username: '',
                 password: '',
                 captcha: '',
-                captchaQuestion: '',
+                captchaImage: '',
                 isLoading: false,
                 toast: { show: false, message: '', type: 'success' },
 
@@ -98,6 +106,7 @@
                     if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                         document.documentElement.classList.add('dark');
                     }
+                    this.loadBackground();
                     this.refreshCaptcha();
                 },
 
@@ -109,8 +118,43 @@
                     try {
                         const res = await fetch('/api/captcha');
                         const data = await res.json();
-                        if (data.status === 'success') this.captchaQuestion = data.question;
+                        if (data.status === 'success') this.captchaImage = data.image || '';
                     } catch (e) {}
+                },
+                loadBackground() {
+                    const customBgPc = {{ request_login_bg_pc | default('') | tojson }};
+                    const customBgMobile = {{ request_login_bg_mobile | default('') | tojson }};
+                    const blurVal = {{ request_login_bg_blur | default(10) | tojson }};
+                    const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+                    const customBg = (isMobile ? customBgMobile : customBgPc) || customBgPc || customBgMobile || "";
+                    if (!customBg || !customBg.trim()) return;
+                    const img = new Image();
+                    img.src = customBg;
+                    img.onload = () => {
+                        const _b = Math.max(0, Math.min(30, Number(blurVal)));
+                        const el = document.getElementById('bg-img');
+                        const overlay = document.getElementById('bg-overlay');
+                        if (el) {
+                            el.style.backgroundImage = `url('${customBg}')`;
+                            if (!Number.isNaN(Number(blurVal))) {
+                                el.style.filter = _b > 0 ? `blur(${_b}px)` : 'none';
+                                el.style.transform = _b > 0 ? 'scale(1.05)' : 'none';
+                            }
+                            el.style.opacity = '1';
+                        }
+                        if (overlay) {
+                            if (!Number.isNaN(Number(blurVal))) {
+                                overlay.style.backdropFilter = _b > 0 ? `blur(${_b}px)` : 'none';
+                                overlay.style.webkitBackdropFilter = _b > 0 ? `blur(${_b}px)` : 'none';
+                                overlay.style.background = _b > 0 ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.06)';
+                            }
+                            overlay.classList.remove('hidden');
+                        }
+                        const decoA = document.getElementById('login-deco-a');
+                        const decoB = document.getElementById('login-deco-b');
+                        if (decoA) decoA.style.opacity = '0.1';
+                        if (decoB) decoB.style.opacity = '0.1';
+                    };
                 },
 
                 async login() {

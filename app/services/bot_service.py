@@ -66,7 +66,7 @@ class SystemDaemon:
         self.schedule_thread.start()
         self.library_thread = threading.Thread(target=self._library_notify_loop, daemon=True)
         self.library_thread.start()
-
+        print("🧠 System Daemon Started (Event Subsystem Online)")
     def stop(self): self.running = False
 
     def on_webhook_event(self, event: str, data: dict):
@@ -323,7 +323,7 @@ class NotificationBot:
         if cfg.get("tg_bot_token"):
             self.poll_thread = threading.Thread(target=self._polling_loop, daemon=True)
             self.poll_thread.start()
-
+        logger.info("🤖 Notification Bot Started")
     def stop(self): self.running = False
 
     def on_risk_alert(self, data):
@@ -827,6 +827,7 @@ class NotificationBot:
             res = requests.post(f"{proxy_url}/cgi-bin/menu/create?access_token={token}&agentid={agentid}", json=menu_data, timeout=5)
             res_data = res.json()
             if res_data.get("errcode") == 0:
+                pass
             else:
                 logger.error(f"❌ [企微助手] 菜单推送失败！错误码: {res_data.get('errcode')}, 详情: {res_data.get('errmsg')}")
         except Exception as e: 

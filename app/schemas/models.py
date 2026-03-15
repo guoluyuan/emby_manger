@@ -16,6 +16,14 @@ class SettingsModel(BaseModel):
     emby_public_url: Optional[str] = ""  
     user_public_url: Optional[str] = ""
     user_lan_url: Optional[str] = ""
+    admin_login_bg_url: Optional[str] = ""
+    request_login_bg_url: Optional[str] = ""
+    admin_login_bg_pc: Optional[str] = ""
+    admin_login_bg_mobile: Optional[str] = ""
+    request_login_bg_pc: Optional[str] = ""
+    request_login_bg_mobile: Optional[str] = ""
+    admin_login_bg_blur: Optional[float] = 12
+    request_login_bg_blur: Optional[float] = 10
     default_invite_template_user_id: Optional[str] = ""
     welcome_message: Optional[str] = ""  
     client_download_url: Optional[str] = ""

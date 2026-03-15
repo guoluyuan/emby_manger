@@ -9,7 +9,7 @@
             <div class="lg:col-span-1 glass-panel p-6 sm:p-8 rounded-3xl flex flex-col items-center justify-center gap-3 relative overflow-hidden text-center border-t border-white/40 dark:border-white/5 shadow-lg">
                 <div class="absolute inset-0 bg-gradient-to-b from-brand-500/5 to-transparent z-0"></div>
                 <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full shadow-xl overflow-hidden shrink-0 bg-slate-200 ring-4 ring-white dark:ring-[#0f0f0f] z-10 relative">
-                    <img :src="'/api/proxy/user_image/' + userId" loading="lazy" decoding="async" class="w-full h-full object-cover" onerror="this.src='https://api.dicebear.com/9.x/notionists/png?seed=User'">
+                    <img :src="userId ? ('/api/proxy/user_image/' + userId) : '/static/img/logo-app-2.png'" loading="lazy" decoding="async" class="w-full h-full object-cover" onerror="this.src='/static/img/logo-app-2.png'">
                 </div>
                 <div class="z-10 mt-1">
                     <h3 class="text-2xl font-black text-slate-900 dark:text-white flex items-center justify-center gap-2">
@@ -88,7 +88,7 @@
 
         <div class="glass-panel p-5 rounded-3xl mt-5 border-t border-white/40 dark:border-white/5 w-full shadow-sm">
             <h4 class="font-black text-sm text-slate-800 dark:text-white tracking-widest uppercase mb-4"><i class="fa-solid fa-chart-line text-blue-500 mr-1.5 text-lg"></i> 近 30 天观影频率 (小时)</h4>
-            <div class="relative h-48 sm:h-64 w-full"><canvas id="profileTrendChart"></canvas></div>
+            <div class="chart-wrapper relative h-48 sm:h-64 w-full"><div class="chart-skeleton"></div><canvas id="profileTrendChart"></canvas></div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-5">
@@ -101,9 +101,9 @@
                 </div>
                 <p class="text-[10px] text-center text-slate-500 dark:text-zinc-500 font-bold mt-4" x-text="getPrefText()"></p>
             </div>
-            <div class="glass-panel p-5 rounded-3xl border-t border-white/40 dark:border-white/5 shadow-sm"><h4 class="font-black text-sm text-slate-800 dark:text-white tracking-widest uppercase mb-4"><i class="fa-solid fa-clock-rotate-left text-indigo-500 mr-1.5 text-lg"></i> 24H 生物钟</h4><div class="relative h-32 w-full"><canvas id="profileHourChart"></canvas></div></div>
-            <div class="glass-panel p-5 rounded-3xl border-t border-white/40 dark:border-white/5 shadow-sm"><h4 class="font-black text-sm text-slate-800 dark:text-white tracking-widest uppercase mb-4"><i class="fa-solid fa-desktop text-emerald-500 mr-1.5 text-lg"></i> 终端分布</h4><div class="relative h-32 w-full"><canvas id="profileDeviceChart"></canvas></div></div>
-            <div class="glass-panel p-5 rounded-3xl border-t border-white/40 dark:border-white/5 shadow-sm"><h4 class="font-black text-sm text-slate-800 dark:text-white tracking-widest uppercase mb-4"><i class="fa-solid fa-clapperboard text-fuchsia-500 mr-1.5 text-lg"></i> 播放软件偏好</h4><div class="relative h-32 w-full"><canvas id="profileClientChart"></canvas></div></div>
+            <div class="glass-panel p-5 rounded-3xl border-t border-white/40 dark:border-white/5 shadow-sm"><h4 class="font-black text-sm text-slate-800 dark:text-white tracking-widest uppercase mb-4"><i class="fa-solid fa-clock-rotate-left text-indigo-500 mr-1.5 text-lg"></i> 24H 生物钟</h4><div class="chart-wrapper relative h-32 w-full"><div class="chart-skeleton"></div><canvas id="profileHourChart"></canvas></div></div>
+            <div class="glass-panel p-5 rounded-3xl border-t border-white/40 dark:border-white/5 shadow-sm"><h4 class="font-black text-sm text-slate-800 dark:text-white tracking-widest uppercase mb-4"><i class="fa-solid fa-desktop text-emerald-500 mr-1.5 text-lg"></i> 终端分布</h4><div class="chart-wrapper relative h-32 w-full"><div class="chart-skeleton"></div><canvas id="profileDeviceChart"></canvas></div></div>
+            <div class="glass-panel p-5 rounded-3xl border-t border-white/40 dark:border-white/5 shadow-sm"><h4 class="font-black text-sm text-slate-800 dark:text-white tracking-widest uppercase mb-4"><i class="fa-solid fa-clapperboard text-fuchsia-500 mr-1.5 text-lg"></i> 播放软件偏好</h4><div class="chart-wrapper relative h-32 w-full"><div class="chart-skeleton"></div><canvas id="profileClientChart"></canvas></div></div>
         </div>
 
         <div class="glass-panel p-5 rounded-3xl mt-5 border-t border-white/40 dark:border-white/5 shadow-sm">

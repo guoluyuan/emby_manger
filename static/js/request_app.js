@@ -50,7 +50,7 @@ document.addEventListener('alpine:init', () => {
 
     Alpine.data('requestApp', () => ({
         scrolled: false, lastScrollTop: 0, isScrollingDown: false, isLoaded: false, isLoggedIn: false, isDarkMode: false,
-        userId: '', userName: '', expireDate: '未知', serverUrl: '', serverUrlLocal: '', serverUrlPublic: '', serverId: '', showServerUrl: false, loginForm: { username: '', password: '', captcha: '' }, captchaQuestion: '', isLoggingIn: false,
+        userId: '', userName: '', expireDate: '未知', serverUrl: '', serverUrlLocal: '', serverUrlPublic: '', serverId: '', showServerUrl: false, loginForm: { username: '', password: '', captcha: '' }, captchaImage: '', isLoggingIn: false,
         currentTab: 'explore', searchQuery: '', isSearching: false, searchResults: [], recommendResults: [], recommendRow1: [], recommendRow2: [], recommendRow3: [], recommendLoaded: false,
         serverDashboard: null, serverLatest: [], serverTopRated: [], serverGenres: [], serverTopMovies: [], serverTopSeries: [],
         showcaseModal: { open: false, isLoading: false, data: null }, queueModal: { open: false, activeTab: 'request' }, myQueue: [], myRequestMap: {}, myFeedbacks: [],
@@ -63,12 +63,63 @@ document.addEventListener('alpine:init', () => {
         posterStudio: { open: false, isLoading: false, isSaving: false, period: 'month', periodLabel: '本月 观影报告', data: null, useCoverBg: false, top1BgBase64: null, rankRows: [] },
         html2canvasPromise: null,
 
-        async initTheme() { this.isDarkMode = document.documentElement.classList.contains('dark'); try { const res = await fetch('/api/requests/check'); const data = await res.json(); if (data.status === 'success') { this.isLoggedIn = true; this.userId = data.user.Id; this.userName = data.user.Name; this.expireDate = data.user.expire_date; this.serverUrlLocal = data.server_url_local || ''; this.serverUrlPublic = data.server_url_public || ''; this.serverUrl = await this.pickBestServerUrl(); this.serverId = data.server_id || ''; this.loadServerData(); } } catch(e) {} this.isLoaded = true; this.refreshCaptcha(); },
+        async initTheme() { 
+            this.isDarkMode = document.documentElement.classList.contains('dark'); 
+            try { 
+                const res = await fetch('/api/requests/check'); 
+                const data = await res.json(); 
+                if (data.status === 'success') { 
+                    this.isLoggedIn = true; 
+                    this.userId = data.user.Id; 
+                    this.userName = data.user.Name; 
+                    this.expireDate = data.user.expire_date; 
+                    this.serverUrlLocal = data.server_url_local || ''; 
+                    this.serverUrlPublic = data.server_url_public || ''; 
+                    this.serverUrl = await this.pickBestServerUrl(); 
+                    this.serverId = data.server_id || ''; 
+                    this.loadServerData(); 
+                } 
+            } catch(e) {} 
+            this.isLoaded = true; 
+            this.refreshCaptcha();
+            this.applyLoginBackground(!this.isLoggedIn);
+        },
         handleScroll() { const st = window.pageYOffset || document.documentElement.scrollTop; this.scrolled = st > 50; this.isScrollingDown = st > this.lastScrollTop && st > 50; this.lastScrollTop = st <= 0 ? 0 : st; },
         toggleTheme() { this.isDarkMode = !this.isDarkMode; localStorage.setItem('ep_theme', this.isDarkMode ? 'dark' : 'light'); document.documentElement.classList.toggle('dark', this.isDarkMode); if (this.currentTab === 'profile' && this.statsLoaded) { this.chartRendered = { hour: false, trend: false, device: false, client: false }; setTimeout(() => this.renderCharts(), 150); } },
         showToast(msg, type = 'success') { this.toast = { show: true, message: msg, type }; setTimeout(() => this.toast.show = false, 3000); },
         async copyToClipboard(text) { try { await navigator.clipboard.writeText(text); } catch(e) { const input = document.createElement('input'); input.value = text; document.body.appendChild(input); input.select(); document.execCommand('copy'); document.body.removeChild(input); } },
-        async login() { if(!this.loginForm.username || !this.loginForm.password || !this.loginForm.captcha) return; this.isLoggingIn = true; try { const res = await fetch('/api/requests/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.loginForm) }); const data = await res.json(); if (data.status === 'success') { const checkRes = await fetch('/api/requests/check'); const checkData = await checkRes.json(); if (checkData.status === 'success') { this.userId = checkData.user.Id; this.userName = checkData.user.Name; this.expireDate = checkData.user.expire_date; this.serverUrlLocal = checkData.server_url_local || ''; this.serverUrlPublic = checkData.server_url_public || ''; this.serverUrl = await this.pickBestServerUrl(); this.serverId = checkData.server_id || ''; } this.isLoggedIn = true; this.loadServerData(); this.showToast('登录成功'); } else { this.showToast(data.message, 'error'); this.loginForm.captcha = ''; this.refreshCaptcha(); } } catch(e) { this.showToast('网络错误', 'error'); } this.isLoggingIn = false; },
+        async login() { 
+            if(!this.loginForm.username || !this.loginForm.password || !this.loginForm.captcha) return; 
+            this.isLoggingIn = true; 
+            try { 
+                const res = await fetch('/api/requests/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.loginForm) }); 
+                const data = await res.json(); 
+                if (data.status === 'success') { 
+                    const checkRes = await fetch('/api/requests/check'); 
+                    const checkData = await checkRes.json(); 
+                    if (checkData.status === 'success') { 
+                        this.userId = checkData.user.Id; 
+                        this.userName = checkData.user.Name; 
+                        this.expireDate = checkData.user.expire_date; 
+                        this.serverUrlLocal = checkData.server_url_local || ''; 
+                        this.serverUrlPublic = checkData.server_url_public || ''; 
+                        this.serverUrl = await this.pickBestServerUrl(); 
+                        this.serverId = checkData.server_id || ''; 
+                    } 
+                    this.isLoggedIn = true; 
+                    this.applyLoginBackground(false);
+                    this.loadServerData(); 
+                    this.showToast('登录成功'); 
+                } else { 
+                    this.showToast(data.message, 'error'); 
+                    this.loginForm.captcha = ''; 
+                    this.refreshCaptcha(); 
+                } 
+            } catch(e) { 
+                this.showToast('网络错误', 'error'); 
+            } 
+            this.isLoggingIn = false; 
+        },
         isPrivateHost(host) {
             if (!host) return false;
             if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
@@ -99,8 +150,65 @@ document.addEventListener('alpine:init', () => {
             const ok = await this.probeLocalEmby(localUrl);
             return ok ? localUrl : publicUrl;
         },
-        async refreshCaptcha() { try { const res = await fetch('/api/captcha'); const data = await res.json(); if (data.status === 'success') this.captchaQuestion = data.question; } catch(e) {} },
-        async logout() { try { await fetch('/api/requests/logout', { method: 'POST' }); this.isLoggedIn = false; } catch (e) {} },
+        async refreshCaptcha() { try { const res = await fetch('/api/captcha'); const data = await res.json(); if (data.status === 'success') this.captchaImage = data.image || ''; } catch(e) {} },
+        async logout() { 
+            try { 
+                await fetch('/api/requests/logout', { method: 'POST' }); 
+                this.isLoggedIn = false; 
+                this.applyLoginBackground(true);
+            } catch (e) {} 
+        },
+        getLoginBgUrl() {
+            const pc = (window.REQUEST_LOGIN_BG_PC || '').trim();
+            const mobile = (window.REQUEST_LOGIN_BG_MOBILE || '').trim();
+            const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+            return (isMobile ? mobile : pc) || pc || mobile || '';
+        },
+        applyLoginBackground(show) {
+            const bgEl = document.getElementById('login-bg');
+            const overlay = document.getElementById('login-bg-overlay');
+            const base = document.getElementById('base-bg');
+            if (!bgEl) return;
+            const bgUrl = this.getLoginBgUrl();
+            const blurValRaw = Number(window.REQUEST_LOGIN_BG_BLUR);
+            const blurVal = Number.isNaN(blurValRaw) ? 0 : Math.max(0, Math.min(30, blurValRaw));
+            if (!bgUrl || !show) {
+                bgEl.style.opacity = '0';
+                if (overlay) overlay.classList.add('hidden');
+                if (base) base.style.opacity = '';
+                return;
+            }
+            const isImg = bgEl.tagName === 'IMG';
+            if (isImg) {
+                bgEl.src = bgUrl;
+                bgEl.style.imageRendering = blurVal > 0 ? 'auto' : 'auto';
+            } else {
+                bgEl.style.backgroundImage = `url('${bgUrl}')`;
+                bgEl.style.backgroundRepeat = 'no-repeat';
+                bgEl.style.backgroundPosition = 'center';
+                bgEl.style.backgroundSize = 'cover';
+            }
+            {
+                const filters = [];
+                if (blurVal > 0) filters.push(`blur(${blurVal}px)`);
+                if (filters.length > 0) {
+                    // Only soften when user explicitly sets blur
+                    filters.push('contrast(0.97)', 'saturate(0.9)');
+                }
+                bgEl.style.filter = filters.length > 0 ? filters.join(' ') : 'none';
+            }
+            bgEl.style.transform = blurVal > 0 ? 'scale(1.05)' : 'none';
+            bgEl.style.opacity = '1';
+            if (overlay) {
+                overlay.style.backdropFilter = blurVal > 0 ? `blur(${blurVal}px)` : 'none';
+                overlay.style.webkitBackdropFilter = blurVal > 0 ? `blur(${blurVal}px)` : 'none';
+                overlay.style.background = blurVal > 0
+                    ? 'linear-gradient(180deg, rgba(255,255,255,0.08), rgba(0,0,0,0.06))'
+                    : 'transparent';
+                overlay.classList.remove('hidden');
+            }
+            if (base) base.style.opacity = blurVal > 0 ? '0' : '';
+        },
 
         async loadServerData() { 
             try { 

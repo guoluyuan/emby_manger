@@ -29,6 +29,16 @@ input, textarea { -webkit-user-select: auto; user-select: auto; }
     border: 1px solid rgba(255, 255, 255, 0.05); 
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6); 
 }
+.login-glass {
+    background: rgba(255, 255, 255, 0.50);
+    backdrop-filter: blur(16px) saturate(120%);
+    -webkit-backdrop-filter: blur(16px) saturate(120%);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+.dark .login-glass {
+    background: rgba(17, 17, 17, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
 
 /* 3. 滚动条美化（隐藏） */
 .hide-scrollbar::-webkit-scrollbar { display: none; }

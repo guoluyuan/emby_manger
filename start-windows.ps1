@@ -14,4 +14,7 @@ if ($existing) {
 Write-Host "Starting EmbyPulse..."
 Write-Host "Open: http://127.0.0.1:10307/"
 
+Write-Host "Building Tailwind CSS..."
+npm run build:css
+
 python run.py

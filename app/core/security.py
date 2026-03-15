@@ -1,7 +1,19 @@
 import sqlite3
 import time
 import random
-from app.core.config import DB_PATH
+import base64
+import io
+import secrets
+from typing import Optional
+import secrets
+import string
+from app.core.config import DB_PATH, FONT_DIR
+
+try:
+    from PIL import Image, ImageDraw, ImageFont, ImageFilter
+    _HAS_PIL = True
+except Exception:
+    _HAS_PIL = False
 
 
 def get_client_ip(request):
@@ -85,12 +97,62 @@ def reset_failures(ip: str, scope: str):
     conn.close()
 
 
+def _load_captcha_font(size: int = 28) -> Optional["ImageFont.ImageFont"]:
+    if not _HAS_PIL:
+        return None
+    try:
+        if FONT_DIR:
+            for name in ("arial.ttf", "Arial.ttf", "DejaVuSans.ttf"):
+                try:
+                    return ImageFont.truetype(f"{FONT_DIR}/{name}", size)
+                except Exception:
+                    continue
+        return ImageFont.load_default()
+    except Exception:
+        return ImageFont.load_default()
+
+def _build_captcha_image(code: str, width: int = 140, height: int = 44) -> Optional[bytes]:
+    if not _HAS_PIL:
+        return None
+    img = Image.new("RGB", (width, height), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    # 背景噪点
+    for _ in range(120):
+        x = random.randint(0, width - 1)
+        y = random.randint(0, height - 1)
+        draw.point((x, y), fill=(random.randint(160, 220), random.randint(160, 220), random.randint(160, 220)))
+    # 干扰线
+    for _ in range(4):
+        x1 = random.randint(0, width)
+        y1 = random.randint(0, height)
+        x2 = random.randint(0, width)
+        y2 = random.randint(0, height)
+        draw.line((x1, y1, x2, y2), fill=(random.randint(80, 160), random.randint(80, 160), random.randint(80, 160)), width=2)
+    font = _load_captcha_font(28)
+    # 文字
+    spacing = width // (len(code) + 1)
+    for i, ch in enumerate(code):
+        x = spacing * (i + 1) - 8 + random.randint(-2, 2)
+        y = random.randint(6, 14)
+        draw.text((x, y), ch, font=font, fill=(random.randint(20, 80), random.randint(20, 80), random.randint(20, 80)))
+    img = img.filter(ImageFilter.SMOOTH)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
 def generate_captcha(request, ttl_seconds: int = 300):
-    a = random.randint(1, 9)
-    b = random.randint(1, 9)
-    request.session["captcha_answer"] = str(a + b)
+    # 字母 + 数字验证码（避开易混淆字符）
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    code = "".join(secrets.choice(alphabet) for _ in range(5))
+    request.session["captcha_answer"] = code
     request.session["captcha_expires"] = int(time.time()) + ttl_seconds
-    return {"question": f"{a} + {b} = ?", "expires_in": ttl_seconds}
+
+    img_bytes = _build_captcha_image(code)
+    if img_bytes:
+        b64 = base64.b64encode(img_bytes).decode("ascii")
+        return {"image": f"data:image/png;base64,{b64}", "expires_in": ttl_seconds}
+    # 兜底：无 PIL 时返回文字（但仍可用）
+    return {"question": f"验证码：{code}", "expires_in": ttl_seconds}
 
 
 def validate_captcha(request, provided: str):
@@ -101,7 +163,7 @@ def validate_captcha(request, provided: str):
         return False, "请先获取验证码"
     if now > exp:
         return False, "验证码已过期，请刷新"
-    if str(provided or "").strip() != str(ans):
+    if str(provided or "").strip().upper() != str(ans).upper():
         return False, "验证码错误"
     request.session.pop("captcha_answer", None)
     request.session.pop("captcha_expires", None)

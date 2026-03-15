@@ -97,6 +97,14 @@ def api_get_settings(request: Request):
             "emby_public_url": cfg.get("emby_public_url", ""),
             "user_public_url": cfg.get("user_public_url", ""),
             "user_lan_url": cfg.get("user_lan_url", ""),
+            "admin_login_bg_url": cfg.get("admin_login_bg_url", ""),
+            "request_login_bg_url": cfg.get("request_login_bg_url", ""),
+            "admin_login_bg_pc": cfg.get("admin_login_bg_pc", ""),
+            "admin_login_bg_mobile": cfg.get("admin_login_bg_mobile", ""),
+            "request_login_bg_pc": cfg.get("request_login_bg_pc", ""),
+            "request_login_bg_mobile": cfg.get("request_login_bg_mobile", ""),
+            "admin_login_bg_blur": cfg.get("admin_login_bg_blur", 12),
+            "request_login_bg_blur": cfg.get("request_login_bg_blur", 10),
             "default_invite_template_user_id": cfg.get("default_invite_template_user_id", ""),
             "welcome_message": cfg.get("welcome_message", ""),
             "client_download_url": cfg.get("client_download_url", ""),
@@ -135,6 +143,14 @@ def api_update_settings(data: SettingsModel, request: Request):
     cfg["emby_public_url"] = data.emby_public_url
     cfg["user_public_url"] = getattr(data, "user_public_url", "")
     cfg["user_lan_url"] = getattr(data, "user_lan_url", "")
+    cfg["admin_login_bg_url"] = getattr(data, "admin_login_bg_url", "")
+    cfg["request_login_bg_url"] = getattr(data, "request_login_bg_url", "")
+    cfg["admin_login_bg_pc"] = getattr(data, "admin_login_bg_pc", "")
+    cfg["admin_login_bg_mobile"] = getattr(data, "admin_login_bg_mobile", "")
+    cfg["request_login_bg_pc"] = getattr(data, "request_login_bg_pc", "")
+    cfg["request_login_bg_mobile"] = getattr(data, "request_login_bg_mobile", "")
+    cfg["admin_login_bg_blur"] = getattr(data, "admin_login_bg_blur", 12)
+    cfg["request_login_bg_blur"] = getattr(data, "request_login_bg_blur", 10)
     cfg["default_invite_template_user_id"] = getattr(data, "default_invite_template_user_id", "")
     cfg["welcome_message"] = data.welcome_message
     cfg["client_download_url"] = data.client_download_url

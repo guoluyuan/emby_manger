@@ -11,6 +11,74 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Detect frontend changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            frontend:
+              - 'templates/**'
+              - 'static/js/**'
+              - 'static/css/tailwind-input.css'
+              - 'tailwind*.config.js'
+              - 'package.json'
+              - 'package-lock.json'
+            images:
+              - 'static/img/**/*.png'
+
+      - name: Check CSS presence
+        id: csscheck
+        run: |
+          if [ -f static/css/admin.css ] && [ -f static/css/request-tailwind.css ]; then
+            echo "present=true" >> $GITHUB_OUTPUT
+          else
+            echo "present=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check image variants
+        id: imgcheck
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          root = Path('static/img')
+          missing = False
+          for p in root.rglob('*.png'):
+            if p.name.lower() == 'favicon.png':
+              continue
+            if not p.with_suffix('.webp').exists() or not p.with_suffix('.avif').exists():
+              missing = True
+              break
+          out = os.environ.get('GITHUB_OUTPUT')
+          if out:
+            with open(out, 'a', encoding='utf-8') as f:
+              f.write(f"missing={str(missing).lower()}\n")
+          print(f"missing={str(missing).lower()}")
+          PY
+
+      - name: Install image deps
+        if: steps.changes.outputs.images == 'true' || steps.imgcheck.outputs.missing == 'true'
+        run: python -m pip install pillow pillow-avif-plugin
+
+      - name: Optimize images (AVIF/WebP)
+        if: steps.changes.outputs.images == 'true' || steps.imgcheck.outputs.missing == 'true'
+        run: python scripts/optimize_images.py
+
+      - name: Set up Node
+        if: steps.changes.outputs.frontend == 'true' || steps.csscheck.outputs.present != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install frontend deps
+        if: steps.changes.outputs.frontend == 'true' || steps.csscheck.outputs.present != 'true'
+        run: npm ci
+
+      - name: Build Tailwind CSS
+        if: steps.changes.outputs.frontend == 'true' || steps.csscheck.outputs.present != 'true'
+        run: npm run build:css
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
@@ -29,11 +97,9 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          # 🔥 修改 1：打上 latest 和自动递增版本号的双标签
           tags: |
             mp740429299/emby_manger:latest
             mp740429299/emby_manger:1.2.0.${{ github.run_number }}
-          # 🔥 修改 2：将版本号作为参数传进 Dockerfile
           build-args: |
             APP_VERSION=1.2.0.${{ github.run_number }}
           cache-from: type=gha

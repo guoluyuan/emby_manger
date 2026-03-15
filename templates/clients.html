@@ -63,7 +63,8 @@
                 </span>
                 <span class="text-[10px] text-gray-400 font-medium">点击图块筛选</span>
             </h3>
-            <div class="relative h-[240px] md:h-[260px] w-full flex items-center justify-center">
+            <div class="chart-wrapper relative h-[240px] md:h-[260px] w-full flex items-center justify-center">
+                <div class="chart-skeleton"></div>
                 <canvas id="clientPieChart" class="cursor-pointer"></canvas>
             </div>
         </div>
@@ -75,7 +76,8 @@
                 </span>
                 <span class="text-[10px] text-gray-400 font-medium">点击图表筛选</span>
             </h3>
-            <div class="relative h-[240px] md:h-[260px] w-full">
+            <div class="chart-wrapper relative h-[240px] md:h-[260px] w-full">
+                <div class="chart-skeleton"></div>
                 <canvas id="deviceBarChart" class="cursor-pointer"></canvas>
             </div>
         </div>
@@ -173,9 +175,55 @@
 <script>
 let pieChartInstance = null;
 let barChartInstance = null;
-let allDevicesData = []; 
+let allDevicesData = [];
+let chartsReady = false;
+let chartsData = null;
+const chartsRendered = { pie: false, bar: false };
+const chartsPending = { pie: false, bar: false };
 
+async function ensureClientsCharts() {
+    if (chartsReady) return;
+    try {
+        if (window.ensureAdminChartJs) await window.ensureAdminChartJs();
+        if (window.Chart) chartsReady = true;
+    } catch (e) { }
+    if (chartsReady) flushPendingCharts();
+}
+
+function flushPendingCharts() {
+    if (!chartsData || !chartsReady || !window.Chart) return;
+    if (chartsPending.pie && !chartsRendered.pie) { renderPieChart(chartsData); chartsRendered.pie = true; }
+    if (chartsPending.bar && !chartsRendered.bar) { renderBarChart(chartsData); chartsRendered.bar = true; }
+}
+
+function setupClientChartObserver(id, key, renderFn) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const trigger = async () => {
+        await ensureClientsCharts();
+        if (chartsData && chartsReady && window.Chart) {
+            renderFn(chartsData);
+            chartsRendered[key] = true;
+        } else {
+            chartsPending[key] = true;
+        }
+    };
+    const observer = new IntersectionObserver((entries) => {
+        if (entries.some(e => e.isIntersecting)) {
+            observer.disconnect();
+            trigger();
+        }
+    }, { rootMargin: '200px' });
+    observer.observe(el);
+    el.addEventListener('click', trigger, { once: true });
+}
+
+function setupClientsChartsLazy() {
+    setupClientChartObserver('clientPieChart', 'pie', renderPieChart);
+    setupClientChartObserver('deviceBarChart', 'bar', renderBarChart);
+}
 document.addEventListener('DOMContentLoaded', () => {
+    setupClientsChartsLazy();
     fetchClientsData();
     fetchBlacklist();
 });
@@ -188,7 +236,15 @@ async function fetchClientsData() {
         
         allDevicesData = data.devices; 
         renderStatsCards(allDevicesData);
-        renderCharts(data.charts);
+        chartsData = data.charts;
+        if (chartsRendered.pie || chartsRendered.bar) {
+            ensureClientsCharts().then(() => {
+                if (chartsRendered.pie) renderPieChart(chartsData);
+                if (chartsRendered.bar) renderBarChart(chartsData);
+            });
+        } else {
+            flushPendingCharts();
+        }
         renderTable(allDevicesData);
         clearFilterTag(); 
     } catch (e) {
@@ -227,12 +283,11 @@ function renderStatsCards(devices) {
     document.getElementById('stats-cards-container').innerHTML = html;
 }
 
-function renderCharts(charts) {
+function renderPieChart(charts) {
+    if (!window.Chart || !charts) return;
     const pieCtx = document.getElementById('clientPieChart').getContext('2d');
-    const barCtx = document.getElementById('deviceBarChart').getContext('2d');
     
     if(pieChartInstance) pieChartInstance.destroy();
-    if(barChartInstance) barChartInstance.destroy();
 
     const isDark = document.documentElement.classList.contains('dark');
     const textColor = isDark ? '#9ca3af' : '#6b7280';
@@ -265,7 +320,20 @@ function renderCharts(charts) {
             }
         }
     });
+    if (window.markAdminChartReady) window.markAdminChartReady('clientPieChart');
 
+}
+
+function renderBarChart(charts) {
+    if (!window.Chart || !charts) return;
+    const barCtx = document.getElementById('deviceBarChart').getContext('2d');
+
+    const isDark = document.documentElement.classList.contains('dark');
+    const textColor = isDark ? '#9ca3af' : '#6b7280';
+    const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+    const tooltipBg = isDark ? 'rgba(28,28,30,0.95)' : 'rgba(255,255,255,0.95)';
+    const tooltipText = isDark ? '#F5F5F7' : '#1C1C1E';
+    if(barChartInstance) barChartInstance.destroy();
     barChartInstance = new Chart(barCtx, {
         type: 'bar',
         data: {
@@ -295,6 +363,7 @@ function renderCharts(charts) {
             }
         }
     });
+    if (window.markAdminChartReady) window.markAdminChartReady('deviceBarChart');
 }
 
 function filterTableData(filterKey, filterValue) {

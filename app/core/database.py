@@ -19,6 +19,29 @@ def init_db():
         
         c.execute('''CREATE TABLE IF NOT EXISTS PlaybackActivity (Id INTEGER PRIMARY KEY AUTOINCREMENT, UserId TEXT, UserName TEXT, ItemId TEXT, ItemName TEXT, PlayDuration INTEGER, DateCreated DATETIME DEFAULT CURRENT_TIMESTAMP, Client TEXT, DeviceName TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS users_meta (user_id TEXT PRIMARY KEY, expire_date TEXT, note TEXT, created_at TEXT)''')
+
+        # 🔧 兼容老版 PlaybackReporting.db：补齐缺失列，避免 "no such column" 报错
+        try:
+            c.execute("PRAGMA table_info(PlaybackActivity)")
+            cols = [col[1] for col in c.fetchall()]
+            def _add(col_name, col_type="TEXT"):
+                if col_name not in cols:
+                    try:
+                        c.execute(f"ALTER TABLE PlaybackActivity ADD COLUMN {col_name} {col_type}")
+                    except Exception:
+                        pass
+            _add("ItemType", "TEXT")
+            _add("ClientName", "TEXT")
+            _add("DeviceName", "TEXT")
+            _add("Client", "TEXT")
+            _add("ItemName", "TEXT")
+            _add("ItemId", "TEXT")
+            _add("UserId", "TEXT")
+            _add("UserName", "TEXT")
+            _add("PlayDuration", "INTEGER")
+            _add("DateCreated", "DATETIME")
+        except Exception:
+            pass
         
         # 🔥 风控模块：为老数据库无损新增“并发控制”和“风控等级”字段
         try: c.execute("ALTER TABLE users_meta ADD COLUMN max_concurrent INTEGER")

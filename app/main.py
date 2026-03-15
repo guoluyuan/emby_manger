@@ -119,9 +119,23 @@ async def lifespan(app: FastAPI):
     # 🔥 唤醒风控天眼
     start_risk_monitor()
     
+    # 🔥 拿掉 sleep，把面板一口气打印完，绝对整齐！
+    print("\n" + "="*55)
+    print("🚀 [系统启动] EmbyPulse 双引擎初始化成功！")
+    print("🤖 [消息通知] 机器人模块已就绪")
+    print("👁️ [风险管控] 并发天眼已开启，时刻监控越界行为！")
+    print(f"🌍 [核心后台] 管理员仪表盘运行在端口: {PORT}")
+    print("🎈 [用户中心] 独立求片门户运行在端口: 10308")
+    print("✅ [系统状态] 物理隔离架构已启动，安全防护中！")
+    print("="*55 + "\n")
+    
     yield
     
+    print("\n" + "="*55)
+    print("🛑 [系统关闭] 正在停止 EmbyPulse 服务...")
     bot.stop()
+    print("💤 [系统关闭] 所有服务已安全退出。")
+    print("="*55 + "\n")
 # ==============================================================================
 
 app = FastAPI(lifespan=lifespan)

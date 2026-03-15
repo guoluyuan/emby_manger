@@ -16,7 +16,7 @@ templates = Jinja2Templates(directory="templates")
 router = APIRouter()
 
 APP_VERSION = os.environ.get("APP_VERSION", "1.2.0.Dev.20260314.2")
-REQUEST_ASSET_VER = os.environ.get("REQUEST_ASSET_VER") or "20260314.2"
+REQUEST_ASSET_VER = os.environ.get("REQUEST_ASSET_VER") or "20260315.6"
 
 def _extract_host_ip(url: str):
     try:
@@ -118,7 +118,14 @@ async def index(request: Request):
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     if check_login(request): return RedirectResponse("/")
-    return templates.TemplateResponse("login.html", {"request": request, "version": APP_VERSION})
+    return templates.TemplateResponse("login.html", {
+        "request": request,
+        "version": APP_VERSION,
+        "admin_login_bg_url": cfg.get("admin_login_bg_url", ""),
+        "admin_login_bg_pc": cfg.get("admin_login_bg_pc", "") or cfg.get("admin_login_bg_url", ""),
+        "admin_login_bg_mobile": cfg.get("admin_login_bg_mobile", ""),
+        "admin_login_bg_blur": cfg.get("admin_login_bg_blur", 12)
+    })
 
 @router.get("/invite/{code}", response_class=HTMLResponse)
 async def invite_page(code: str, request: Request):
@@ -179,12 +186,27 @@ async def history_page(request: Request):
 @router.get("/request", response_class=HTMLResponse)
 async def request_page(request: Request):
     req_user = request.session.get("req_user")
-    return templates.TemplateResponse("request.html", {"request": request, "req_user": req_user, "version": APP_VERSION, "request_asset_ver": REQUEST_ASSET_VER})
+    return templates.TemplateResponse("request.html", {
+        "request": request,
+        "req_user": req_user,
+        "version": APP_VERSION,
+        "request_asset_ver": REQUEST_ASSET_VER,
+        "request_login_bg_pc": cfg.get("request_login_bg_pc", "") or cfg.get("request_login_bg_url", ""),
+        "request_login_bg_mobile": cfg.get("request_login_bg_mobile", ""),
+        "request_login_bg_blur": cfg.get("request_login_bg_blur", 10)
+    })
 
 @router.get("/request_login", response_class=HTMLResponse)
 async def request_login_page(request: Request):
     if request.session.get("req_user"): return RedirectResponse("/request")
-    return templates.TemplateResponse("request_login.html", {"request": request, "version": APP_VERSION})
+    return templates.TemplateResponse("request_login.html", {
+        "request": request,
+        "version": APP_VERSION,
+        "request_login_bg_url": cfg.get("request_login_bg_url", ""),
+        "request_login_bg_pc": cfg.get("request_login_bg_pc", "") or cfg.get("request_login_bg_url", ""),
+        "request_login_bg_mobile": cfg.get("request_login_bg_mobile", ""),
+        "request_login_bg_blur": cfg.get("request_login_bg_blur", 10)
+    })
 
 @router.get("/requests_admin", response_class=HTMLResponse)
 async def requests_admin_page(request: Request):

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>登录 - EmbyPulse</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+        <link rel="stylesheet" href="/static/css/admin.css?v={{ version | default('') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;500;700;900&display=swap');
@@ -18,8 +18,9 @@
         }
         .bg-overlay {
             position: fixed; inset: 0; z-index: 0;
-            background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.4));
-            backdrop-filter: blur(5px);
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.20), rgba(0, 0, 0, 0.05));
+            background-color: rgba(0, 0, 0, 0.06);
+            backdrop-filter: blur(2px);
         }
         .glass-panel {
             background: rgba(255, 255, 255, 0.08);
@@ -42,7 +43,7 @@
                 <i class="fa-solid fa-heart-pulse text-green-400 text-3xl animate-pulse"></i>
             </div>
             <h1 class="text-3xl font-black tracking-tight mb-1">EmbyPulse</h1>
-            <p id="login-subtitle" class="text-gray-400 text-xs uppercase tracking-widest font-bold">Admin Access</p>
+            <p id="login-subtitle" class="text-gray-400 text-xs uppercase tracking-widest font-bold">管理员登录</p>
         </div>
 
         <div id="setup-section" class="space-y-5 hidden">
@@ -92,7 +93,7 @@
         <div id="login-section" class="space-y-5">
             <form id="login-form" class="space-y-5" onsubmit="handleLogin(event)">
                 <div>
-                    <label class="block text-xs font-bold uppercase text-gray-500 mb-2 ml-1">Emby Username</label>
+                    <label class="block text-xs font-bold uppercase text-gray-500 mb-2 ml-1">Emby 账号</label>
                     <div class="relative group">
                         <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500 group-focus-within:text-green-400 transition"><i class="fa-solid fa-user"></i></span>
                         <input type="text" id="username" required 
@@ -102,7 +103,7 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold uppercase text-gray-500 mb-2 ml-1">Password</label>
+                    <label class="block text-xs font-bold uppercase text-gray-500 mb-2 ml-1">密码</label>
                     <div class="relative group">
                         <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-500 group-focus-within:text-green-400 transition"><i class="fa-solid fa-lock"></i></span>
                         <input type="password" id="password"
@@ -111,9 +112,9 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold uppercase text-gray-500 mb-2 ml-1">Captcha</label>
+                    <label class="block text-xs font-bold uppercase text-gray-500 mb-2 ml-1">验证码</label>
                     <div class="flex items-center gap-2 mb-2">
-                        <div id="captcha-question" class="text-[11px] text-gray-400">点击刷新获取验证码</div>
+                        <img id="captcha-img" alt="captcha" class="h-10 rounded-lg border border-white/10 bg-white/5">
                         <button type="button" id="captcha-btn" onclick="refreshCaptcha()"
                             class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white/10 hover:bg-white/20 border border-white/10 transition">刷新</button>
                     </div>
@@ -141,10 +142,35 @@
     <script>
         async function loadBackground() {
             try {
-                // 优先尝试从后端获取 TMDB 壁纸
+                const customBgPc = {{ admin_login_bg_pc | default('') | tojson }};
+                const customBgMobile = {{ admin_login_bg_mobile | default('') | tojson }};
+                const blurVal = {{ admin_login_bg_blur | default(12) | tojson }};
+                const overlay = document.querySelector('.bg-overlay');
+                if (overlay && !Number.isNaN(Number(blurVal))) {
+                    const _b = Math.max(0, Math.min(30, Number(blurVal)));
+                    overlay.style.backdropFilter = _b > 0 ? `blur(${_b}px)` : 'none';
+                    overlay.style.webkitBackdropFilter = _b > 0 ? `blur(${_b}px)` : 'none';
+                }
+                const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+                const customBg = (isMobile ? customBgMobile : customBgPc) || customBgPc || customBgMobile || "";
+                if (customBg && customBg.trim().length > 0) {
+                    const el = document.getElementById('bg-img');
+                    el.style.backgroundImage = `url('${customBg}')`;
+                    if (!Number.isNaN(Number(blurVal))) {
+                        const _b = Math.max(0, Math.min(30, Number(blurVal)));
+                        const filterParts = [];
+                        if (_b > 0) filterParts.push(`blur(${_b}px)`);
+                        el.style.filter = filterParts.length > 0 ? filterParts.join(' ') : 'none';
+                        el.style.transform = _b > 0 ? 'scale(1.05)' : 'none';
+                    }
+                    el.style.opacity = '1';
+                    document.getElementById('bg-source').innerText = 'Custom Background';
+                    return;
+                }
+
+                // 默认使用 TMDB 壁纸
                 const res = await fetch('/api/wallpaper');
                 const json = await res.json();
-                
                 if(json.status === 'success' && json.url) {
                     const img = new Image();
                     img.src = json.url;
@@ -152,6 +178,13 @@
                         const el = document.getElementById('bg-img');
                         el.style.backgroundImage = `url('${json.url}')`;
                         el.style.opacity = '1';
+                        if (!Number.isNaN(Number(blurVal))) {
+                            const _b = Math.max(0, Math.min(30, Number(blurVal)));
+                            const filterParts = [];
+                            if (_b > 0) filterParts.push(`blur(${_b}px)`);
+                            el.style.filter = filterParts.length > 0 ? filterParts.join(' ') : 'none';
+                            el.style.transform = _b > 0 ? 'scale(1.05)' : 'none';
+                        }
                         if(json.title) document.getElementById('bg-source').innerText = json.title;
                     };
                 }
@@ -169,11 +202,11 @@
                 if (json.status === 'success' && json.configured) {
                     setup.classList.add('hidden');
                     login.classList.remove('hidden');
-                    subtitle.textContent = 'Admin Access';
+                    subtitle.textContent = '管理员登录';
                 } else {
                     setup.classList.remove('hidden');
                     login.classList.add('hidden');
-                    subtitle.textContent = 'First-Time Setup';
+                    subtitle.textContent = '首次配置';
                 }
             } catch(e) {}
         }
@@ -183,7 +216,9 @@
                 const res = await fetch('/api/captcha');
                 const json = await res.json();
                 if (json.status === 'success') {
-                    document.getElementById('captcha-question').innerText = `验证码：${json.question}`;
+                    if (json.image) {
+                        document.getElementById('captcha-img').src = json.image;
+                    }
                 }
             } catch (e) {}
         }

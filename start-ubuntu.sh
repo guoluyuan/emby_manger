@@ -13,4 +13,7 @@ fi
 echo "Starting EmbyPulse..."
 echo "Open: http://127.0.0.1:10307/"
 
+echo "Building Tailwind CSS..."
+npm run build:css
+
 python3 run.py

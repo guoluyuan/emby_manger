@@ -312,7 +312,7 @@
         if(imgEl.getAttribute('data-fallback-done')) return;
         imgEl.setAttribute('data-fallback-done', 'true');
         
-        imgEl.src = '/static/img/logo-app-2.png';
+        imgEl.dataset.fallback = 'avif'; imgEl.onerror = () => { if (imgEl.dataset.fallback === 'avif') { imgEl.dataset.fallback = 'webp'; imgEl.src = '/static/img/logo-app-2.webp?v={{ version }}'; } else if (imgEl.dataset.fallback === 'webp') { imgEl.dataset.fallback = 'png'; imgEl.src = '/static/img/logo-app-2.png?v={{ version }}'; } else { imgEl.onerror = null; } }; imgEl.src = '/static/img/logo-app-2.avif?v={{ version }}';
         imgEl.style.objectFit = "contain";
         imgEl.style.padding = "20px";
         

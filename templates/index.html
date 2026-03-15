@@ -159,7 +159,7 @@
                     <button onclick="switchTrend('month')" id="trend-btn-month" class="px-3.5 py-1.5 rounded-md text-gray-500 hover:text-gray-900 dark:hover:text-white transition">12月</button>
                 </div>
             </div>
-            <div class="relative flex-1 w-full min-h-[260px] md:min-h-[300px]"><canvas id="trendChart"></canvas></div>
+            <div class="chart-wrapper relative flex-1 w-full min-h-[260px] md:min-h-[300px]"><div class="chart-skeleton"></div><canvas id="trendChart"></canvas></div>
         </div>
         
         <div class="apple-card flex flex-col stat-card-mobile h-[400px] md:h-auto">
@@ -184,6 +184,41 @@
 <script>
     let trendChart = null; let currentTrendDim = 'day'; let currentTopPeriod = 'all';
     const embyBaseUrl = "{{ emby_url }}"; const embyServerId = "{{ server_id }}";
+    let trendChartReady = false;
+    let pendingTrendArgs = { userId: 'all', dim: 'day' };
+
+    async function ensureTrendChart() {
+        if (trendChartReady) return;
+        try {
+            if (window.ensureAdminChartJs) await window.ensureAdminChartJs();
+            if (window.Chart) trendChartReady = true;
+        } catch (e) { }
+    }
+
+    function scheduleTrendChart(userId, dim) {
+        pendingTrendArgs = { userId, dim };
+        if (trendChartReady && window.Chart) initTrendChart(userId, dim);
+    }
+
+    function setupTrendChartLazy() {
+        const canvas = document.getElementById('trendChart');
+        if (!canvas) return;
+        const trigger = async () => {
+            await ensureTrendChart();
+            if (pendingTrendArgs && trendChartReady) {
+                initTrendChart(pendingTrendArgs.userId, pendingTrendArgs.dim);
+            }
+        };
+        const observer = new IntersectionObserver((entries) => {
+            if (entries.some(e => e.isIntersecting)) {
+                observer.disconnect();
+                trigger();
+            }
+        }, { rootMargin: '200px' });
+        observer.observe(canvas);
+        canvas.addEventListener('click', trigger, { once: true });
+    }
+
 
     function jumpToEmby(itemId) {
         if (!embyBaseUrl) { alert("提示: 未在设置中配置 Emby 地址。"); return; }
@@ -211,11 +246,11 @@
     document.getElementById('current-date').innerText = new Date().toLocaleDateString('zh-CN', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
 
     window.addEventListener('theme-changed', () => {
-        if(trendChart) { initTrendChart(document.getElementById('dash-user-select').value, currentTrendDim); }
+        if(trendChartReady) { scheduleTrendChart(document.getElementById('dash-user-select').value, currentTrendDim); }
     });
 
     async function init() {
-        await loadUsers(); fetchDashboardData('all'); fetchLibraries(); fetchLatest(); fetchRecentActivity('all'); fetchTopUsers('all'); initTrendChart('all', 'day'); 
+        await loadUsers(); fetchDashboardData('all'); fetchLibraries(); fetchLatest(); fetchRecentActivity('all'); fetchTopUsers('all'); setupTrendChartLazy(); scheduleTrendChart('all', 'day'); 
     }
     
     async function loadUsers() { 
@@ -230,7 +265,7 @@
     }
     function changeUser() {
         const userId = document.getElementById('dash-user-select').value;
-        fetchDashboardData(userId); fetchRecentActivity(userId); initTrendChart(userId, currentTrendDim); 
+        fetchDashboardData(userId); fetchRecentActivity(userId); scheduleTrendChart(userId, currentTrendDim); 
     }
 
     async function fetchDashboardData(userId) { 
@@ -348,10 +383,11 @@
             const btn = document.getElementById(`trend-btn-${d}`);
             btn.className = d === dim ? "px-3.5 py-1.5 rounded-md bg-white dark:bg-gray-600 shadow-sm text-gray-900 dark:text-white transition font-medium" : "px-3.5 py-1.5 rounded-md text-gray-500 hover:text-gray-900 dark:hover:text-white transition";
         });
-        initTrendChart(document.getElementById('dash-user-select').value, dim);
+        scheduleTrendChart(document.getElementById('dash-user-select').value, dim);
     }
 
     async function initTrendChart(userId, dimension = 'day') {
+        if (!window.Chart) return;
         const ctx = document.getElementById('trendChart').getContext('2d'); if(trendChart) trendChart.destroy(); 
         const isDark = document.documentElement.classList.contains('dark'); const textColor = isDark ? '#6b7280' : '#9ca3af';
         try {
@@ -368,6 +404,7 @@
                 data: { labels: labels.length > 0 ? labels : ['无数据'], datasets: [{ label: '播放时长', data: values.length > 0 ? values : [0], borderColor: borderColor, backgroundColor: gradient, borderWidth: 2.5, pointBackgroundColor: borderColor, pointBorderColor: isDark ? '#1C1C1E' : '#fff', pointBorderWidth: 2, pointRadius: 0, pointHoverRadius: 5, fill: true, tension: 0.4 }] }, 
                 options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false, }, plugins: { legend: { display: false }, tooltip: { backgroundColor: isDark ? 'rgba(28, 28, 30, 0.9)' : 'rgba(255, 255, 255, 0.9)', titleColor: isDark ? '#F5F5F7' : '#1C1C1E', bodyColor: isDark ? '#A1A1A6' : '#6E6E73', borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', borderWidth: 1, padding: 10, displayColors: false, titleFont: { size: 13, weight: '600' }, bodyFont: { size: 12 }, callbacks: { label: function(context) { return context.parsed.y + ' 小时'; } } } }, scales: { y: { beginAtZero: true, border: { display: false }, grid: { display: false }, ticks: { display: false } }, x: { border: { display: false }, grid: { display: false }, ticks: { font: { family: 'ui-monospace, SFPro, sans-serif', size: 10}, color: textColor, maxTicksLimit: 6, maxRotation: 0 } } } } 
             });
+            if (window.markAdminChartReady) window.markAdminChartReady('trendChart');
         } catch(e) {}
     }
     
