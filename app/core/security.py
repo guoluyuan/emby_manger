@@ -97,7 +97,7 @@ def reset_failures(ip: str, scope: str):
     conn.close()
 
 
-def _load_captcha_font(size: int = 28) -> Optional["ImageFont.ImageFont"]:
+def _load_captcha_font(size: int = 34) -> Optional["ImageFont.ImageFont"]:
     if not _HAS_PIL:
         return None
     try:
@@ -111,7 +111,7 @@ def _load_captcha_font(size: int = 28) -> Optional["ImageFont.ImageFont"]:
     except Exception:
         return ImageFont.load_default()
 
-def _build_captcha_image(code: str, width: int = 140, height: int = 44) -> Optional[bytes]:
+def _build_captcha_image(code: str, width: int = 180, height: int = 56) -> Optional[bytes]:
     if not _HAS_PIL:
         return None
     img = Image.new("RGB", (width, height), (255, 255, 255))
@@ -128,12 +128,18 @@ def _build_captcha_image(code: str, width: int = 140, height: int = 44) -> Optio
         x2 = random.randint(0, width)
         y2 = random.randint(0, height)
         draw.line((x1, y1, x2, y2), fill=(random.randint(80, 160), random.randint(80, 160), random.randint(80, 160)), width=2)
-    font = _load_captcha_font(28)
+    font = _load_captcha_font(34)
     # 文字
     spacing = width // (len(code) + 1)
     for i, ch in enumerate(code):
-        x = spacing * (i + 1) - 8 + random.randint(-2, 2)
-        y = random.randint(6, 14)
+        try:
+            bbox = font.getbbox(ch)
+            ch_w = bbox[2] - bbox[0]
+            ch_h = bbox[3] - bbox[1]
+        except Exception:
+            ch_w, ch_h = font.getsize(ch)
+        x = spacing * (i + 1) - (ch_w // 2) + random.randint(-2, 2)
+        y = max(4, (height - ch_h) // 2 + random.randint(-3, 3))
         draw.text((x, y), ch, font=font, fill=(random.randint(20, 80), random.randint(20, 80), random.randint(20, 80)))
     img = img.filter(ImageFilter.SMOOTH)
     buf = io.BytesIO()

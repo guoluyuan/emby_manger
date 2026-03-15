@@ -12,7 +12,7 @@
             <div class="space-y-1">
                 <div class="text-[11px] text-slate-500 dark:text-zinc-400">验证码</div>
                 <div class="flex items-center gap-2">
-                    <img :src="captchaImage" alt="captcha" class="h-10 rounded-lg border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-white/5">
+                    <img :src="captchaImage" alt="captcha" class="h-14 rounded-lg border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-white/5">
                     <button type="button" @click="refreshCaptcha()" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white/10 hover:bg-white/20 border border-white/10 transition text-brand-500 hover:text-brand-600">刷新</button>
                 </div>
                 <input type="text" x-model="loginForm.captcha" placeholder="请输入验证码" required class="w-full px-4 py-3.5 rounded-2xl bg-white/60 dark:bg-white/5 border border-slate-200 dark:border-white/5 focus:ring-2 focus:ring-brand-500 outline-none transition-all placeholder-slate-400 dark:placeholder-zinc-500 text-slate-900 dark:text-white">
