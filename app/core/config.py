@@ -4,7 +4,13 @@ import secrets
 from fastapi.templating import Jinja2Templates
 
 # ================= 路径配置 =================
-CONFIG_DIR = "/app/config"
+ENV_CONFIG_DIR = os.getenv("CONFIG_DIR", "").strip()
+if ENV_CONFIG_DIR:
+    CONFIG_DIR = ENV_CONFIG_DIR
+elif os.path.exists("/app/config"):
+    CONFIG_DIR = "/app/config"
+else:
+    CONFIG_DIR = os.path.abspath("./app/config")
 if not os.path.exists(CONFIG_DIR):
     os.makedirs(CONFIG_DIR, exist_ok=True)
 
@@ -148,7 +154,6 @@ if _db_dir and not os.path.exists(_db_dir):
 if DB_PATH and not os.path.exists(DB_PATH):
     try:
         open(DB_PATH, "a").close()
-        print(f"ℹ️ [数据库] 当前不存在数据库文件，已自动创建: {DB_PATH}")
     except Exception as e:
         print(f"⚠️ [数据库] 自动创建数据库文件失败: {DB_PATH} ({e})")
 
@@ -160,19 +165,14 @@ def save_config():
 def _auto_select_playback_mode():
     env_mode = os.getenv("PLAYBACK_DATA_MODE", "").strip().lower()
     if env_mode in ("api", "sqlite"):
-        print(f"ℹ️ [播放数据] 已检测到环境变量 PLAYBACK_DATA_MODE={env_mode}，使用指定模式。")
         return
     current = cfg.get("playback_data_mode", "sqlite")
     db_exists = os.path.isfile(DB_PATH)
     if current == "sqlite" and not db_exists:
         cfg.set("playback_data_mode", "api")
-        print("⚠️ [播放数据] 未找到 PlaybackReporting.db，自动切换为 API 穿透模式。")
     elif current == "sqlite" and db_exists:
-        print("✅ [播放数据] 已检测到 PlaybackReporting.db，使用 SQLite 直读模式。")
+        pass
     elif current == "api":
-        msg = "ℹ️ [播放数据] 使用 API 穿透模式。"
-        if db_exists:
-            msg += "（检测到 PlaybackReporting.db，但保持 API 模式）"
-        print(msg)
+        pass
 
 _auto_select_playback_mode()

@@ -100,14 +100,14 @@ def scan_playbacks_and_alert():
         
         # 🔥 只有在真正有人看视频的时候，才在控制台打印这句战报，0人的时候静默防守
         if len(active_playbacks) > 0:
-            logger.info(f"📡 [天眼雷达] 正在扫网... 发现 {len(active_playbacks)} 名用户正在看视频。")
+            pass
 
         for uid, user_sessions in active_playbacks.items():
             limit = get_user_concurrent_limit(uid)
             current_count = len(user_sessions)
             username = user_sessions[0].get("UserName", "未知用户")
             
-            logger.info(f"   ▶️ 锁定用户: {username} | 当前并发: {current_count} | 专属限额: {limit}")
+            # 仅记录异常，避免常规扫描刷屏
             
             if current_count > limit:
                 devices_info = []
@@ -135,7 +135,7 @@ def scan_playbacks_and_alert():
                         "devices_info": devices_text
                     })
                 else:
-                    logger.info(f"⚠️ [风控防抖] {username} 的这批设备已在处置中，忽略重复报警...")
+                    # 防抖命中不再输出日志
                     
         _alerted_sessions.clear()
         _alerted_sessions.update(current_alert_fingerprints)
@@ -144,7 +144,7 @@ def scan_playbacks_and_alert():
         logger.error(f"[风控天眼] 扫描异常: {e}")
 
 def _on_playback_start(data):
-    logger.info("🔔 [事件总线] 捕获到视频播放动作，雷达将在 3 秒后启动...")
+    # 静默触发扫描，避免刷屏
     def delay_scan():
         time.sleep(3)
         scan_playbacks_and_alert()
@@ -175,4 +175,4 @@ def start_risk_monitor():
     bus.subscribe("notify.risk.alert", _on_risk_alert_for_web)
     
     threading.Thread(target=_risk_monitor_loop, daemon=True, name="RiskMonitorThread").start()
-    logger.info("👁️ [风险管控] 零延迟天眼系统已启动 (事件驱动 + 60s兜底)")
+    # 启动日志已去除，避免控制台噪音

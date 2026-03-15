@@ -141,10 +141,4 @@ async def toggle_debug(req: Request):
     uvicorn_logger.setLevel(level)
     app_logger.setLevel(level)
     
-    # 用 print 测试一下，新版的流劫持器会自动捕获并加上时间戳
-    if enable:
-        print("======== DEBUG 模式已被控制中心动态开启 ========")
-    else:
-        print("======== DEBUG 模式已关闭，恢复 INFO 级别 ========")
-        
     return {"success": True, "msg": f"Debug 模式已{'开启' if enable else '关闭'}"}

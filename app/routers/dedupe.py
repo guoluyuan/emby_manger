@@ -148,7 +148,6 @@ def is_valid_tmdb(val) -> bool:
 def run_dedupe_scan(strategy: str = "quality", custom_weights: dict = None):
     global scan_state
     start_time = time.time()
-    logger.info(f"🚀 [去重引擎] 开始全库扫描，策略: {strategy}...")
     
     scan_state["is_scanning"] = True
     scan_state["progress"] = 0
@@ -275,7 +274,6 @@ def run_dedupe_scan(strategy: str = "quality", custom_weights: dict = None):
             
         conn.close()
         elapsed = time.time() - start_time
-        logger.info(f"✅ [去重引擎] 扫描完成！共遍历 {scan_state['total_items']} 个资源，发现 {scan_state['duplicate_groups']} 组重复。耗时: {elapsed:.2f} 秒。")
         scan_state["message"] = f"✅ 扫描完成！遍历 {scan_state['total_items']} 项，发现 {scan_state['duplicate_groups']} 组重复"
         
     except Exception as e:

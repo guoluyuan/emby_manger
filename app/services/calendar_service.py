@@ -31,11 +31,9 @@ class CalendarService:
             time.sleep(60)
             while True:
                 try:
-                    logger.info("🔄 [定时任务] 开始在后台自动刷新追剧日历缓存...")
                     # 强制同步本周 (0) 和 下周 (1) 的数据
                     self.get_weekly_calendar(force_refresh=True, week_offset=0)
                     self.get_weekly_calendar(force_refresh=True, week_offset=1)
-                    logger.info("✅ [定时任务] 追剧日历后台更新成功，数据已持久化至 SQLite。")
                 except Exception as e:
                     logger.error(f"❌ [定时任务] 后台同步日历失败: {e}")
                 
@@ -72,7 +70,6 @@ class CalendarService:
             # 清理内存缓存，确保下次刷新页面时读到最新状态
             with self._cache_lock:
                 self._cache.clear()
-            logger.info(f"🟢 [日历联动] Webhook 触发成功，已点亮绿灯: SeriesId={series_id} S{season}E{episode}")
         except Exception as e:
             logger.error(f"❌ 日历状态更新失败: {e}")
 

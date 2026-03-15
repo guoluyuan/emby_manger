@@ -157,7 +157,6 @@ async def wecom_webhook_get(msg_signature: str = "", timestamp: str = "", nonce:
         
         # 2. 解密字符串
         msg = decrypt_wecom_data(echostr)
-        logger.info(f"WeCom Webhook: 验证成功，准备向企微放行")
         return Response(content=msg, media_type="text/plain")
         
     except Exception as e: 

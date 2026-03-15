@@ -50,7 +50,6 @@ def init_db():
 
         conn.commit()
         conn.close()
-        print("✅ 数据库结构初始化完成.")
     except Exception as e: 
         print(f"❌ DB Init Error: {e}")
 
@@ -141,7 +140,6 @@ def query_db(query, args=(), one=False):
                 else:
                     final_data = [raw_data] if raw_data else []
 
-                print(f"[API 引擎] 🎯 完美缝合数据: {len(final_data)} 条 (API 穿透成功)")
                 data = [APIRow(item) if isinstance(item, dict) else item for item in final_data]
                 if query.strip().upper().startswith("SELECT"):
                     return (data[0] if data else None) if one else data
@@ -160,7 +158,7 @@ def query_db(query, args=(), one=False):
         if api_result is not None:
             return api_result
         else:
-            print("[API 引擎] ⚠️ 警告: API 模式失败，自动降级回 SQLite。")
+            pass
             
     # ==========================================
     # 🚂 原版 SQLite 执行器 (处理非播放表及降级情况)

@@ -66,7 +66,6 @@ class SystemDaemon:
         self.schedule_thread.start()
         self.library_thread = threading.Thread(target=self._library_notify_loop, daemon=True)
         self.library_thread.start()
-        print("🧠 System Daemon Started (Event Subsystem Online)")
 
     def stop(self): self.running = False
 
@@ -324,7 +323,6 @@ class NotificationBot:
         if cfg.get("tg_bot_token"):
             self.poll_thread = threading.Thread(target=self._polling_loop, daemon=True)
             self.poll_thread.start()
-        logger.info("🤖 Notification Bot Started")
 
     def stop(self): self.running = False
 
@@ -471,7 +469,7 @@ class NotificationBot:
             
             # 🔥 拦截器：如果用户被静音了播放通知，直接抛弃不发
             if self._is_muted(user_id, "playback"):
-                logger.info(f"🔇 [静音规则] 拦截了用户 {user_name} 的播放通知")
+                # 静音规则命中，不做日志输出以免刷屏
                 return
 
             title = item.get("Name") or "未知内容"
@@ -568,7 +566,7 @@ class NotificationBot:
             
             # 🔥 拦截器：如果用户被静音了登录通知，直接抛弃不发
             if self._is_muted(user_id, "login"):
-                logger.info(f"🔇 [静音规则] 拦截了用户 {user_name} 的登录通知")
+                # 静音规则命中，不做日志输出以免刷屏
                 return
 
             ip = session.get("RemoteEndPoint") or data.get("RemoteEndPoint") or "127.0.0.1"
@@ -829,7 +827,6 @@ class NotificationBot:
             res = requests.post(f"{proxy_url}/cgi-bin/menu/create?access_token={token}&agentid={agentid}", json=menu_data, timeout=5)
             res_data = res.json()
             if res_data.get("errcode") == 0:
-                logger.info("✅ [企微助手] 底部三栏菜单推送成功！")
             else:
                 logger.error(f"❌ [企微助手] 菜单推送失败！错误码: {res_data.get('errcode')}, 详情: {res_data.get('errmsg')}")
         except Exception as e: 

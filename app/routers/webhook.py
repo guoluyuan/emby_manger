@@ -76,7 +76,6 @@ async def emby_webhook(request: Request):
             return {"status": "success", "message": "Blocked"}
 
         event = data.get("Event", "").lower().strip()
-        if event: logger.info(f"🔔 触发事件: {event}")
 
         # 2. 彻底解耦：不再调 bot，而是发布到事件总线
         bus.publish("webhook.received", event, data)
