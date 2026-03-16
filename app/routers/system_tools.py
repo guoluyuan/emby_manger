@@ -279,6 +279,17 @@ def _compose_args(files, project_name: str = ""):
 def _all_files_exist(files):
     return all(os.path.exists(f) for f in files)
 
+def _get_bind_source(inspect: dict, target: str):
+    binds = (inspect.get("HostConfig") or {}).get("Binds") or []
+    for b in binds:
+        try:
+            src, dst, *_ = b.split(":")
+            if dst == target:
+                return src
+        except Exception:
+            continue
+    return ""
+
 @router.get("/network_check")
 async def network_check():
     proxy_url = cfg.get("proxy_url")
@@ -435,17 +446,49 @@ async def docker_update_apply(request: Request):
 
     args = compose_bin + _compose_args(files, project)
 
-    pull_res = _run_cmd(args + ["pull", service], timeout=300)
+    # 使用独立更新容器执行更新，避免“自杀式更新”导致创建后不启动
+    compose_host = _get_bind_source(inspect, "/compose")
+    if not compose_host:
+        return {"status": "error", "message": "无法定位 /compose 挂载源路径"}
+
+    sock_host = _get_bind_source(inspect, "/var/run/docker.sock") or "/var/run/docker.sock"
+    if not os.path.exists(sock_host):
+        return {"status": "error", "message": "未找到宿主机 docker.sock"}
+
+    # 组装 compose 命令（在更新容器内执行）
+    compose_cmd = []
+    if project:
+        compose_cmd.extend(["-p", project])
+    for f in files:
+        compose_cmd.extend(["-f", f])
+
+    updater_name = f"{project or 'emby'}-updater"
+    # 清理可能残留的 updater 容器
+    _run_cmd(["docker", "rm", "-f", updater_name], timeout=10)
+
+    helper_image = "docker/compose:2.27.0"
+    pull_helper = _run_cmd(["docker", "pull", helper_image], timeout=120)
+    if pull_helper.returncode != 0:
+        err_msg = (pull_helper.stderr or pull_helper.stdout or "").strip()
+        return {"status": "error", "message": f"拉取更新器镜像失败: {err_msg or 'unknown'}"}
+
+    # 先 pull，再 up -d（去掉 down，避免自杀）
+    run_pull = ["docker", "run", "--rm", "--name", updater_name,
+                "-v", f"{sock_host}:/var/run/docker.sock",
+                "-v", f"{compose_host}:/compose",
+                "-w", "/compose",
+                helper_image] + compose_cmd + ["pull", service]
+    pull_res = _run_cmd(run_pull, timeout=300)
     if pull_res.returncode != 0:
         err_msg = (pull_res.stderr or pull_res.stdout or "").strip()
         return {"status": "error", "message": f"拉取更新失败: {err_msg or 'unknown'}"}
 
-    down_res = _run_cmd(args + ["down", "--remove-orphans"], timeout=120)
-    if down_res.returncode != 0:
-        err_msg = (down_res.stderr or down_res.stdout or "").strip()
-        return {"status": "error", "message": f"停止旧容器失败: {err_msg or 'unknown'}"}
-
-    up_res = _run_cmd(args + ["up", "-d"], timeout=300)
+    run_up = ["docker", "run", "--rm", "--name", updater_name,
+              "-v", f"{sock_host}:/var/run/docker.sock",
+              "-v", f"{compose_host}:/compose",
+              "-w", "/compose",
+              helper_image] + compose_cmd + ["up", "-d", "--remove-orphans"]
+    up_res = _run_cmd(run_up, timeout=300)
     if up_res.returncode != 0:
         err_msg = (up_res.stderr or up_res.stdout or "").strip()
         return {"status": "error", "message": f"应用更新失败: {err_msg or 'unknown'}"}
