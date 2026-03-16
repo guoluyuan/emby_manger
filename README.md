@@ -30,9 +30,10 @@
 
 ### Docker Compose（推荐）
 
+> 若你使用的是旧版 `docker-compose`（v1），项目名默认取 **当前目录名**。建议把部署目录命名为 `emby-manger`，即可避免与已有项目冲突；或使用命令行 `docker-compose -p emby-manger up -d` 指定项目名。
+
 ```yaml
 version: '3.8'
-name: emby-manger
 services:
   emby-manger:
     image: mp740429299/emby_manger:latest
@@ -66,7 +67,6 @@ API 模式：
 
 ```yaml
 version: '3.8'
-name: emby-manger
 services:
   emby-manger:
     image: mp740429299/emby_manger:latest
@@ -89,7 +89,6 @@ services:
 
 ```yaml
 version: '3.8'
-name: emby-manger
 services:
   emby-manger:
     image: mp740429299/emby_manger:latest
@@ -144,7 +143,6 @@ docker-compose up -d
 **示例（在 compose 中启用）**
 
 ```yaml
-name: emby-manger
 services:
   emby-manger:
     image: mp740429299/emby_manger:latest
