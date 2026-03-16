@@ -676,9 +676,53 @@ function setUpdateUI(state) {
 
 async function checkDockerUpdate(silent = false, force = false) {
     if (window.__disableUpdateCheck && !force) {
+        try {
+            const localRes = await fetch('/api/system/docker_update/local');
+            const localJson = await localRes.json();
+            if (localJson.status === 'success') {
+                const d = localJson.data || {};
+                const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+                const currentVer = d.current_version ? `版本 ${escapeHtml(d.current_version)}` : '版本未知';
+                const currentCreated = escapeHtml(d.current_created || '');
+                const detailHtml = `
+                    <div class="grid grid-cols-[1fr_auto] gap-y-2 gap-x-4">
+                        <div class="text-[11px] text-gray-500">当前版本</div>
+                        <div class="text-[11px] text-gray-500 text-right">创建时间</div>
+                        <div><span class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 text-[10px] font-bold">${currentVer}</span></div>
+                        <div class="font-mono text-[11px] text-gray-400 text-right">${currentCreated || '-'}</div>
+
+                        <div class="text-[11px] text-gray-500 mt-1">最新版本</div>
+                        <div class="text-[11px] text-gray-500 text-right mt-1">创建时间</div>
+                        <div><span class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 text-[10px] font-bold">未检测</span></div>
+                        <div class="font-mono text-[11px] text-gray-400 text-right">-</div>
+                    </div>
+                `;
+                setUpdateUI({
+                    title: '自动检测已关闭',
+                    detailHtml,
+                    badge: '已禁用',
+                    badgeClass: 'px-2.5 py-1 rounded-full text-[10px] font-black bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400 border border-gray-200/60 dark:border-white/10 shrink-0',
+                    canUpdate: false
+                });
+                return;
+            }
+        } catch (e) {}
+
         setUpdateUI({
             title: '自动检测已关闭',
-            detail: '如需检测请点击“检查更新”',
+            detailHtml: `
+                <div class="grid grid-cols-[1fr_auto] gap-y-2 gap-x-4">
+                    <div class="text-[11px] text-gray-500">当前版本</div>
+                    <div class="text-[11px] text-gray-500 text-right">创建时间</div>
+                    <div><span class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 text-[10px] font-bold">版本未知</span></div>
+                    <div class="font-mono text-[11px] text-gray-400 text-right">-</div>
+
+                    <div class="text-[11px] text-gray-500 mt-1">最新版本</div>
+                    <div class="text-[11px] text-gray-500 text-right mt-1">创建时间</div>
+                    <div><span class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 text-[10px] font-bold">未检测</span></div>
+                    <div class="font-mono text-[11px] text-gray-400 text-right">-</div>
+                </div>
+            `,
             badge: '已禁用',
             badgeClass: 'px-2.5 py-1 rounded-full text-[10px] font-black bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400 border border-gray-200/60 dark:border-white/10 shrink-0',
             canUpdate: false

@@ -242,6 +242,16 @@ def _get_image_created(image_ref: str):
         return ""
     return _format_docker_time((res.stdout or "").strip())
 
+def _build_current_info(inspect: dict):
+    image = (inspect.get("Config") or {}).get("Image") or ""
+    current_image_id = (inspect.get("Image") or "").strip()
+    current_env = (inspect.get("Config") or {}).get("Env") or []
+    current_version = _extract_env_value(current_env, "APP_VERSION")
+    if not current_version:
+        current_version = _get_image_env_value(current_image_id, "APP_VERSION")
+    current_created = _get_image_created(current_image_id)
+    return image, current_image_id, current_version, current_created
+
 def _get_image_digest(image: str):
     res = _run_cmd(["docker", "image", "inspect", "--format", "{{json .RepoDigests}}", image], timeout=10)
     if res.returncode != 0:
@@ -317,10 +327,7 @@ async def docker_update_status(request: Request):
     if not inspect:
         return {"status": "error", "message": f"读取容器信息失败: {err or 'unknown'}"}
 
-    image = (inspect.get("Config") or {}).get("Image") or ""
-    current_image_id = (inspect.get("Image") or "").strip()
-    current_env = (inspect.get("Config") or {}).get("Env") or []
-    current_version = _extract_env_value(current_env, "APP_VERSION")
+    image, current_image_id, current_version, current_created = _build_current_info(inspect)
 
     if not image:
         return {"status": "error", "message": "无法识别当前镜像名称"}
@@ -332,9 +339,6 @@ async def docker_update_status(request: Request):
     latest_image_id = _get_image_id(image)
     latest_digest = _get_image_digest(image)
     latest_version = _get_image_env_value(image, "APP_VERSION")
-    if not current_version:
-        current_version = _get_image_env_value(current_image_id, "APP_VERSION")
-    current_created = _get_image_created(current_image_id)
     latest_created = _get_image_created(image)
     available = bool(latest_image_id and current_image_id and latest_image_id != current_image_id)
 
@@ -355,6 +359,44 @@ async def docker_update_status(request: Request):
             "latest_version": latest_version,
             "current_created": current_created,
             "latest_created": latest_created,
+            "compose_files": files,
+            "compose_service": service,
+            "compose_ready": compose_ok,
+            "compose_project": project,
+            "checked_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+    }
+
+@router.get("/docker_update/local")
+async def docker_update_local(request: Request):
+    user = request.session.get("user") or {}
+    if not user.get("is_admin"):
+        return {"status": "error", "message": "权限不足"}
+
+    ok, msg = _docker_ready()
+    if not ok:
+        return {"status": "error", "message": msg}
+
+    cid = _get_container_id()
+    if not cid:
+        return {"status": "error", "message": "无法识别当前容器 ID，请设置 DOCKER_UPDATE_NAME"}
+
+    inspect, err = _inspect_container(cid)
+    if not inspect:
+        return {"status": "error", "message": f"读取容器信息失败: {err or 'unknown'}"}
+
+    image, current_image_id, current_version, current_created = _build_current_info(inspect)
+    files, service, project = _get_compose_meta(inspect)
+    compose_ok = bool(files and service and _all_files_exist(files))
+
+    return {
+        "status": "success",
+        "data": {
+            "image": image,
+            "current_image_id": current_image_id,
+            "current_image_id_short": _short_id(current_image_id),
+            "current_version": current_version,
+            "current_created": current_created,
             "compose_files": files,
             "compose_service": service,
             "compose_ready": compose_ok,
