@@ -707,26 +707,42 @@ async function checkDockerUpdate(silent = false, force = false) {
         const composeReady = !!d.compose_ready;
         const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         const imageText = escapeHtml(d.image || '未知镜像');
-        const appVerText = d.app_version ? `版本 ${escapeHtml(d.app_version)}` : '';
         const timeText = escapeHtml(d.checked_at || '刚刚');
         const projectText = d.compose_project ? `项目 ${escapeHtml(d.compose_project)}` : '';
+        const composeText = composeReady ? '' : 'compose 未就绪';
+        const currentVer = d.current_version ? `版本 ${escapeHtml(d.current_version)}` : '版本未知';
+        const latestVer = d.latest_version ? `版本 ${escapeHtml(d.latest_version)}` : '版本未知';
+        const currentCreated = escapeHtml(d.current_created || '');
+        const latestCreated = escapeHtml(d.latest_created || '');
         const currentIdText = d.current_image_id_short ? escapeHtml(d.current_image_id_short) : '';
         const latestIdText = d.latest_image_id_short ? escapeHtml(d.latest_image_id_short) : '';
-        const composeText = composeReady ? '' : 'compose 未就绪';
         const detailHtml = `
             <div class="flex flex-wrap items-center gap-2">
                 <span class="font-mono text-[11px]">${imageText}</span>
-                ${appVerText ? `<span class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 text-[10px] font-bold">${appVerText}</span>` : ''}
-            </div>
-            <div class="mt-1 flex flex-wrap items-center gap-2">
-                <span>${timeText}</span>
                 ${projectText ? `<span class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 text-[10px] font-bold">${projectText}</span>` : ''}
                 ${composeText ? `<span class="px-2 py-0.5 rounded-md bg-red-100/70 dark:bg-red-500/20 text-[10px] font-bold text-red-600 dark:text-red-400">${composeText}</span>` : ''}
             </div>
+            <div class="mt-2 text-[10px] text-gray-400">${timeText}</div>
+            <div class="mt-2 space-y-2">
+                <div class="flex items-center justify-between gap-3 text-[10px] text-gray-500 uppercase tracking-wider">
+                    <span>当前版本</span><span>创建时间</span>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                    <span class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 text-[10px] font-bold">${currentVer}</span>
+                    <span class="font-mono text-[10px] text-gray-400">${currentCreated || '-'}</span>
+                </div>
+                <div class="flex items-center justify-between gap-3 text-[10px] text-gray-500 uppercase tracking-wider">
+                    <span>最新版本</span><span>创建时间</span>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                    <span class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 text-[10px] font-bold">${latestVer}</span>
+                    <span class="font-mono text-[10px] text-gray-400">${latestCreated || '-'}</span>
+                </div>
+            </div>
             ${(currentIdText || latestIdText) ? `
-            <div class="mt-1 flex flex-wrap items-center gap-2">
-                ${currentIdText ? `<span class="font-mono text-[10px]">当前ID ${currentIdText}</span>` : ''}
-                ${latestIdText ? `<span class="font-mono text-[10px]">最新ID ${latestIdText}</span>` : ''}
+            <div class="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-gray-400">
+                ${currentIdText ? `<span class="font-mono">当前ID ${currentIdText}</span>` : ''}
+                ${latestIdText ? `<span class="font-mono">最新ID ${latestIdText}</span>` : ''}
             </div>` : ''}
         `;
 
