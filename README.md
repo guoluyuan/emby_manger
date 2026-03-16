@@ -51,6 +51,7 @@ services:
       # - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       # - DOCKER_UPDATE_SERVICE=emby-pulse
       # - DOCKER_UPDATE_CONTAINER=emby-manger
+      # - DOCKER_UPDATE_PROJECT_NAME=emby
 ```
 
 首次安装后，请访问 `http://localhost:10307/` 在网页中填写 Emby 地址与 API Key（无需写入 `docker-compose.yml`）。
@@ -83,6 +84,7 @@ services:
       # - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       # - DOCKER_UPDATE_SERVICE=emby-pulse
       # - DOCKER_UPDATE_CONTAINER=emby-manger
+      # - DOCKER_UPDATE_PROJECT_NAME=emby
 ```
 
 本地模式（sqlite）：
@@ -108,6 +110,7 @@ services:
       # - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       # - DOCKER_UPDATE_SERVICE=emby-pulse
       # - DOCKER_UPDATE_CONTAINER=emby-manger
+      # - DOCKER_UPDATE_PROJECT_NAME=emby
 ```
 
 **常见报错（API 模式误用 / 本地模式未挂载）**
@@ -148,7 +151,7 @@ docker-compose up -d
 services:
   emby-pulse:
     image: mp740429299/emby_manger:latest
-    container_name: emby-pulse
+    container_name: emby-manger
     restart: unless-stopped
     network_mode: host
     volumes:
