@@ -296,8 +296,8 @@ def _pull_helper_image():
     if override:
         candidates.append(override)
     candidates.extend([
-        "docker/compose:latest",
-        "ghcr.io/docker/compose:latest"
+        "docker:25-cli",
+        "docker:24-cli"
     ])
     last_err = ""
     for img in candidates:
@@ -488,21 +488,40 @@ async def docker_update_apply(request: Request):
         return {"status": "error", "message": f"拉取更新器镜像失败: {helper_err}"}
 
     # 先 pull，再 up -d（去掉 down，避免自杀）
-    run_pull = ["docker", "run", "--rm", "--name", updater_name,
-                "-v", f"{sock_host}:/var/run/docker.sock",
-                "-v", f"{compose_host}:/compose",
-                "-w", "/compose",
-                helper_image] + compose_cmd + ["pull", service]
+    # docker:*-cli 镜像需要安装 compose 插件
+    if helper_image.startswith("docker:"):
+        pull_cmd = " ".join([*compose_cmd, "pull", service])
+        run_pull = ["docker", "run", "--rm", "--name", updater_name,
+                    "-v", f"{sock_host}:/var/run/docker.sock",
+                    "-v", f"{compose_host}:/compose",
+                    "-w", "/compose",
+                    helper_image, "sh", "-c",
+                    f"apk add --no-cache docker-cli-compose >/dev/null 2>&1 && docker compose {pull_cmd}"]
+    else:
+        run_pull = ["docker", "run", "--rm", "--name", updater_name,
+                    "-v", f"{sock_host}:/var/run/docker.sock",
+                    "-v", f"{compose_host}:/compose",
+                    "-w", "/compose",
+                    helper_image] + compose_cmd + ["pull", service]
     pull_res = _run_cmd(run_pull, timeout=300)
     if pull_res.returncode != 0:
         err_msg = (pull_res.stderr or pull_res.stdout or "").strip()
         return {"status": "error", "message": f"拉取更新失败: {err_msg or 'unknown'}"}
 
-    run_up = ["docker", "run", "--rm", "--name", updater_name,
-              "-v", f"{sock_host}:/var/run/docker.sock",
-              "-v", f"{compose_host}:/compose",
-              "-w", "/compose",
-              helper_image] + compose_cmd + ["up", "-d", "--remove-orphans"]
+    if helper_image.startswith("docker:"):
+        up_cmd = " ".join([*compose_cmd, "up", "-d", "--remove-orphans"])
+        run_up = ["docker", "run", "--rm", "--name", updater_name,
+                  "-v", f"{sock_host}:/var/run/docker.sock",
+                  "-v", f"{compose_host}:/compose",
+                  "-w", "/compose",
+                  helper_image, "sh", "-c",
+                  f"apk add --no-cache docker-cli-compose >/dev/null 2>&1 && docker compose {up_cmd}"]
+    else:
+        run_up = ["docker", "run", "--rm", "--name", updater_name,
+                  "-v", f"{sock_host}:/var/run/docker.sock",
+                  "-v", f"{compose_host}:/compose",
+                  "-w", "/compose",
+                  helper_image] + compose_cmd + ["up", "-d", "--remove-orphans"]
     up_res = _run_cmd(run_up, timeout=300)
     if up_res.returncode != 0:
         err_msg = (up_res.stderr or up_res.stdout or "").strip()

@@ -142,7 +142,7 @@ docker-compose up -d
 - 如果使用 docker compose：需要把 compose 文件目录挂载进容器，并设置环境变量
   - `DOCKER_UPDATE_COMPOSE_FILES`：容器内的 compose 文件路径
   - `DOCKER_UPDATE_NAME`：项目名/服务名/容器名（推荐三者一致，减少配置）
-  - `DOCKER_UPDATE_HELPER_IMAGE`：可选，更新器镜像（默认依次尝试 `docker/compose:latest` 和 `ghcr.io/docker/compose:latest`）
+  - `DOCKER_UPDATE_HELPER_IMAGE`：可选，更新器镜像（默认优先 `docker:25-cli` / `docker:24-cli`，会自动安装 compose 插件）
 
 **示例（在 compose 中启用）**
 
