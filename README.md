@@ -140,6 +140,7 @@ docker-compose up -d
 - 如果使用 docker compose：需要把 compose 文件目录挂载进容器，并设置两个环境变量
   - `DOCKER_UPDATE_COMPOSE_FILES`：容器内的 compose 文件路径
   - `DOCKER_UPDATE_SERVICE`：当前服务名（compose 的 service name）
+  - `DOCKER_UPDATE_PROJECT_NAME`：可选，compose 项目名（避免容器内执行 compose 时项目名不一致导致冲突）
 
 **示例（在 compose 中启用）**
 
@@ -158,6 +159,8 @@ services:
       - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       - DOCKER_UPDATE_SERVICE=emby-pulse
       - DOCKER_UPDATE_CONTAINER=emby-manger
+      # 可选：如遇到“容器名冲突”，可指定项目名
+      # - DOCKER_UPDATE_PROJECT_NAME=emby
 ```
 
 启用后，进入「系统设置」即可看到“容器一键更新”卡片。

@@ -167,7 +167,10 @@ def _get_compose_meta(inspect: dict):
     service = (os.getenv("DOCKER_UPDATE_SERVICE") or "").strip()
     if not service:
         service = (labels.get("com.docker.compose.service") or "").strip()
-    return files, service
+    project = (os.getenv("DOCKER_UPDATE_PROJECT_NAME") or "").strip()
+    if not project:
+        project = (labels.get("com.docker.compose.project") or "").strip()
+    return files, service, project
 
 def _compose_bin():
     res = _run_cmd(["docker", "compose", "version"], timeout=6)
@@ -213,8 +216,10 @@ def _pull_image(image: str):
     res = _run_cmd(["docker", "pull", image], timeout=300)
     return res.returncode == 0, (res.stderr or res.stdout or "").strip()
 
-def _compose_args(files):
+def _compose_args(files, project_name: str = ""):
     args = []
+    if project_name:
+        args.extend(["-p", project_name])
     for f in files:
         args.extend(["-f", f])
     return args
@@ -286,7 +291,7 @@ async def docker_update_status(request: Request):
     latest_digest = _get_image_digest(image)
     available = bool(latest_image_id and current_image_id and latest_image_id != current_image_id)
 
-    files, service = _get_compose_meta(inspect)
+    files, service, project = _get_compose_meta(inspect)
     compose_ok = bool(files and service and _all_files_exist(files))
 
     return {
@@ -303,6 +308,7 @@ async def docker_update_status(request: Request):
             "compose_files": files,
             "compose_service": service,
             "compose_ready": compose_ok,
+            "compose_project": project,
             "checked_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
     }
@@ -325,7 +331,7 @@ async def docker_update_apply(request: Request):
     if not inspect:
         return {"status": "error", "message": f"读取容器信息失败: {err or 'unknown'}"}
 
-    files, service = _get_compose_meta(inspect)
+    files, service, project = _get_compose_meta(inspect)
     if not files or not service:
         return {"status": "error", "message": "未检测到 compose 信息，请设置 DOCKER_UPDATE_COMPOSE_FILES 与 DOCKER_UPDATE_SERVICE"}
     if not _all_files_exist(files):
@@ -335,7 +341,7 @@ async def docker_update_apply(request: Request):
     if not compose_bin:
         return {"status": "error", "message": "未检测到 docker compose 命令"}
 
-    args = compose_bin + _compose_args(files)
+    args = compose_bin + _compose_args(files, project)
 
     pull_res = _run_cmd(args + ["pull", service], timeout=300)
     if pull_res.returncode != 0:
