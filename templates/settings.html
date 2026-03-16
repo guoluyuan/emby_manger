@@ -782,6 +782,16 @@ async function applyDockerUpdate() {
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 更新中...'; }
 
     try {
+        const preRes = await fetch('/api/system/docker_update/status');
+        const preJson = await preRes.json();
+        if (preJson.status !== 'success') throw new Error(preJson.message || '更新前自检失败');
+        const pre = preJson.data || {};
+        if (!pre.compose_ready) {
+            showToast('更新前自检失败：compose 未就绪，请检查 /compose 挂载', 'error');
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> 立即更新'; }
+            return;
+        }
+
         const res = await fetch('/api/system/docker_update/apply', { method: 'POST' });
         const json = await res.json();
         if (json.status !== 'success') throw new Error(json.message || '更新失败');
