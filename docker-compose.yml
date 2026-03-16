@@ -1,3 +1,4 @@
+# 旧版 docker-compose(v1) 项目名默认取当前目录名，建议目录名为 emby-manger（或用 -p emby-manger 指定）
 version: '3.8'
 
 services:
