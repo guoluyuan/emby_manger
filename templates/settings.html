@@ -222,6 +222,22 @@
                     </div>
                 </div>
                 <div>
+                    <label class="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider pl-1">MP 下载器选择</label>
+                    <div class="flex items-center gap-2">
+                        <select id="moviepilot_downloader" class="flex-1 px-4 py-3 rounded-xl border border-transparent bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-[13px] font-mono text-gray-800 dark:text-gray-100 focus:bg-white dark:focus:bg-black/30 focus:ring-2 focus:ring-purple-500/50 outline-none transition-all cursor-pointer">
+                            <option value="">（请先拉取 MoviePilot 下载器）</option>
+                        </select>
+                        <button type="button" onclick="loadMPDownloaders()" class="px-4 py-3 bg-purple-50 text-purple-600 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:hover:bg-purple-900/40 rounded-xl text-[12px] font-bold shadow-sm transition-all active:scale-95 border border-purple-100 dark:border-purple-800/30">
+                            拉取
+                        </button>
+                    </div>
+                    <p class="mt-1 text-[10px] text-gray-400">将自动读取 MoviePilot 下载器列表并选中默认项</p>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider pl-1">MP 默认保存路径</label>
+                    <input type="text" id="moviepilot_save_path" class="w-full px-4 py-3 rounded-xl border border-transparent bg-gray-100 hover:bg-gray-200 dark:bg-[#2C2C2E] dark:hover:bg-[#3A3A3C] text-[13px] font-mono text-gray-800 dark:text-gray-100 focus:bg-white dark:focus:bg-black/30 focus:ring-2 focus:ring-purple-500/50 outline-none transition-all placeholder-gray-400" placeholder="自动从 MP 下载器配置获取">
+                </div>
+                <div>
                     <button type="button" onclick="testMPConnection(this)" class="w-full flex items-center justify-center gap-2 px-5 py-3 bg-purple-50 text-purple-600 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:hover:bg-purple-900/40 rounded-xl text-[13px] font-bold shadow-sm transition-all active:scale-95 border border-purple-100 dark:border-purple-800/30">
                         <i class="fa-solid fa-plug"></i> 探测连通性
                     </button>
@@ -386,6 +402,7 @@
 <script>
 let allUsers = [];
 let hiddenUsers = [];
+let mpDownloaders = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
     const uRes = await fetch('/api/users');
@@ -436,6 +453,8 @@ async function loadSettings() {
         document.getElementById('client_download_url').value = d.client_download_url || '';
         document.getElementById('moviepilot_url').value = d.moviepilot_url || '';
         document.getElementById('moviepilot_token').value = d.moviepilot_token || '';
+        document.getElementById('moviepilot_downloader').value = d.moviepilot_downloader || '';
+        document.getElementById('moviepilot_save_path').value = d.moviepilot_save_path || '';
         document.getElementById('pulse_url').value = d.pulse_url || '';
 
         // 🔥 新增开关状态回填
@@ -453,6 +472,10 @@ async function loadSettings() {
         hiddenUsers = d.hidden_users || [];
         renderHiddenUsers();
         updateWebhookPreview();
+
+        if (d.moviepilot_url && d.moviepilot_token) {
+            loadMPDownloaders(d.moviepilot_downloader || '', d.moviepilot_save_path || '');
+        }
     }
 }
 
@@ -497,6 +520,76 @@ function updateWebhookPreview() {
 }
 
 document.getElementById('webhook_token').addEventListener('input', updateWebhookPreview);
+document.getElementById('moviepilot_downloader').addEventListener('change', () => {
+    updateMpSavePath(document.getElementById('moviepilot_save_path').value);
+});
+
+function populateMpDownloaders(downloaders, selectedName, fallbackPath) {
+    const select = document.getElementById('moviepilot_downloader');
+    select.innerHTML = '';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = downloaders.length ? '请选择下载器...' : '未获取到下载器';
+    select.appendChild(placeholder);
+
+    const enabledList = downloaders.filter(d => d.enabled);
+    let chosen = (selectedName || '').trim();
+    if (!chosen && enabledList.length > 0) {
+        const defItem = enabledList.find(d => d.default) || enabledList[0];
+        chosen = defItem ? defItem.name : '';
+    }
+
+    enabledList.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.name || '';
+        const typeText = d.type ? ` (${d.type})` : '';
+        const defText = d.default ? ' 默认' : '';
+        opt.textContent = `${d.name || '未知'}${typeText}${defText}`;
+        select.appendChild(opt);
+    });
+
+    if (chosen) select.value = chosen;
+    updateMpSavePath(fallbackPath);
+}
+
+function updateMpSavePath(fallbackPath = '') {
+    const input = document.getElementById('moviepilot_save_path');
+    const selectedName = document.getElementById('moviepilot_downloader').value;
+    const selected = mpDownloaders.find(d => d.name === selectedName);
+    if (selected && selected.save_path) {
+        input.value = selected.save_path;
+        return;
+    }
+    if (fallbackPath) input.value = fallbackPath;
+}
+
+async function loadMPDownloaders(presetName = '', presetPath = '') {
+    const mpUrl = document.getElementById('moviepilot_url').value;
+    const mpToken = document.getElementById('moviepilot_token').value;
+    if (!mpUrl || !mpToken) { showToast('请先填写 MoviePilot 信息', 'error'); return; }
+
+    const currentName = presetName || document.getElementById('moviepilot_downloader').value;
+    const currentPath = presetPath || document.getElementById('moviepilot_save_path').value;
+
+    try {
+        const res = await fetch('/api/settings/mp_downloaders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mp_url: mpUrl, mp_token: mpToken })
+        });
+        const json = await res.json();
+        if (json.status === 'success') {
+            mpDownloaders = json.data.downloaders || [];
+            populateMpDownloaders(mpDownloaders, currentName, currentPath);
+            showToast('下载器列表已更新', 'success');
+        } else {
+            showToast(json.message || '下载器拉取失败', 'error');
+        }
+    } catch (e) {
+        showToast('下载器拉取失败', 'error');
+    }
+}
 
 function showToast(msg, type = 'success') {
     const toast = document.getElementById('settings-toast');
@@ -543,6 +636,8 @@ async function saveSettings() {
         client_download_url: document.getElementById('client_download_url').value,
         moviepilot_url: document.getElementById('moviepilot_url').value,
         moviepilot_token: document.getElementById('moviepilot_token').value,
+        moviepilot_downloader: document.getElementById('moviepilot_downloader').value,
+        moviepilot_save_path: document.getElementById('moviepilot_save_path').value,
         pulse_url: document.getElementById('pulse_url').value,
         playback_data_mode: document.querySelector('input[name="playback_data_mode"]:checked')?.value || 'sqlite',
         // 🔥 提取新增开关的值传递给后端

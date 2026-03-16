@@ -84,6 +84,8 @@ DEFAULT_CONFIG = {
     "client_download_url": "",
     "moviepilot_url": "",
     "moviepilot_token": "",
+    "moviepilot_downloader": "",
+    "moviepilot_save_path": "",
     "pulse_url": "",
     "server_type": "emby",
     "secret_key": "",

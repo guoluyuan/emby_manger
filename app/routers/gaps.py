@@ -619,7 +619,13 @@ def download_gap_item(payload: dict):
     try: pure_torrent_in["size"] = int(float(pure_torrent_in.get("size", 0)))
     except: pure_torrent_in["size"] = 0
 
-    mp_payload = {"torrent_in": pure_torrent_in}
+    mp_downloader = (cfg.get("moviepilot_downloader") or "").strip()
+    mp_save_path = (cfg.get("moviepilot_save_path") or "").strip()
+    mp_payload = {
+        "torrent_in": pure_torrent_in,
+        "downloader": mp_downloader,
+        "save_path": mp_save_path
+    }
 
     try:
         res = requests.post(f"{mp_url.rstrip('/')}/api/v1/download/add", headers=headers, json=mp_payload, timeout=90)

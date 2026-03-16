@@ -44,6 +44,15 @@ def _is_private_ip(ip_str: str) -> bool:
     except Exception:
         return False
 
+def _extract_mp_save_path(conf: dict) -> str:
+    if not isinstance(conf, dict):
+        return ""
+    for key in ("save_path", "savepath", "download_path", "download_dir", "download_dir_path", "path", "tv_path", "movie_path"):
+        val = conf.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    return ""
+
 def is_configured() -> bool:
     host = (cfg.get("emby_host") or "").strip()
     key = (cfg.get("emby_api_key") or "").strip()
@@ -110,6 +119,8 @@ def api_get_settings(request: Request):
             "client_download_url": cfg.get("client_download_url", ""),
             "moviepilot_url": cfg.get("moviepilot_url", ""),
             "moviepilot_token": cfg.get("moviepilot_token", ""),
+            "moviepilot_downloader": cfg.get("moviepilot_downloader", ""),
+            "moviepilot_save_path": cfg.get("moviepilot_save_path", ""),
             "pulse_url": cfg.get("pulse_url", ""),
             "playback_data_mode": cfg.get("playback_data_mode", "sqlite"), # 🔥 就是这里之前少了个逗号
             "notify_user_login": cfg.get("notify_user_login", False),
@@ -156,6 +167,8 @@ def api_update_settings(data: SettingsModel, request: Request):
     cfg["client_download_url"] = data.client_download_url
     cfg["moviepilot_url"] = data.moviepilot_url
     cfg["moviepilot_token"] = data.moviepilot_token
+    cfg["moviepilot_downloader"] = getattr(data, "moviepilot_downloader", "")
+    cfg["moviepilot_save_path"] = getattr(data, "moviepilot_save_path", "")
     cfg["pulse_url"] = data.pulse_url
     cfg["playback_data_mode"] = getattr(data, "playback_data_mode", "sqlite")
     cfg["notify_user_login"] = getattr(data, "notify_user_login", False)
@@ -192,6 +205,40 @@ async def test_moviepilot(request: Request):
         elif res.status_code in [401, 403]: return {"status": "error", "message": "❌ Token 认证失败"}
         else: return {"status": "success", "message": f"⚠️ 服务器连通(状态码: {res.status_code})"}
     except: return {"status": "error", "message": f"❌ 无法连接到 MoviePilot"}
+
+@router.post("/api/settings/mp_downloaders")
+async def api_mp_downloaders(request: Request):
+    if not request.session.get("user"): return {"status": "error", "message": "权限不足"}
+    data = await request.json()
+    mp_url = (data.get("mp_url") or cfg.get("moviepilot_url") or "").strip().rstrip('/')
+    mp_token = (data.get("mp_token") or cfg.get("moviepilot_token") or "").strip().strip("'\"")
+    if not mp_url or not mp_token:
+        return {"status": "error", "message": "请先填写 MoviePilot 信息"}
+    try:
+        res = requests.get(
+            f"{mp_url}/api/v1/system/setting/Downloaders",
+            headers={"X-API-KEY": mp_token, "User-Agent": "Mozilla/5.0"},
+            timeout=10
+        )
+        if res.status_code != 200:
+            return {"status": "error", "message": f"下载器配置拉取失败 (HTTP {res.status_code})"}
+        payload = res.json()
+        if not payload.get("success", False):
+            return {"status": "error", "message": payload.get("message") or "下载器配置拉取失败"}
+        value = payload.get("data", {}).get("value", []) or []
+        downloaders = []
+        for d in value:
+            conf = d.get("config") or {}
+            downloaders.append({
+                "name": d.get("name", ""),
+                "type": d.get("type", ""),
+                "default": bool(d.get("default", False)),
+                "enabled": bool(d.get("enabled", True)),
+                "save_path": _extract_mp_save_path(conf)
+            })
+        return {"status": "success", "data": {"downloaders": downloaders}}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @router.post("/api/settings/test_invite_url")
 async def test_invite_url(request: Request):

@@ -24,6 +24,7 @@
 - 10308 用户端放行 /api/csrf 并自动重试 CSRF
 - “我的”页图表切换标签后稳定渲染（含 rAF 兜底）
 - 工单大厅“前往用户前台”公网访问时跳转到系统配置的公网入口
+- MoviePilot 下载器自动拉取与选择，缺集补齐下发时显式携带 downloader/save_path
 
 ## 🚀 快速部署
 
@@ -181,6 +182,8 @@ python run.py
 
 - `moviepilot_url`：MoviePilot 服务地址
 - `moviepilot_token`：MoviePilot API Token
+- `moviepilot_downloader`：MoviePilot 下载器名称（从 MP 端拉取选择）
+- `moviepilot_save_path`：MoviePilot 默认保存路径（可自动读取并回填）
 
 支持能力：
 - 缺集搜索

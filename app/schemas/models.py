@@ -29,6 +29,8 @@ class SettingsModel(BaseModel):
     client_download_url: Optional[str] = ""
     moviepilot_url: Optional[str] = ""
     moviepilot_token: Optional[str] = ""
+    moviepilot_downloader: Optional[str] = ""
+    moviepilot_save_path: Optional[str] = ""
     pulse_url: Optional[str] = ""
     cors_origins: Optional[List[str]] = []
     # 🔥 新增：双引擎模式开关
