@@ -207,6 +207,41 @@ def _extract_env_value(env_list, key: str):
             return item[len(prefix):]
     return ""
 
+def _get_image_env_value(image_ref: str, key: str):
+    if not image_ref:
+        return ""
+    res = _run_cmd(["docker", "image", "inspect", "--format", "{{json .Config.Env}}", image_ref], timeout=10)
+    if res.returncode != 0:
+        return ""
+    try:
+        env_list = json.loads(res.stdout or "[]") or []
+        return _extract_env_value(env_list, key)
+    except Exception:
+        return ""
+
+def _format_docker_time(ts: str):
+    if not ts:
+        return ""
+    try:
+        import datetime as _dt
+        raw = ts.strip()
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        dt = _dt.datetime.fromisoformat(raw)
+        if dt.tzinfo:
+            dt = dt.astimezone()
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return ts
+
+def _get_image_created(image_ref: str):
+    if not image_ref:
+        return ""
+    res = _run_cmd(["docker", "image", "inspect", "--format", "{{.Created}}", image_ref], timeout=10)
+    if res.returncode != 0:
+        return ""
+    return _format_docker_time((res.stdout or "").strip())
+
 def _get_image_digest(image: str):
     res = _run_cmd(["docker", "image", "inspect", "--format", "{{json .RepoDigests}}", image], timeout=10)
     if res.returncode != 0:
@@ -285,7 +320,7 @@ async def docker_update_status(request: Request):
     image = (inspect.get("Config") or {}).get("Image") or ""
     current_image_id = (inspect.get("Image") or "").strip()
     current_env = (inspect.get("Config") or {}).get("Env") or []
-    app_version = _extract_env_value(current_env, "APP_VERSION")
+    current_version = _extract_env_value(current_env, "APP_VERSION")
 
     if not image:
         return {"status": "error", "message": "无法识别当前镜像名称"}
@@ -296,6 +331,11 @@ async def docker_update_status(request: Request):
 
     latest_image_id = _get_image_id(image)
     latest_digest = _get_image_digest(image)
+    latest_version = _get_image_env_value(image, "APP_VERSION")
+    if not current_version:
+        current_version = _get_image_env_value(current_image_id, "APP_VERSION")
+    current_created = _get_image_created(current_image_id)
+    latest_created = _get_image_created(image)
     available = bool(latest_image_id and current_image_id and latest_image_id != current_image_id)
 
     files, service, project = _get_compose_meta(inspect)
@@ -311,7 +351,10 @@ async def docker_update_status(request: Request):
             "current_image_id_short": _short_id(current_image_id),
             "latest_image_id_short": _short_id(latest_image_id),
             "image_digest": latest_digest,
-            "app_version": app_version,
+            "current_version": current_version,
+            "latest_version": latest_version,
+            "current_created": current_created,
+            "latest_created": latest_created,
             "compose_files": files,
             "compose_service": service,
             "compose_ready": compose_ok,
@@ -355,7 +398,7 @@ async def docker_update_apply(request: Request):
         err_msg = (pull_res.stderr or pull_res.stdout or "").strip()
         return {"status": "error", "message": f"拉取更新失败: {err_msg or 'unknown'}"}
 
-    up_res = _run_cmd(args + ["up", "-d", "--no-deps", service], timeout=300)
+    up_res = _run_cmd(args + ["up", "-d", "--no-deps", "--force-recreate", "--remove-orphans", service], timeout=300)
     if up_res.returncode != 0:
         err_msg = (up_res.stderr or up_res.stdout or "").strip()
         return {"status": "error", "message": f"应用更新失败: {err_msg or 'unknown'}"}
