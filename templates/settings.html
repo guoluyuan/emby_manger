@@ -350,13 +350,10 @@
                     </div>
                 </label>
 
-                <div class="flex items-start justify-between gap-3">
-                    <div class="flex-1">
-                        <div class="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">更新状态</div>
-                        <div id="docker-update-status" class="text-[14px] font-black text-gray-800 dark:text-gray-200">未检测</div>
-                        <div id="docker-update-detail" class="text-[10px] text-gray-400 mt-1 leading-relaxed break-words">等待检测镜像版本...</div>
-                    </div>
-                    <span id="docker-update-badge" class="px-2.5 py-1 rounded-full text-[10px] font-black bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400 border border-gray-200/60 dark:border-white/10 shrink-0">未检测</span>
+                <div class="hidden">
+                    <div id="docker-update-status">未检测</div>
+                    <div id="docker-update-detail">等待检测镜像版本...</div>
+                    <span id="docker-update-badge">未检测</span>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
