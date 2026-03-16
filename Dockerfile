@@ -20,13 +20,19 @@ WORKDIR /app
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 安装基础字体，确保验证码/图片字体可用
+# 安装基础字体 + Docker CLI（避免发布无 docker 的镜像）
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends fonts-dejavu-core docker.io docker-compose \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg fonts-dejavu-core \
+    && install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+    && chmod a+r /etc/apt/keyrings/docker.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \
     && rm -rf /var/lib/apt/lists/*
 
 # 构建时校验 docker CLI 是否可用（避免发布无 docker 的镜像）
-RUN docker --version && docker-compose --version
+RUN docker --version && docker compose version
 
 # 1. 先复制依赖文件并安装 (只要 requirements.txt 不变，这里就会完美命中缓存，瞬间跳过！)
 COPY requirements.txt .
