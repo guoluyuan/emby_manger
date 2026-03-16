@@ -352,7 +352,6 @@
 
                 <div class="hidden">
                     <div id="docker-update-status">未检测</div>
-                    <div id="docker-update-detail">等待检测镜像版本...</div>
                     <span id="docker-update-badge">未检测</span>
                 </div>
 
@@ -363,6 +362,11 @@
                     <button id="btn-apply-update" onclick="applyDockerUpdate()" disabled class="py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-[12px] transition-all active:scale-[0.98] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
                         <i class="fa-solid fa-cloud-arrow-down"></i> 立即更新
                     </button>
+                </div>
+
+                <div id="docker-update-detail" class="mt-4 text-[11px] text-gray-400 leading-relaxed">
+                    当前版本：[版本 -]　　创建时间<br>
+                    最新版本：[版本 -]　　创建时间
                 </div>
 
             </div>
@@ -703,44 +707,22 @@ async function checkDockerUpdate(silent = false, force = false) {
         const available = !!d.available;
         const composeReady = !!d.compose_ready;
         const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        const imageText = escapeHtml(d.image || '未知镜像');
-        const timeText = escapeHtml(d.checked_at || '刚刚');
-        const projectText = d.compose_project ? `项目 ${escapeHtml(d.compose_project)}` : '';
-        const composeText = composeReady ? '' : 'compose 未就绪';
         const currentVer = d.current_version ? `版本 ${escapeHtml(d.current_version)}` : '版本未知';
         const latestVer = d.latest_version ? `版本 ${escapeHtml(d.latest_version)}` : '版本未知';
         const currentCreated = escapeHtml(d.current_created || '');
         const latestCreated = escapeHtml(d.latest_created || '');
-        const currentIdText = d.current_image_id_short ? escapeHtml(d.current_image_id_short) : '';
-        const latestIdText = d.latest_image_id_short ? escapeHtml(d.latest_image_id_short) : '';
         const detailHtml = `
-            <div class="flex flex-wrap items-center gap-2">
-                <span class="font-mono text-[11px]">${imageText}</span>
-                ${projectText ? `<span class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 text-[10px] font-bold">${projectText}</span>` : ''}
-                ${composeText ? `<span class="px-2 py-0.5 rounded-md bg-red-100/70 dark:bg-red-500/20 text-[10px] font-bold text-red-600 dark:text-red-400">${composeText}</span>` : ''}
+            <div class="grid grid-cols-[1fr_auto] gap-y-2 gap-x-4">
+                <div class="text-[11px] text-gray-500">当前版本</div>
+                <div class="text-[11px] text-gray-500 text-right">创建时间</div>
+                <div><span class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 text-[10px] font-bold">${currentVer}</span></div>
+                <div class="font-mono text-[11px] text-gray-400 text-right">${currentCreated || '-'}</div>
+
+                <div class="text-[11px] text-gray-500 mt-1">最新版本</div>
+                <div class="text-[11px] text-gray-500 text-right mt-1">创建时间</div>
+                <div><span class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 text-[10px] font-bold">${latestVer}</span></div>
+                <div class="font-mono text-[11px] text-gray-400 text-right">${latestCreated || '-'}</div>
             </div>
-            <div class="mt-2 text-[10px] text-gray-400">${timeText}</div>
-            <div class="mt-2 space-y-2">
-                <div class="flex items-center justify-between gap-3 text-[10px] text-gray-500 uppercase tracking-wider">
-                    <span>当前版本</span><span>创建时间</span>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                    <span class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 text-[10px] font-bold">${currentVer}</span>
-                    <span class="font-mono text-[10px] text-gray-400">${currentCreated || '-'}</span>
-                </div>
-                <div class="flex items-center justify-between gap-3 text-[10px] text-gray-500 uppercase tracking-wider">
-                    <span>最新版本</span><span>创建时间</span>
-                </div>
-                <div class="flex items-center justify-between gap-3">
-                    <span class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 text-[10px] font-bold">${latestVer}</span>
-                    <span class="font-mono text-[10px] text-gray-400">${latestCreated || '-'}</span>
-                </div>
-            </div>
-            ${(currentIdText || latestIdText) ? `
-            <div class="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-gray-400">
-                ${currentIdText ? `<span class="font-mono">当前ID ${currentIdText}</span>` : ''}
-                ${latestIdText ? `<span class="font-mono">最新ID ${latestIdText}</span>` : ''}
-            </div>` : ''}
         `;
 
         if (available) {
