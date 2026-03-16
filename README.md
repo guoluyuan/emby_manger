@@ -114,9 +114,15 @@ python -m pip install -r requirements.txt
 
 3. 启动服务：
 
+Linux：
+
 ```bash
-python run.py
+./start-ubuntu.sh
 ```
+
+Windows：右键 `start-windows.ps1` → 使用 PowerShell 打开
+
+说明：启动脚本会自动构建 Tailwind CSS 资源、确保工作目录正确，并避免重复启动进程；直接 `python run.py` 可能导致样式未生成或多实例冲突。
 
 4. 首次访问 `http://localhost:10307/` 在网页中完成配置（Emby 地址与 API Key）
 
