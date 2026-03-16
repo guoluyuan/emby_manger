@@ -25,6 +25,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends fonts-dejavu-core docker.io docker-compose \
     && rm -rf /var/lib/apt/lists/*
 
+# 构建时校验 docker CLI 是否可用（避免发布无 docker 的镜像）
+RUN docker --version && docker-compose --version
+
 # 1. 先复制依赖文件并安装 (只要 requirements.txt 不变，这里就会完美命中缓存，瞬间跳过！)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
