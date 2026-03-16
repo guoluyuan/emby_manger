@@ -103,6 +103,15 @@ services:
 2. 确认插件已启用并处于运行状态。
 3. 若首次安装无历史数据，至少产生一次播放记录后再刷新页面。
 
+### 容器更新（Docker）
+
+```bash
+cd /path/to/docker-compose.yml
+docker-compose down
+docker-compose pull
+docker-compose up -d
+```
+
 ### 本地部署（非 Docker）
 
 1. 安装 Python 与 pip（建议使用系统自带或官方安装包）
