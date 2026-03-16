@@ -440,7 +440,12 @@ async def docker_update_apply(request: Request):
         err_msg = (pull_res.stderr or pull_res.stdout or "").strip()
         return {"status": "error", "message": f"拉取更新失败: {err_msg or 'unknown'}"}
 
-    up_res = _run_cmd(args + ["up", "-d", "--no-deps", "--force-recreate", "--remove-orphans", service], timeout=300)
+    down_res = _run_cmd(args + ["down", "--remove-orphans"], timeout=120)
+    if down_res.returncode != 0:
+        err_msg = (down_res.stderr or down_res.stdout or "").strip()
+        return {"status": "error", "message": f"停止旧容器失败: {err_msg or 'unknown'}"}
+
+    up_res = _run_cmd(args + ["up", "-d"], timeout=300)
     if up_res.returncode != 0:
         err_msg = (up_res.stderr or up_res.stdout or "").strip()
         return {"status": "error", "message": f"应用更新失败: {err_msg or 'unknown'}"}
