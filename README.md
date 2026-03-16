@@ -42,6 +42,7 @@ services:
     network_mode: host # 默认端口号为 10307
     volumes:
       - /volume1/docker/emby/data:/emby-data # API 模式下可不挂载数据库
+      - ./config:/app/config # 配置持久化（避免更新后重新初始化）
       # 可选：启用网页一键更新
       # - /var/run/docker.sock:/var/run/docker.sock
       # - ./:/compose
@@ -74,6 +75,7 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
+      - ./config:/app/config # 配置持久化（避免更新后重新初始化）
       # 可选：启用网页一键更新
       # - /var/run/docker.sock:/var/run/docker.sock
       # - ./:/compose
@@ -97,6 +99,7 @@ services:
     network_mode: host
     volumes:
       - /volume1/docker/emby/data:/emby-data:ro
+      - ./config:/app/config # 配置持久化（避免更新后重新初始化）
       # 可选：启用网页一键更新
       # - /var/run/docker.sock:/var/run/docker.sock
       # - ./:/compose
@@ -151,6 +154,7 @@ services:
     network_mode: host
     volumes:
       - /volume1/docker/emby/data:/emby-data:ro
+      - ./config:/app/config # 配置持久化（避免更新后重新初始化）
       - /var/run/docker.sock:/var/run/docker.sock
       - ./:/compose
     environment:
