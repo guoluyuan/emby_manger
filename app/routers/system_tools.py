@@ -290,6 +290,23 @@ def _get_bind_source(inspect: dict, target: str):
             continue
     return ""
 
+def _pull_helper_image():
+    override = (os.getenv("DOCKER_UPDATE_HELPER_IMAGE") or "").strip()
+    candidates = []
+    if override:
+        candidates.append(override)
+    candidates.extend([
+        "docker/compose:latest",
+        "ghcr.io/docker/compose:latest"
+    ])
+    last_err = ""
+    for img in candidates:
+        res = _run_cmd(["docker", "pull", img], timeout=120)
+        if res.returncode == 0:
+            return img, ""
+        last_err = (res.stderr or res.stdout or "").strip()
+    return "", last_err or "unknown"
+
 @router.get("/network_check")
 async def network_check():
     proxy_url = cfg.get("proxy_url")
@@ -466,11 +483,9 @@ async def docker_update_apply(request: Request):
     # 清理可能残留的 updater 容器
     _run_cmd(["docker", "rm", "-f", updater_name], timeout=10)
 
-    helper_image = "docker/compose:2.27.0"
-    pull_helper = _run_cmd(["docker", "pull", helper_image], timeout=120)
-    if pull_helper.returncode != 0:
-        err_msg = (pull_helper.stderr or pull_helper.stdout or "").strip()
-        return {"status": "error", "message": f"拉取更新器镜像失败: {err_msg or 'unknown'}"}
+    helper_image, helper_err = _pull_helper_image()
+    if not helper_image:
+        return {"status": "error", "message": f"拉取更新器镜像失败: {helper_err}"}
 
     # 先 pull，再 up -d（去掉 down，避免自杀）
     run_pull = ["docker", "run", "--rm", "--name", updater_name,
