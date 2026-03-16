@@ -11,14 +11,14 @@ services:
     network_mode: host
     
     volumes:
-      # 你的 Emby 数据真实路径
-      - /volume1/docker/emby/data:/emby-data:ro
+      # 你的 Emby 数据真实路径（按实际修改）
+      - /path/to/emby/data:/emby-data:ro
       # 配置持久化（避免更新后重新初始化）
-      - /em/docker/emby管理/config:/app/config
+      - ./config:/app/config
       # 允许容器内执行更新
       - /var/run/docker.sock:/var/run/docker.sock
       # 挂载 compose 文件目录，供容器内更新使用
-      - /em/docker/emby管理:/compose
+      - ./:/compose
     
     environment:
       - TZ=Asia/Shanghai

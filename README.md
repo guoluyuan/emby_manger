@@ -41,11 +41,11 @@ services:
     restart: unless-stopped
     network_mode: host # 默认端口号为 10307
     volumes:
-      - /volume1/docker/emby/data:/emby-data # API 模式下可不挂载数据库
-      - /em/docker/emby管理/config:/app/config # 配置持久化（避免更新后重新初始化）
+      - /path/to/emby/data:/emby-data # API 模式下可不挂载数据库
+      - ./config:/app/config # 配置持久化（避免更新后重新初始化）
       # 可选：启用网页一键更新
       # - /var/run/docker.sock:/var/run/docker.sock
-      # - /em/docker/emby管理:/compose
+      # - ./:/compose
     environment:
       - TZ=Asia/Shanghai
       - PLAYBACK_DATA_MODE=api # api 或 sqlite
@@ -75,10 +75,10 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
-      - /em/docker/emby管理/config:/app/config # 配置持久化（避免更新后重新初始化）
+      - ./config:/app/config # 配置持久化（避免更新后重新初始化）
       # 可选：启用网页一键更新
       # - /var/run/docker.sock:/var/run/docker.sock
-      # - /em/docker/emby管理:/compose
+      # - ./:/compose
     environment:
       - TZ=Asia/Shanghai
       - PLAYBACK_DATA_MODE=api
@@ -98,11 +98,11 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
-      - /volume1/docker/emby/data:/emby-data:ro
-      - /em/docker/emby管理/config:/app/config # 配置持久化（避免更新后重新初始化）
+      - /path/to/emby/data:/emby-data:ro
+      - ./config:/app/config # 配置持久化（避免更新后重新初始化）
       # 可选：启用网页一键更新
       # - /var/run/docker.sock:/var/run/docker.sock
-      # - /em/docker/emby管理:/compose
+      # - ./:/compose
     environment:
       - TZ=Asia/Shanghai
       - PLAYBACK_DATA_MODE=sqlite
@@ -153,10 +153,10 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
-      - /volume1/docker/emby/data:/emby-data:ro
-      - /em/docker/emby管理/config:/app/config # 配置持久化（避免更新后重新初始化）
+      - /path/to/emby/data:/emby-data:ro
+      - ./config:/app/config # 配置持久化（避免更新后重新初始化）
       - /var/run/docker.sock:/var/run/docker.sock
-      - /em/docker/emby管理:/compose
+      - ./:/compose
     environment:
       - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       - DOCKER_UPDATE_NAME=emby-manger
