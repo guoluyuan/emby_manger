@@ -124,7 +124,8 @@ def api_get_settings(request: Request):
             "pulse_url": cfg.get("pulse_url", ""),
             "playback_data_mode": cfg.get("playback_data_mode", "sqlite"), # 🔥 就是这里之前少了个逗号
             "notify_user_login": cfg.get("notify_user_login", False),
-            "notify_item_deleted": cfg.get("notify_item_deleted", False)
+            "notify_item_deleted": cfg.get("notify_item_deleted", False),
+            "disable_update_check": cfg.get("disable_update_check", False)
         }
     }
 
@@ -173,6 +174,7 @@ def api_update_settings(data: SettingsModel, request: Request):
     cfg["playback_data_mode"] = getattr(data, "playback_data_mode", "sqlite")
     cfg["notify_user_login"] = getattr(data, "notify_user_login", False)
     cfg["notify_item_deleted"] = getattr(data, "notify_item_deleted", False)
+    cfg["disable_update_check"] = getattr(data, "disable_update_check", False)
     
     save_config()
     

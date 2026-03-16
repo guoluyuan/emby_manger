@@ -159,6 +159,14 @@
                         <span id="notify-badge-desktop" class="hidden absolute top-[6px] right-[6px] h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white dark:border-apple-cardDark animate-pulse"></span>
                     </button>
 
+                    <button onclick="handleUpdateClick()" id="global-update-btn" class="relative w-10 h-10 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark transition-colors" title="检查更新">
+                        <i class="fa-solid fa-arrows-rotate text-lg"></i>
+                        <span id="global-update-badge" class="hidden absolute top-[6px] right-[6px] flex h-2.5 w-2.5">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500 border-2 border-white dark:border-apple-cardDark"></span>
+                        </span>
+                    </button>
+
                     <button onclick="toggleToolsDropdown()" class="tools-menu-btn relative w-10 h-10 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-200/50 dark:hover:bg-apple-hoverDark transition-colors">
                         <i class="fa-solid fa-toolbox text-lg"></i>
                     </button>

@@ -333,6 +333,48 @@
             </div>
         </div>
 
+        <div class="apple-card flex flex-col h-full p-5 md:p-6" id="docker-update">
+            <h3 class="text-[15px] font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center shrink-0">
+                <div class="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-500 flex items-center justify-center mr-3 shadow-sm"><i class="fa-solid fa-arrows-rotate text-sm"></i></div> 
+                容器一键更新
+            </h3>
+            <div class="flex-1 flex flex-col justify-start space-y-4">
+                <label class="flex items-center justify-between p-3.5 border border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-[#2C2C2E] rounded-xl cursor-pointer hover:bg-gray-100 dark:hover:bg-[#3A3A3C] transition-all shadow-sm group">
+                    <div>
+                        <div class="text-[13px] font-bold text-gray-800 dark:text-gray-100 flex items-center gap-1.5"><i class="fa-solid fa-ban text-gray-400 group-hover:text-amber-500 transition-colors"></i> 禁止自动检查更新</div>
+                        <div class="text-[10px] text-gray-500 mt-1">关闭后全局不再自动检测，可手动点击“检查更新”</div>
+                    </div>
+                    <div class="relative shrink-0 ml-3">
+                        <input type="checkbox" id="disable_update_check" class="sr-only peer">
+                        <div class="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                    </div>
+                </label>
+
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex-1">
+                        <div class="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">更新状态</div>
+                        <div id="docker-update-status" class="text-[14px] font-black text-gray-800 dark:text-gray-200">未检测</div>
+                        <div id="docker-update-detail" class="text-[10px] text-gray-400 mt-1 break-all">等待检测镜像版本...</div>
+                    </div>
+                    <span id="docker-update-badge" class="px-2.5 py-1 rounded-full text-[10px] font-black bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400 border border-gray-200/60 dark:border-white/10 shrink-0">未检测</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="btn-check-update" onclick="checkDockerUpdate(false, true)" class="py-3 rounded-xl bg-gray-900 hover:bg-black text-white font-bold text-[12px] transition-all active:scale-[0.98] shadow-sm">
+                        <i class="fa-solid fa-rotate"></i> 检查更新
+                    </button>
+                    <button id="btn-apply-update" onclick="applyDockerUpdate()" disabled class="py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-[12px] transition-all active:scale-[0.98] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fa-solid fa-cloud-arrow-down"></i> 立即更新
+                    </button>
+                </div>
+
+                <div class="text-[10px] text-gray-400 leading-relaxed">
+                    提示：需要挂载 <span class="font-mono">/var/run/docker.sock</span> 并确保容器内可用 <span class="font-mono">docker</span> 命令；
+                    若使用 compose，请把 compose 文件挂载到容器内并设置 <span class="font-mono">DOCKER_UPDATE_COMPOSE_FILES</span> 与 <span class="font-mono">DOCKER_UPDATE_SERVICE</span>。
+                </div>
+            </div>
+        </div>
+
         <div class="apple-card flex flex-col h-full p-5 md:p-6 lg:col-span-2 2xl:col-span-3">
             <h3 class="text-[15px] font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center shrink-0">
                 <div class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-[#2C2C2E] text-slate-500 flex items-center justify-center mr-3 shadow-sm border border-gray-200/50 dark:border-white/5"><i class="fa-solid fa-user-ninja text-sm"></i></div> 
@@ -424,7 +466,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
     }
-    loadSettings();
+    await loadSettings();
+    if (!window.__disableUpdateCheck) {
+        checkDockerUpdate(true, false);
+    }
 });
 
 async function loadSettings() {
@@ -456,6 +501,8 @@ async function loadSettings() {
         document.getElementById('moviepilot_downloader').value = d.moviepilot_downloader || '';
         document.getElementById('moviepilot_save_path').value = d.moviepilot_save_path || '';
         document.getElementById('pulse_url').value = d.pulse_url || '';
+        document.getElementById('disable_update_check').checked = !!d.disable_update_check;
+        window.__disableUpdateCheck = !!d.disable_update_check;
 
         // 🔥 新增开关状态回填
         document.getElementById('notify_user_login').checked = d.notify_user_login || false;
@@ -612,6 +659,118 @@ function showToast(msg, type = 'success') {
     }, 3000);
 }
 
+function setUpdateUI(state) {
+    const statusEl = document.getElementById('docker-update-status');
+    const detailEl = document.getElementById('docker-update-detail');
+    const badgeEl = document.getElementById('docker-update-badge');
+    const btnApply = document.getElementById('btn-apply-update');
+    if (!statusEl || !detailEl || !badgeEl || !btnApply) return;
+
+    statusEl.textContent = state.title || '未检测';
+    detailEl.textContent = state.detail || '等待检测镜像版本...';
+    badgeEl.textContent = state.badge || '未检测';
+    badgeEl.className = state.badgeClass || 'px-2.5 py-1 rounded-full text-[10px] font-black bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400 border border-gray-200/60 dark:border-white/10 shrink-0';
+    btnApply.disabled = !state.canUpdate;
+}
+
+async function checkDockerUpdate(silent = false, force = false) {
+    if (window.__disableUpdateCheck && !force) {
+        setUpdateUI({
+            title: '自动检测已关闭',
+            detail: '如需检测请点击“检查更新”',
+            badge: '已禁用',
+            badgeClass: 'px-2.5 py-1 rounded-full text-[10px] font-black bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400 border border-gray-200/60 dark:border-white/10 shrink-0',
+            canUpdate: false
+        });
+        return;
+    }
+    const btn = document.getElementById('btn-check-update');
+    const applyBtn = document.getElementById('btn-apply-update');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 检测中...'; }
+    if (applyBtn) applyBtn.disabled = true;
+
+    setUpdateUI({
+        title: '正在检测...',
+        detail: '正在拉取最新镜像并对比版本',
+        badge: '检测中',
+        badgeClass: 'px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 border border-amber-200/60 dark:border-amber-500/30 shrink-0',
+        canUpdate: false
+    });
+
+    try {
+        const res = await fetch('/api/system/docker_update/status');
+        const json = await res.json();
+        if (json.status !== 'success') throw new Error(json.message || '检测失败');
+
+        const d = json.data || {};
+        const available = !!d.available;
+        const composeReady = !!d.compose_ready;
+        const detail = `${d.image || '未知镜像'} | ${d.checked_at || '刚刚'}${composeReady ? '' : ' | compose 未就绪'}`;
+
+        if (available) {
+            setUpdateUI({
+                title: '检测到新版本',
+                detail,
+                badge: '可更新',
+                badgeClass: 'px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-500/30 shrink-0',
+                canUpdate: composeReady
+            });
+            if (!silent) showToast('发现新镜像版本，可立即更新', 'success');
+        } else {
+            setUpdateUI({
+                title: '已是最新版本',
+                detail,
+                badge: '最新',
+                badgeClass: 'px-2.5 py-1 rounded-full text-[10px] font-black bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400 border border-gray-200/60 dark:border-white/10 shrink-0',
+                canUpdate: false
+            });
+            if (!silent) showToast('当前已是最新版本', 'success');
+        }
+    } catch (e) {
+        setUpdateUI({
+            title: '检测失败',
+            detail: e.message || '检测异常',
+            badge: '失败',
+            badgeClass: 'px-2.5 py-1 rounded-full text-[10px] font-black bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400 border border-red-200/60 dark:border-red-500/30 shrink-0',
+            canUpdate: false
+        });
+        if (!silent) showToast(e.message || '检测失败', 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate"></i> 检查更新'; }
+    }
+}
+
+async function applyDockerUpdate() {
+    if (!confirm('即将拉取新镜像并重启容器，服务会短暂中断，确认继续吗？')) return;
+    const btn = document.getElementById('btn-apply-update');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 更新中...'; }
+
+    try {
+        const res = await fetch('/api/system/docker_update/apply', { method: 'POST' });
+        const json = await res.json();
+        if (json.status !== 'success') throw new Error(json.message || '更新失败');
+        showToast(json.message || '已触发更新', 'success');
+        setUpdateUI({
+            title: '更新已触发',
+            detail: '容器将短暂重启，稍后刷新页面',
+            badge: '更新中',
+            badgeClass: 'px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 border border-amber-200/60 dark:border-amber-500/30 shrink-0',
+            canUpdate: false
+        });
+    } catch (e) {
+        showToast(e.message || '更新失败', 'error');
+        setUpdateUI({
+            title: '更新失败',
+            detail: e.message || '更新异常',
+            badge: '失败',
+            badgeClass: 'px-2.5 py-1 rounded-full text-[10px] font-black bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400 border border-red-200/60 dark:border-red-500/30 shrink-0',
+            canUpdate: false
+        });
+    } finally {
+        if (btn) btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> 立即更新';
+    }
+}
+
 async function saveSettings() {
     const data = {
         server_type: document.querySelector('input[name="server_type"]:checked')?.value || 'emby',
@@ -642,7 +801,8 @@ async function saveSettings() {
         playback_data_mode: document.querySelector('input[name="playback_data_mode"]:checked')?.value || 'sqlite',
         // 🔥 提取新增开关的值传递给后端
         notify_user_login: document.getElementById('notify_user_login').checked,
-        notify_item_deleted: document.getElementById('notify_item_deleted').checked
+        notify_item_deleted: document.getElementById('notify_item_deleted').checked,
+        disable_update_check: document.getElementById('disable_update_check').checked
     };
 
     const btnBtn = document.getElementById('top-save-btn');
@@ -666,6 +826,9 @@ async function saveSettings() {
         btnBtn.classList.replace('bg-brand-500', 'bg-emerald-500');
         btnBtn.classList.replace('hover:bg-brand-600', 'hover:bg-emerald-600');
         showToast('设置保存成功', 'success');
+        if (window.setUpdateCheckDisabled) {
+            window.setUpdateCheckDisabled(!!data.disable_update_check);
+        }
         
         setTimeout(() => {
             icon.className = "fa-solid fa-floppy-disk";

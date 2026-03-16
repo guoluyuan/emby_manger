@@ -35,16 +35,21 @@ version: '3.8'
 services:
   emby-pulse:
     image: mp740429299/emby_manger:latest
-    container_name: emby-manger
+    container_name: emby-pulse
     restart: unless-stopped
-    network_mode: host #默认端口号为10307
+    network_mode: host # 默认端口号为 10307
     volumes:
-      - ./config:/app/config
-      - /path/to/emby/data:/emby-data # API 模式下可不挂载数据库
+      - /volume1/docker/emby/data:/emby-data # API 模式下可不挂载数据库
+      # 可选：启用网页一键更新
+      # - /var/run/docker.sock:/var/run/docker.sock
+      # - ./:/compose
     environment:
       - TZ=Asia/Shanghai
       - PLAYBACK_DATA_MODE=api # api 或 sqlite
       - DB_PATH=/emby-data/playback_reporting.db # sqlite 模式必填
+      # 可选：网页一键更新
+      # - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
+      # - DOCKER_UPDATE_SERVICE=emby-pulse
 ```
 
 首次安装后，请访问 `http://localhost:10307/` 在网页中填写 Emby 地址与 API Key（无需写入 `docker-compose.yml`）。
@@ -63,14 +68,19 @@ version: '3.8'
 services:
   emby-pulse:
     image: mp740429299/emby_manger:latest
-    container_name: emby-manger
+    container_name: emby-pulse
     restart: unless-stopped
     network_mode: host
     volumes:
-      - ./config:/app/config
+      # 可选：启用网页一键更新
+      # - /var/run/docker.sock:/var/run/docker.sock
+      # - ./:/compose
     environment:
       - TZ=Asia/Shanghai
       - PLAYBACK_DATA_MODE=api
+      # 可选：网页一键更新
+      # - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
+      # - DOCKER_UPDATE_SERVICE=emby-pulse
 ```
 
 本地模式（sqlite）：
@@ -80,16 +90,21 @@ version: '3.8'
 services:
   emby-pulse:
     image: mp740429299/emby_manger:latest
-    container_name: emby-manger
+    container_name: emby-pulse
     restart: unless-stopped
     network_mode: host
     volumes:
-      - ./config:/app/config
-      - /path/to/emby/data:/emby-data:ro
+      - /volume1/docker/emby/data:/emby-data:ro
+      # 可选：启用网页一键更新
+      # - /var/run/docker.sock:/var/run/docker.sock
+      # - ./:/compose
     environment:
       - TZ=Asia/Shanghai
       - PLAYBACK_DATA_MODE=sqlite
       - DB_PATH=/emby-data/playback_reporting.db
+      # 可选：网页一键更新
+      # - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
+      # - DOCKER_UPDATE_SERVICE=emby-pulse
 ```
 
 **常见报错（API 模式误用 / 本地模式未挂载）**
@@ -111,6 +126,37 @@ docker-compose down
 docker-compose pull
 docker-compose up -d
 ```
+
+### 网页一键更新（docker.sock 方式）
+
+适用于想在管理后台直接点击更新的场景，需要宿主机把 Docker 控制权交给容器。
+
+**前置条件**
+- 挂载 ` /var/run/docker.sock `
+- 容器内有 `docker` 命令（本镜像已内置）
+- 如果使用 docker compose：需要把 compose 文件目录挂载进容器，并设置两个环境变量
+  - `DOCKER_UPDATE_COMPOSE_FILES`：容器内的 compose 文件路径
+  - `DOCKER_UPDATE_SERVICE`：当前服务名（compose 的 service name）
+
+**示例（在 compose 中启用）**
+
+```yaml
+services:
+  emby-pulse:
+    image: mp740429299/emby_manger:latest
+    container_name: emby-pulse
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /volume1/docker/emby/data:/emby-data:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/compose
+    environment:
+      - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
+      - DOCKER_UPDATE_SERVICE=emby-pulse
+```
+
+启用后，进入「系统设置」即可看到“容器一键更新”卡片。
 
 ### 本地部署（非 Docker）
 

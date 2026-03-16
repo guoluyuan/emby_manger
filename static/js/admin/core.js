@@ -191,7 +191,126 @@
             });
         }
 
-        document.addEventListener('DOMContentLoaded', () => { setTimeout(fetchNotifications, 1000); setInterval(fetchNotifications, 30000); setTimeout(fetchGlobalLive, 2000); setInterval(fetchGlobalLive, 10000); });
+        // ==========================================
+        // 全局更新提示
+        // ==========================================
+        let __updateCheckDisabled = null;
+        let __updateHasUpdate = false;
+        let __updateChecking = false;
+        let __updateLastCheckedAt = 0;
+        let __updateToastShown = false;
+
+        function handleUpdateClick() {
+            window.location.href = '/settings#docker-update';
+        }
+
+        function setGlobalUpdateUI(state) {
+            const btn = document.getElementById('global-update-btn');
+            const badge = document.getElementById('global-update-badge');
+            if (!btn || !badge) return;
+
+            if (state === 'disabled') {
+                btn.classList.add('opacity-50');
+                badge.classList.add('hidden');
+                btn.title = '已禁用自动检查更新';
+                return;
+            }
+
+            btn.classList.remove('opacity-50');
+
+            if (state === 'available') {
+                badge.classList.remove('hidden');
+                btn.title = '检测到新版本，点击前往更新';
+            } else if (state === 'checking') {
+                badge.classList.add('hidden');
+                btn.title = '正在检测更新';
+            } else {
+                badge.classList.add('hidden');
+                btn.title = '已是最新版本';
+            }
+        }
+
+        function showUpdateToast() {
+            if (__updateToastShown) return;
+            const container = document.getElementById('global-toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = "flex items-center gap-3 bg-white/95 dark:bg-apple-cardDark/95 backdrop-blur-2xl border border-amber-200/70 dark:border-amber-500/20 p-3 rounded-2xl shadow-xl transform translate-x-full opacity-0 transition-all duration-400 pointer-events-auto w-[280px] md:w-80 cursor-pointer";
+            toast.onclick = handleUpdateClick;
+            toast.innerHTML = `<div class="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center shrink-0 shadow-inner"><i class="fa-solid fa-arrow-up-right-dots text-white"></i></div><div class="flex-1 min-w-0"><div class="text-[10px] font-bold text-amber-600 dark:text-amber-400 mb-0.5">版本更新</div><div class="text-[13px] font-medium text-gray-800 dark:text-gray-200 truncate">检测到新镜像，点击更新</div></div>`;
+            container.appendChild(toast);
+            setTimeout(() => { toast.classList.remove('translate-x-full', 'opacity-0'); toast.classList.add('translate-x-0', 'opacity-100'); }, 50);
+            setTimeout(() => { if (toast.parentElement) { toast.classList.remove('translate-x-0', 'opacity-100'); toast.classList.add('translate-x-full', 'opacity-0'); setTimeout(() => toast.remove(), 400); } }, 6000);
+            __updateToastShown = true;
+        }
+
+        async function loadUpdateCheckSetting() {
+            try {
+                const res = await fetch('/api/settings');
+                const json = await res.json();
+                if (json.status === 'success') {
+                    __updateCheckDisabled = !!(json.data && json.data.disable_update_check);
+                } else {
+                    __updateCheckDisabled = true;
+                }
+            } catch (e) {
+                __updateCheckDisabled = true;
+            }
+            return __updateCheckDisabled;
+        }
+
+        window.setUpdateCheckDisabled = function(value) {
+            __updateCheckDisabled = !!value;
+            if (__updateCheckDisabled) {
+                setGlobalUpdateUI('disabled');
+            }
+        };
+
+        async function checkGlobalDockerUpdate(force = false) {
+            if (__updateChecking) return;
+            if (__updateCheckDisabled === null) await loadUpdateCheckSetting();
+            if (__updateCheckDisabled && !force) {
+                setGlobalUpdateUI('disabled');
+                return;
+            }
+
+            const now = Date.now();
+            if (!force && __updateLastCheckedAt && (now - __updateLastCheckedAt) < 60 * 60 * 1000) {
+                return;
+            }
+
+            __updateChecking = true;
+            setGlobalUpdateUI('checking');
+            try {
+                const res = await fetch('/api/system/docker_update/status');
+                const json = await res.json();
+                if (json.status === 'success') {
+                    __updateHasUpdate = !!(json.data && json.data.available);
+                    if (__updateHasUpdate) {
+                        setGlobalUpdateUI('available');
+                        showUpdateToast();
+                    } else {
+                        setGlobalUpdateUI('latest');
+                    }
+                } else {
+                    setGlobalUpdateUI('latest');
+                }
+            } catch (e) {
+                setGlobalUpdateUI('latest');
+            } finally {
+                __updateChecking = false;
+                __updateLastCheckedAt = Date.now();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(fetchNotifications, 1000);
+            setInterval(fetchNotifications, 30000);
+            setTimeout(fetchGlobalLive, 2000);
+            setInterval(fetchGlobalLive, 10000);
+            setTimeout(() => checkGlobalDockerUpdate(false), 3500);
+            setInterval(() => checkGlobalDockerUpdate(false), 60 * 60 * 1000);
+        });
         
         // ==========================================
         // 全局检索

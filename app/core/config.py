@@ -90,7 +90,8 @@ DEFAULT_CONFIG = {
     "server_type": "emby",
     "secret_key": "",
     "cors_origins": [],
-    "playback_data_mode": _get_playback_mode_from_env()
+    "playback_data_mode": _get_playback_mode_from_env(),
+    "disable_update_check": False
 }
 
 class ConfigManager:

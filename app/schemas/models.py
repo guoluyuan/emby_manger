@@ -38,6 +38,7 @@ class SettingsModel(BaseModel):
     server_type: str = "emby"
     notify_user_login: bool = False     # 🔥 补上这行
     notify_item_deleted: bool = False   # 🔥 补上这行
+    disable_update_check: Optional[bool] = False
 # 🔥 新增风控全局字段
     enable_risk_control: Optional[bool] = False         # 全局风控总开关
     default_max_concurrent: Optional[int] = 2           # 全局默认允许并发数

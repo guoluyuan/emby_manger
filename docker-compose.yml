@@ -12,8 +12,14 @@ services:
     volumes:
       # 你的 Emby 数据真实路径
       - /volume1/docker/emby/data:/emby-data:ro
+      # 允许容器内执行更新
+      - /var/run/docker.sock:/var/run/docker.sock
+      # 挂载 compose 文件目录，供容器内更新使用
+      - ./:/compose
     
     environment:
       - TZ=Asia/Shanghai
       - PLAYBACK_DATA_MODE=sqlite # api 或 sqlite
       - DB_PATH=/emby-data/playback_reporting.db
+      - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
+      - DOCKER_UPDATE_SERVICE=emby-pulse

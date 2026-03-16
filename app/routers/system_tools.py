@@ -3,6 +3,11 @@ import requests
 import logging
 import sys
 import datetime
+import os
+import json
+import re
+import shutil
+import subprocess
 from collections import deque
 from fastapi import APIRouter, Request
 from app.core.config import cfg
@@ -86,6 +91,78 @@ def ping_url(url, proxies=None):
     except Exception:
         return False, 0
 
+def _run_cmd(args, timeout=90):
+    return subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+
+def _get_container_id():
+    cid = (os.getenv("HOSTNAME") or "").strip()
+    if cid:
+        return cid
+    try:
+        with open("/proc/self/cgroup", "r", encoding="utf-8") as f:
+            for line in f:
+                m = re.search(r"([0-9a-f]{64})", line)
+                if m:
+                    return m.group(1)
+    except Exception:
+        pass
+    return ""
+
+def _docker_ready():
+    if not os.path.exists("/var/run/docker.sock"):
+        return False, "未检测到 /var/run/docker.sock"
+    if not shutil.which("docker"):
+        return False, "容器内未安装 docker CLI"
+    return True, ""
+
+def _inspect_container(cid: str):
+    res = _run_cmd(["docker", "inspect", cid], timeout=10)
+    if res.returncode != 0:
+        return None, (res.stderr or res.stdout or "").strip()
+    try:
+        data = json.loads(res.stdout)[0]
+        return data, ""
+    except Exception as e:
+        return None, str(e)
+
+def _get_compose_meta(inspect: dict):
+    labels = (inspect.get("Config") or {}).get("Labels") or {}
+    files_raw = (os.getenv("DOCKER_UPDATE_COMPOSE_FILES") or "").strip()
+    if not files_raw:
+        files_raw = (labels.get("com.docker.compose.project.config_files") or "").strip()
+    files = [f.strip() for f in files_raw.split(",") if f.strip()]
+    service = (os.getenv("DOCKER_UPDATE_SERVICE") or "").strip()
+    if not service:
+        service = (labels.get("com.docker.compose.service") or "").strip()
+    return files, service
+
+def _compose_bin():
+    res = _run_cmd(["docker", "compose", "version"], timeout=6)
+    if res.returncode == 0:
+        return ["docker", "compose"]
+    if shutil.which("docker-compose"):
+        return ["docker-compose"]
+    return []
+
+def _get_image_id(image: str):
+    res = _run_cmd(["docker", "image", "inspect", "--format", "{{.Id}}", image], timeout=10)
+    if res.returncode != 0:
+        return ""
+    return (res.stdout or "").strip()
+
+def _pull_image(image: str):
+    res = _run_cmd(["docker", "pull", image], timeout=300)
+    return res.returncode == 0, (res.stderr or res.stdout or "").strip()
+
+def _compose_args(files):
+    args = []
+    for f in files:
+        args.extend(["-f", f])
+    return args
+
+def _all_files_exist(files):
+    return all(os.path.exists(f) for f in files)
+
 @router.get("/network_check")
 async def network_check():
     proxy_url = cfg.get("proxy_url")
@@ -115,6 +192,96 @@ async def network_check():
             "webhook": {"last_active": last_webhook}
         }
     }
+
+@router.get("/docker_update/status")
+async def docker_update_status(request: Request):
+    user = request.session.get("user") or {}
+    if not user.get("is_admin"):
+        return {"status": "error", "message": "权限不足"}
+
+    ok, msg = _docker_ready()
+    if not ok:
+        return {"status": "error", "message": msg}
+
+    cid = _get_container_id()
+    if not cid:
+        return {"status": "error", "message": "无法识别当前容器 ID"}
+
+    inspect, err = _inspect_container(cid)
+    if not inspect:
+        return {"status": "error", "message": f"读取容器信息失败: {err or 'unknown'}"}
+
+    image = (inspect.get("Config") or {}).get("Image") or ""
+    current_image_id = (inspect.get("Image") or "").strip()
+
+    if not image:
+        return {"status": "error", "message": "无法识别当前镜像名称"}
+
+    pull_ok, pull_msg = _pull_image(image)
+    if not pull_ok:
+        return {"status": "error", "message": f"拉取镜像失败: {pull_msg or 'unknown'}"}
+
+    latest_image_id = _get_image_id(image)
+    available = bool(latest_image_id and current_image_id and latest_image_id != current_image_id)
+
+    files, service = _get_compose_meta(inspect)
+    compose_ok = bool(files and service and _all_files_exist(files))
+
+    return {
+        "status": "success",
+        "data": {
+            "available": available,
+            "image": image,
+            "current_image_id": current_image_id,
+            "latest_image_id": latest_image_id,
+            "compose_files": files,
+            "compose_service": service,
+            "compose_ready": compose_ok,
+            "checked_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+    }
+
+@router.post("/docker_update/apply")
+async def docker_update_apply(request: Request):
+    user = request.session.get("user") or {}
+    if not user.get("is_admin"):
+        return {"status": "error", "message": "权限不足"}
+
+    ok, msg = _docker_ready()
+    if not ok:
+        return {"status": "error", "message": msg}
+
+    cid = _get_container_id()
+    if not cid:
+        return {"status": "error", "message": "无法识别当前容器 ID"}
+
+    inspect, err = _inspect_container(cid)
+    if not inspect:
+        return {"status": "error", "message": f"读取容器信息失败: {err or 'unknown'}"}
+
+    files, service = _get_compose_meta(inspect)
+    if not files or not service:
+        return {"status": "error", "message": "未检测到 compose 信息，请设置 DOCKER_UPDATE_COMPOSE_FILES 与 DOCKER_UPDATE_SERVICE"}
+    if not _all_files_exist(files):
+        return {"status": "error", "message": "compose 配置文件在容器内不可见，请挂载并设置正确路径"}
+
+    compose_bin = _compose_bin()
+    if not compose_bin:
+        return {"status": "error", "message": "未检测到 docker compose 命令"}
+
+    args = compose_bin + _compose_args(files)
+
+    pull_res = _run_cmd(args + ["pull", service], timeout=300)
+    if pull_res.returncode != 0:
+        err_msg = (pull_res.stderr or pull_res.stdout or "").strip()
+        return {"status": "error", "message": f"拉取更新失败: {err_msg or 'unknown'}"}
+
+    up_res = _run_cmd(args + ["up", "-d", "--no-deps", service], timeout=300)
+    if up_res.returncode != 0:
+        err_msg = (up_res.stderr or up_res.stdout or "").strip()
+        return {"status": "error", "message": f"应用更新失败: {err_msg or 'unknown'}"}
+
+    return {"status": "success", "message": "更新已触发，容器将短暂重启"}
 
 @router.get("/logs")
 async def get_logs(lines: int = 150):
