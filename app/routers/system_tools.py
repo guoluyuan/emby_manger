@@ -183,6 +183,32 @@ def _get_image_id(image: str):
         return ""
     return (res.stdout or "").strip()
 
+def _short_id(image_id: str):
+    if not image_id:
+        return ""
+    return image_id.replace("sha256:", "")[:12]
+
+def _extract_env_value(env_list, key: str):
+    if not env_list:
+        return ""
+    prefix = f"{key}="
+    for item in env_list:
+        if isinstance(item, str) and item.startswith(prefix):
+            return item[len(prefix):]
+    return ""
+
+def _get_image_digest(image: str):
+    res = _run_cmd(["docker", "image", "inspect", "--format", "{{json .RepoDigests}}", image], timeout=10)
+    if res.returncode != 0:
+        return ""
+    try:
+        digests = json.loads(res.stdout or "[]") or []
+        if digests:
+            return digests[0]
+    except Exception:
+        pass
+    return ""
+
 def _pull_image(image: str):
     res = _run_cmd(["docker", "pull", image], timeout=300)
     return res.returncode == 0, (res.stderr or res.stdout or "").strip()
@@ -246,6 +272,8 @@ async def docker_update_status(request: Request):
 
     image = (inspect.get("Config") or {}).get("Image") or ""
     current_image_id = (inspect.get("Image") or "").strip()
+    current_env = (inspect.get("Config") or {}).get("Env") or []
+    app_version = _extract_env_value(current_env, "APP_VERSION")
 
     if not image:
         return {"status": "error", "message": "无法识别当前镜像名称"}
@@ -255,6 +283,7 @@ async def docker_update_status(request: Request):
         return {"status": "error", "message": f"拉取镜像失败: {pull_msg or 'unknown'}"}
 
     latest_image_id = _get_image_id(image)
+    latest_digest = _get_image_digest(image)
     available = bool(latest_image_id and current_image_id and latest_image_id != current_image_id)
 
     files, service = _get_compose_meta(inspect)
@@ -267,6 +296,10 @@ async def docker_update_status(request: Request):
             "image": image,
             "current_image_id": current_image_id,
             "latest_image_id": latest_image_id,
+            "current_image_id_short": _short_id(current_image_id),
+            "latest_image_id_short": _short_id(latest_image_id),
+            "image_digest": latest_digest,
+            "app_version": app_version,
             "compose_files": files,
             "compose_service": service,
             "compose_ready": compose_ok,

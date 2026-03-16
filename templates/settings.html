@@ -705,7 +705,10 @@ async function checkDockerUpdate(silent = false, force = false) {
         const d = json.data || {};
         const available = !!d.available;
         const composeReady = !!d.compose_ready;
-        const detail = `${d.image || '未知镜像'} | ${d.checked_at || '刚刚'}${composeReady ? '' : ' | compose 未就绪'}`;
+        const imageId = d.current_image_id_short ? ` | 当前ID ${d.current_image_id_short}` : '';
+        const latestId = d.latest_image_id_short ? ` | 最新ID ${d.latest_image_id_short}` : '';
+        const appVer = d.app_version ? ` | 版本 ${d.app_version}` : '';
+        const detail = `${d.image || '未知镜像'}${appVer} | ${d.checked_at || '刚刚'}${imageId}${latestId}${composeReady ? '' : ' | compose 未就绪'}`;
 
         if (available) {
             setUpdateUI({
