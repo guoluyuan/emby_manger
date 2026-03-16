@@ -106,7 +106,7 @@ services:
 ### 容器更新（Docker）
 
 ```bash
-cd /path/to/docker-compose.yml
+cd docker-compose.yml所在目录
 docker-compose down
 docker-compose pull
 docker-compose up -d
