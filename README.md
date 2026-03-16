@@ -120,7 +120,8 @@ Linux：
 ./start-ubuntu.sh
 ```
 
-Windows：右键 `start-windows.ps1` → 使用 PowerShell 打开
+Windows：
+右键 `start-windows.ps1` → 使用 PowerShell 打开
 
 说明：启动脚本会自动构建 Tailwind CSS 资源、确保工作目录正确，并避免重复启动进程；直接 `python run.py` 可能导致样式未生成或多实例冲突。
 
