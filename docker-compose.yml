@@ -23,3 +23,4 @@ services:
       - DB_PATH=/emby-data/playback_reporting.db
       - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       - DOCKER_UPDATE_SERVICE=emby-pulse
+      - DOCKER_UPDATE_CONTAINER=emby-pulse

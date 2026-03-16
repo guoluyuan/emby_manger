@@ -95,17 +95,50 @@ def _run_cmd(args, timeout=90):
     return subprocess.run(args, capture_output=True, text=True, timeout=timeout)
 
 def _get_container_id():
+    # 允许手动指定（避免 HOSTNAME 非容器 ID 的场景）
+    env_cid = (os.getenv("DOCKER_UPDATE_CONTAINER") or os.getenv("DOCKER_UPDATE_CONTAINER_ID") or "").strip()
+    if env_cid:
+        return env_cid
+
     cid = (os.getenv("HOSTNAME") or "").strip()
-    if cid:
+    if re.fullmatch(r"[0-9a-f]{12,64}", cid or ""):
         return cid
+
+    # 尝试从 cgroup / mountinfo 中解析容器 ID
+    for path in ("/proc/self/cgroup", "/proc/1/cgroup"):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                for line in f:
+                    m = re.search(r"docker-([0-9a-f]{64})\.scope", line)
+                    if m:
+                        return m.group(1)
+                    m = re.search(r"([0-9a-f]{64})", line)
+                    if m:
+                        return m.group(1)
+        except Exception:
+            pass
+
     try:
-        with open("/proc/self/cgroup", "r", encoding="utf-8") as f:
+        with open("/proc/self/mountinfo", "r", encoding="utf-8") as f:
             for line in f:
-                m = re.search(r"([0-9a-f]{64})", line)
+                m = re.search(r"/docker/containers/([0-9a-f]{64})/", line)
                 if m:
                     return m.group(1)
     except Exception:
         pass
+
+    # 兜底：用 compose service 标签查找容器
+    service = (os.getenv("DOCKER_UPDATE_SERVICE") or "").strip()
+    if service and shutil.which("docker"):
+        try:
+            res = _run_cmd(["docker", "ps", "-q", "-f", f"label=com.docker.compose.service={service}"], timeout=6)
+            if res.returncode == 0:
+                ids = [i.strip() for i in (res.stdout or "").splitlines() if i.strip()]
+                if len(ids) == 1:
+                    return ids[0]
+        except Exception:
+            pass
+
     return ""
 
 def _docker_ready():
@@ -205,7 +238,7 @@ async def docker_update_status(request: Request):
 
     cid = _get_container_id()
     if not cid:
-        return {"status": "error", "message": "无法识别当前容器 ID"}
+        return {"status": "error", "message": "无法识别当前容器 ID，请设置 DOCKER_UPDATE_CONTAINER"}
 
     inspect, err = _inspect_container(cid)
     if not inspect:
@@ -253,7 +286,7 @@ async def docker_update_apply(request: Request):
 
     cid = _get_container_id()
     if not cid:
-        return {"status": "error", "message": "无法识别当前容器 ID"}
+        return {"status": "error", "message": "无法识别当前容器 ID，请设置 DOCKER_UPDATE_CONTAINER"}
 
     inspect, err = _inspect_container(cid)
     if not inspect:

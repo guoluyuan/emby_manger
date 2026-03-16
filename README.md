@@ -154,6 +154,7 @@ services:
     environment:
       - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       - DOCKER_UPDATE_SERVICE=emby-pulse
+      - DOCKER_UPDATE_CONTAINER=emby-pulse
 ```
 
 启用后，进入「系统设置」即可看到“容器一键更新”卡片。
