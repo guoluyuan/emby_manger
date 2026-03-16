@@ -354,7 +354,7 @@
                     <div class="flex-1">
                         <div class="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">更新状态</div>
                         <div id="docker-update-status" class="text-[14px] font-black text-gray-800 dark:text-gray-200">未检测</div>
-                        <div id="docker-update-detail" class="text-[10px] text-gray-400 mt-1 break-all">等待检测镜像版本...</div>
+                        <div id="docker-update-detail" class="text-[10px] text-gray-400 mt-1 leading-relaxed break-words">等待检测镜像版本...</div>
                     </div>
                     <span id="docker-update-badge" class="px-2.5 py-1 rounded-full text-[10px] font-black bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400 border border-gray-200/60 dark:border-white/10 shrink-0">未检测</span>
                 </div>
@@ -667,7 +667,11 @@ function setUpdateUI(state) {
     if (!statusEl || !detailEl || !badgeEl || !btnApply) return;
 
     statusEl.textContent = state.title || '未检测';
-    detailEl.textContent = state.detail || '等待检测镜像版本...';
+    if (state.detailHtml) {
+        detailEl.innerHTML = state.detailHtml;
+    } else {
+        detailEl.textContent = state.detail || '等待检测镜像版本...';
+    }
     badgeEl.textContent = state.badge || '未检测';
     badgeEl.className = state.badgeClass || 'px-2.5 py-1 rounded-full text-[10px] font-black bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400 border border-gray-200/60 dark:border-white/10 shrink-0';
     btnApply.disabled = !state.canUpdate;
@@ -705,16 +709,35 @@ async function checkDockerUpdate(silent = false, force = false) {
         const d = json.data || {};
         const available = !!d.available;
         const composeReady = !!d.compose_ready;
-        const imageId = d.current_image_id_short ? ` | 当前ID ${d.current_image_id_short}` : '';
-        const latestId = d.latest_image_id_short ? ` | 最新ID ${d.latest_image_id_short}` : '';
-        const appVer = d.app_version ? ` | 版本 ${d.app_version}` : '';
-        const projectName = d.compose_project ? ` | 项目 ${d.compose_project}` : '';
-        const detail = `${d.image || '未知镜像'}${appVer} | ${d.checked_at || '刚刚'}${imageId}${latestId}${projectName}${composeReady ? '' : ' | compose 未就绪'}`;
+        const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const imageText = escapeHtml(d.image || '未知镜像');
+        const appVerText = d.app_version ? `版本 ${escapeHtml(d.app_version)}` : '';
+        const timeText = escapeHtml(d.checked_at || '刚刚');
+        const projectText = d.compose_project ? `项目 ${escapeHtml(d.compose_project)}` : '';
+        const currentIdText = d.current_image_id_short ? escapeHtml(d.current_image_id_short) : '';
+        const latestIdText = d.latest_image_id_short ? escapeHtml(d.latest_image_id_short) : '';
+        const composeText = composeReady ? '' : 'compose 未就绪';
+        const detailHtml = `
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="font-mono text-[11px]">${imageText}</span>
+                ${appVerText ? `<span class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 text-[10px] font-bold">${appVerText}</span>` : ''}
+            </div>
+            <div class="mt-1 flex flex-wrap items-center gap-2">
+                <span>${timeText}</span>
+                ${projectText ? `<span class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-white/5 text-[10px] font-bold">${projectText}</span>` : ''}
+                ${composeText ? `<span class="px-2 py-0.5 rounded-md bg-red-100/70 dark:bg-red-500/20 text-[10px] font-bold text-red-600 dark:text-red-400">${composeText}</span>` : ''}
+            </div>
+            ${(currentIdText || latestIdText) ? `
+            <div class="mt-1 flex flex-wrap items-center gap-2">
+                ${currentIdText ? `<span class="font-mono text-[10px]">当前ID ${currentIdText}</span>` : ''}
+                ${latestIdText ? `<span class="font-mono text-[10px]">最新ID ${latestIdText}</span>` : ''}
+            </div>` : ''}
+        `;
 
         if (available) {
             setUpdateUI({
                 title: '检测到新版本',
-                detail,
+                detailHtml,
                 badge: '可更新',
                 badgeClass: 'px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-500/30 shrink-0',
                 canUpdate: composeReady
@@ -723,7 +746,7 @@ async function checkDockerUpdate(silent = false, force = false) {
         } else {
             setUpdateUI({
                 title: '已是最新版本',
-                detail,
+                detailHtml,
                 badge: '最新',
                 badgeClass: 'px-2.5 py-1 rounded-full text-[10px] font-black bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400 border border-gray-200/60 dark:border-white/10 shrink-0',
                 canUpdate: false

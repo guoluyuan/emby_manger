@@ -32,6 +32,7 @@
 
 ```yaml
 version: '3.8'
+name: emby-manger
 services:
   emby-pulse:
     image: mp740429299/emby_manger:latest
@@ -51,7 +52,7 @@ services:
       # - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       # - DOCKER_UPDATE_SERVICE=emby-pulse
       # - DOCKER_UPDATE_CONTAINER=emby-manger
-      # - DOCKER_UPDATE_PROJECT_NAME=emby
+      # - DOCKER_UPDATE_PROJECT_NAME=emby-manger
 ```
 
 首次安装后，请访问 `http://localhost:10307/` 在网页中填写 Emby 地址与 API Key（无需写入 `docker-compose.yml`）。
@@ -67,6 +68,7 @@ API 模式：
 
 ```yaml
 version: '3.8'
+name: emby-manger
 services:
   emby-pulse:
     image: mp740429299/emby_manger:latest
@@ -84,13 +86,14 @@ services:
       # - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       # - DOCKER_UPDATE_SERVICE=emby-pulse
       # - DOCKER_UPDATE_CONTAINER=emby-manger
-      # - DOCKER_UPDATE_PROJECT_NAME=emby
+      # - DOCKER_UPDATE_PROJECT_NAME=emby-manger
 ```
 
 本地模式（sqlite）：
 
 ```yaml
 version: '3.8'
+name: emby-manger
 services:
   emby-pulse:
     image: mp740429299/emby_manger:latest
@@ -110,7 +113,7 @@ services:
       # - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       # - DOCKER_UPDATE_SERVICE=emby-pulse
       # - DOCKER_UPDATE_CONTAINER=emby-manger
-      # - DOCKER_UPDATE_PROJECT_NAME=emby
+      # - DOCKER_UPDATE_PROJECT_NAME=emby-manger
 ```
 
 **常见报错（API 模式误用 / 本地模式未挂载）**
@@ -148,6 +151,7 @@ docker-compose up -d
 **示例（在 compose 中启用）**
 
 ```yaml
+name: emby-manger
 services:
   emby-pulse:
     image: mp740429299/emby_manger:latest
@@ -163,7 +167,7 @@ services:
       - DOCKER_UPDATE_SERVICE=emby-pulse
       - DOCKER_UPDATE_CONTAINER=emby-manger
       # 可选：如遇到“容器名冲突”，可指定项目名
-      # - DOCKER_UPDATE_PROJECT_NAME=emby
+      # - DOCKER_UPDATE_PROJECT_NAME=emby-manger
 ```
 
 启用后，进入「系统设置」即可看到“容器一键更新”卡片。

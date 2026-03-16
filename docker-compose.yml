@@ -1,4 +1,5 @@
 version: '3.8'
+name: emby-manger
 
 services:
   emby-pulse:
@@ -24,3 +25,4 @@ services:
       - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       - DOCKER_UPDATE_SERVICE=emby-pulse
       - DOCKER_UPDATE_CONTAINER=emby-manger
+      - DOCKER_UPDATE_PROJECT_NAME=emby-manger
