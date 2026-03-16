@@ -96,7 +96,12 @@ def _run_cmd(args, timeout=90):
 
 def _get_container_id():
     # 允许手动指定（避免 HOSTNAME 非容器 ID 的场景）
-    env_cid = (os.getenv("DOCKER_UPDATE_CONTAINER") or os.getenv("DOCKER_UPDATE_CONTAINER_ID") or "").strip()
+    env_cid = (
+        os.getenv("DOCKER_UPDATE_CONTAINER")
+        or os.getenv("DOCKER_UPDATE_CONTAINER_ID")
+        or os.getenv("DOCKER_UPDATE_NAME")
+        or ""
+    ).strip()
     if env_cid:
         return env_cid
 
@@ -128,7 +133,8 @@ def _get_container_id():
         pass
 
     # 兜底：用 compose service 标签查找容器
-    service = (os.getenv("DOCKER_UPDATE_SERVICE") or "").strip()
+    update_name = (os.getenv("DOCKER_UPDATE_NAME") or "").strip()
+    service = (os.getenv("DOCKER_UPDATE_SERVICE") or update_name or "").strip()
     if service and shutil.which("docker"):
         try:
             res = _run_cmd(["docker", "ps", "-q", "-f", f"label=com.docker.compose.service={service}"], timeout=6)
@@ -164,10 +170,11 @@ def _get_compose_meta(inspect: dict):
     if not files_raw:
         files_raw = (labels.get("com.docker.compose.project.config_files") or "").strip()
     files = [f.strip() for f in files_raw.split(",") if f.strip()]
-    service = (os.getenv("DOCKER_UPDATE_SERVICE") or "").strip()
+    update_name = (os.getenv("DOCKER_UPDATE_NAME") or "").strip()
+    service = (os.getenv("DOCKER_UPDATE_SERVICE") or update_name or "").strip()
     if not service:
         service = (labels.get("com.docker.compose.service") or "").strip()
-    project = (os.getenv("DOCKER_UPDATE_PROJECT_NAME") or "").strip()
+    project = (os.getenv("DOCKER_UPDATE_PROJECT_NAME") or update_name or "").strip()
     if not project:
         project = (labels.get("com.docker.compose.project") or "").strip()
     return files, service, project
@@ -269,7 +276,7 @@ async def docker_update_status(request: Request):
 
     cid = _get_container_id()
     if not cid:
-        return {"status": "error", "message": "无法识别当前容器 ID，请设置 DOCKER_UPDATE_CONTAINER"}
+        return {"status": "error", "message": "无法识别当前容器 ID，请设置 DOCKER_UPDATE_NAME"}
 
     inspect, err = _inspect_container(cid)
     if not inspect:
@@ -325,7 +332,7 @@ async def docker_update_apply(request: Request):
 
     cid = _get_container_id()
     if not cid:
-        return {"status": "error", "message": "无法识别当前容器 ID，请设置 DOCKER_UPDATE_CONTAINER"}
+        return {"status": "error", "message": "无法识别当前容器 ID，请设置 DOCKER_UPDATE_NAME"}
 
     inspect, err = _inspect_container(cid)
     if not inspect:
@@ -333,7 +340,7 @@ async def docker_update_apply(request: Request):
 
     files, service, project = _get_compose_meta(inspect)
     if not files or not service:
-        return {"status": "error", "message": "未检测到 compose 信息，请设置 DOCKER_UPDATE_COMPOSE_FILES 与 DOCKER_UPDATE_SERVICE"}
+        return {"status": "error", "message": "未检测到 compose 信息，请设置 DOCKER_UPDATE_COMPOSE_FILES 与 DOCKER_UPDATE_NAME"}
     if not _all_files_exist(files):
         return {"status": "error", "message": "compose 配置文件在容器内不可见，请挂载并设置正确路径"}
 

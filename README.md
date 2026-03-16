@@ -34,7 +34,7 @@
 version: '3.8'
 name: emby-manger
 services:
-  emby-pulse:
+  emby-manger:
     image: mp740429299/emby_manger:latest
     container_name: emby-manger
     restart: unless-stopped
@@ -50,9 +50,7 @@ services:
       - DB_PATH=/emby-data/playback_reporting.db # sqlite 模式必填
       # 可选：网页一键更新
       # - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
-      # - DOCKER_UPDATE_SERVICE=emby-pulse
-      # - DOCKER_UPDATE_CONTAINER=emby-manger
-      # - DOCKER_UPDATE_PROJECT_NAME=emby-manger
+      # - DOCKER_UPDATE_NAME=emby-manger
 ```
 
 首次安装后，请访问 `http://localhost:10307/` 在网页中填写 Emby 地址与 API Key（无需写入 `docker-compose.yml`）。
@@ -70,7 +68,7 @@ API 模式：
 version: '3.8'
 name: emby-manger
 services:
-  emby-pulse:
+  emby-manger:
     image: mp740429299/emby_manger:latest
     container_name: emby-manger
     restart: unless-stopped
@@ -84,9 +82,7 @@ services:
       - PLAYBACK_DATA_MODE=api
       # 可选：网页一键更新
       # - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
-      # - DOCKER_UPDATE_SERVICE=emby-pulse
-      # - DOCKER_UPDATE_CONTAINER=emby-manger
-      # - DOCKER_UPDATE_PROJECT_NAME=emby-manger
+      # - DOCKER_UPDATE_NAME=emby-manger
 ```
 
 本地模式（sqlite）：
@@ -95,7 +91,7 @@ services:
 version: '3.8'
 name: emby-manger
 services:
-  emby-pulse:
+  emby-manger:
     image: mp740429299/emby_manger:latest
     container_name: emby-manger
     restart: unless-stopped
@@ -111,9 +107,7 @@ services:
       - DB_PATH=/emby-data/playback_reporting.db
       # 可选：网页一键更新
       # - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
-      # - DOCKER_UPDATE_SERVICE=emby-pulse
-      # - DOCKER_UPDATE_CONTAINER=emby-manger
-      # - DOCKER_UPDATE_PROJECT_NAME=emby-manger
+      # - DOCKER_UPDATE_NAME=emby-manger
 ```
 
 **常见报错（API 模式误用 / 本地模式未挂载）**
@@ -143,17 +137,16 @@ docker-compose up -d
 **前置条件**
 - 挂载 ` /var/run/docker.sock `
 - 容器内有 `docker` 命令（本镜像已内置）
-- 如果使用 docker compose：需要把 compose 文件目录挂载进容器，并设置两个环境变量
+- 如果使用 docker compose：需要把 compose 文件目录挂载进容器，并设置环境变量
   - `DOCKER_UPDATE_COMPOSE_FILES`：容器内的 compose 文件路径
-  - `DOCKER_UPDATE_SERVICE`：当前服务名（compose 的 service name）
-  - `DOCKER_UPDATE_PROJECT_NAME`：可选，compose 项目名（避免容器内执行 compose 时项目名不一致导致冲突）
+  - `DOCKER_UPDATE_NAME`：项目名/服务名/容器名（推荐三者一致，减少配置）
 
 **示例（在 compose 中启用）**
 
 ```yaml
 name: emby-manger
 services:
-  emby-pulse:
+  emby-manger:
     image: mp740429299/emby_manger:latest
     container_name: emby-manger
     restart: unless-stopped
@@ -164,10 +157,7 @@ services:
       - ./:/compose
     environment:
       - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
-      - DOCKER_UPDATE_SERVICE=emby-pulse
-      - DOCKER_UPDATE_CONTAINER=emby-manger
-      # 可选：如遇到“容器名冲突”，可指定项目名
-      # - DOCKER_UPDATE_PROJECT_NAME=emby-manger
+      - DOCKER_UPDATE_NAME=emby-manger
 ```
 
 启用后，进入「系统设置」即可看到“容器一键更新”卡片。

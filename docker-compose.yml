@@ -2,7 +2,7 @@ version: '3.8'
 name: emby-manger
 
 services:
-  emby-pulse:
+  emby-manger:
     image: mp740429299/emby_manger:latest
     container_name: emby-manger
     restart: unless-stopped
@@ -23,6 +23,4 @@ services:
       - PLAYBACK_DATA_MODE=sqlite # api 或 sqlite
       - DB_PATH=/emby-data/playback_reporting.db
       - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
-      - DOCKER_UPDATE_SERVICE=emby-pulse
-      - DOCKER_UPDATE_CONTAINER=emby-manger
-      - DOCKER_UPDATE_PROJECT_NAME=emby-manger
+      - DOCKER_UPDATE_NAME=emby-manger
