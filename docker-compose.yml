@@ -14,11 +14,11 @@ services:
       # 你的 Emby 数据真实路径（按实际修改）
       - /path/to/emby/data:/emby-data:ro
       # 配置持久化（避免更新后重新初始化）
-      - ./config:/app/config
+      - /path/to/emby-manger/config:/app/config
       # 允许容器内执行更新
       - /var/run/docker.sock:/var/run/docker.sock
       # 挂载 compose 文件目录，供容器内更新使用
-      - ./:/compose
+      - /path/to/emby-manger/:/compose
     
     environment:
       - TZ=Asia/Shanghai
