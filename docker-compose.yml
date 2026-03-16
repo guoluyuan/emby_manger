@@ -3,7 +3,7 @@ version: '3.8'
 services:
   emby-pulse:
     image: mp740429299/emby_manger:latest
-    container_name: emby-pulse
+    container_name: emby-manger
     restart: unless-stopped
     
     # Host 模式：直接使用宿主机网络
@@ -23,4 +23,4 @@ services:
       - DB_PATH=/emby-data/playback_reporting.db
       - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       - DOCKER_UPDATE_SERVICE=emby-pulse
-      - DOCKER_UPDATE_CONTAINER=emby-pulse
+      - DOCKER_UPDATE_CONTAINER=emby-manger

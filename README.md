@@ -35,7 +35,7 @@ version: '3.8'
 services:
   emby-pulse:
     image: mp740429299/emby_manger:latest
-    container_name: emby-pulse
+    container_name: emby-manger
     restart: unless-stopped
     network_mode: host # 默认端口号为 10307
     volumes:
@@ -50,6 +50,7 @@ services:
       # 可选：网页一键更新
       # - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       # - DOCKER_UPDATE_SERVICE=emby-pulse
+      # - DOCKER_UPDATE_CONTAINER=emby-manger
 ```
 
 首次安装后，请访问 `http://localhost:10307/` 在网页中填写 Emby 地址与 API Key（无需写入 `docker-compose.yml`）。
@@ -68,7 +69,7 @@ version: '3.8'
 services:
   emby-pulse:
     image: mp740429299/emby_manger:latest
-    container_name: emby-pulse
+    container_name: emby-manger
     restart: unless-stopped
     network_mode: host
     volumes:
@@ -81,6 +82,7 @@ services:
       # 可选：网页一键更新
       # - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       # - DOCKER_UPDATE_SERVICE=emby-pulse
+      # - DOCKER_UPDATE_CONTAINER=emby-manger
 ```
 
 本地模式（sqlite）：
@@ -90,7 +92,7 @@ version: '3.8'
 services:
   emby-pulse:
     image: mp740429299/emby_manger:latest
-    container_name: emby-pulse
+    container_name: emby-manger
     restart: unless-stopped
     network_mode: host
     volumes:
@@ -105,6 +107,7 @@ services:
       # 可选：网页一键更新
       # - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       # - DOCKER_UPDATE_SERVICE=emby-pulse
+      # - DOCKER_UPDATE_CONTAINER=emby-manger
 ```
 
 **常见报错（API 模式误用 / 本地模式未挂载）**
@@ -154,7 +157,7 @@ services:
     environment:
       - DOCKER_UPDATE_COMPOSE_FILES=/compose/docker-compose.yml
       - DOCKER_UPDATE_SERVICE=emby-pulse
-      - DOCKER_UPDATE_CONTAINER=emby-pulse
+      - DOCKER_UPDATE_CONTAINER=emby-manger
 ```
 
 启用后，进入「系统设置」即可看到“容器一键更新”卡片。
