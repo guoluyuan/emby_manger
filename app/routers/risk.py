@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
+from typing import Optional
 import sqlite3
 import requests
 import json
@@ -24,6 +25,8 @@ class ActionRequest(BaseModel):
 class ConfigRequest(BaseModel):
     enable_risk_control: bool
     default_max_concurrent: int
+    risk_scan_interval_sec: Optional[int] = None
+    enable_risk_auto_ban: Optional[bool] = None
 
 @router.get("/online")
 def get_online_status():
@@ -114,7 +117,9 @@ def get_risk_config():
     """获取风控设置"""
     return {
         "enable_risk_control": cfg.get("enable_risk_control", False),
-        "default_max_concurrent": cfg.get("default_max_concurrent", 2)
+        "default_max_concurrent": cfg.get("default_max_concurrent", 2),
+        "enable_risk_auto_ban": cfg.get("enable_risk_auto_ban", False),
+        "risk_scan_interval_sec": cfg.get("risk_scan_interval_sec", 60)
     }
 
 @router.post("/config")
@@ -122,6 +127,16 @@ def update_risk_config(req: ConfigRequest):
     """保存风控设置"""
     cfg["enable_risk_control"] = req.enable_risk_control
     cfg["default_max_concurrent"] = req.default_max_concurrent
+    if req.risk_scan_interval_sec is not None:
+        try:
+            interval = int(req.risk_scan_interval_sec)
+        except Exception:
+            interval = 60
+        if interval < 5: interval = 5
+        if interval > 3600: interval = 3600
+        cfg["risk_scan_interval_sec"] = interval
+    if req.enable_risk_auto_ban is not None:
+        cfg["enable_risk_auto_ban"] = req.enable_risk_auto_ban
     save_config()
     return {"message": "配置已生效"}
 

@@ -123,16 +123,36 @@ def scan_playbacks_and_alert():
                 current_alert_fingerprints.add(fingerprint)
                 
                 if fingerprint not in _alerted_sessions:
-                    log_risk_action(uid, username, "warn", f"并发超限: 当前 {current_count} / 限额 {limit}")
+                    auto_ban_enabled = cfg.get("enable_risk_auto_ban", False)
+                    auto_ban_result = None
+                    auto_kick_total = len(user_sessions)
+                    auto_kick_success = 0
+                    if auto_ban_enabled:
+                        for s in user_sessions:
+                            sid = s.get("Id")
+                            if sid and kick_session(sid, "并发超限自动踢线"):
+                                auto_kick_success += 1
+                        if auto_kick_success > 0:
+                            log_risk_action(uid, username, "kick", f"并发超限自动踢线: 成功 {auto_kick_success}/{auto_kick_total}")
+                        auto_ban_result = ban_user(uid)
+                        if auto_ban_result:
+                            log_risk_action(uid, username, "ban", f"并发超限自动封禁: 当前 {current_count} / 限额 {limit}")
+                        else:
+                            log_risk_action(uid, username, "warn", f"并发超限自动封禁失败: 当前 {current_count} / 限额 {limit}")
+                    else:
+                        log_risk_action(uid, username, "warn", f"并发超限: 当前 {current_count} / 限额 {limit}")
                     devices_text = "\n".join([f"  🔸 {d}" for d in devices_info])
                     logger.warning(f"🚨 [风控执行] 发现越界！立即通过总线呼叫机器人发送警报！")
-                    
                     bus.publish("notify.risk.alert", {
-                        "user_id": uid,          # 🔥 必须传给机器人用于封禁按钮
+                        "user_id": uid,
                         "username": username,
                         "current": current_count,
                         "limit": limit,
-                        "devices_info": devices_text
+                        "devices_info": devices_text,
+                        "auto_ban": auto_ban_enabled,
+                        "auto_ban_result": auto_ban_result,
+                        "auto_kick_total": auto_kick_total,
+                        "auto_kick_success": auto_kick_success
                     })
                 else:
                     # 防抖命中不再输出日志
@@ -155,18 +175,38 @@ def _risk_monitor_loop():
     while True:
         try: scan_playbacks_and_alert()
         except: pass
-        time.sleep(60) 
+        interval = cfg.get("risk_scan_interval_sec", 60)
+        try:
+            interval = int(interval)
+        except Exception:
+            interval = 60
+        if interval < 5: interval = 5
+        if interval > 3600: interval = 3600
+        time.sleep(interval) 
 
 # 👇 新增：为 Web 端全局通知中心订阅风控事件
 def _on_risk_alert_for_web(data):
     username = data.get("username", "未知")
     current = data.get("current", 0)
     limit = data.get("limit", 0)
-    
+    auto_ban = data.get("auto_ban", False)
+    auto_ban_result = data.get("auto_ban_result", None)
+    auto_kick_total = data.get("auto_kick_total", 0)
+    auto_kick_success = data.get("auto_kick_success", 0)
+    if auto_ban and auto_ban_result is True:
+        if auto_kick_total > 0:
+            action_note = f"已自动封禁并踢线({auto_kick_success}/{auto_kick_total})"
+        else:
+            action_note = "已自动封禁"
+    elif auto_ban and auto_ban_result is False:
+        action_note = "自动封禁失败，请尽快处理"
+    else:
+        action_note = "请立即处理"
+
     add_sys_notification(
         notify_type="risk",
         title=f"🚨 账号并发越界: {username}",
-        message=f"当前并发 {current} / 额度 {limit}，请立即处理！",
+        message=f"当前并发 {current} / 额度 {limit}，{action_note}！",
         action_url="/risk"
     )
 

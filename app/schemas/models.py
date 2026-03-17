@@ -42,6 +42,7 @@ class SettingsModel(BaseModel):
 # 🔥 新增风控全局字段
     enable_risk_control: Optional[bool] = False         # 全局风控总开关
     default_max_concurrent: Optional[int] = 2           # 全局默认允许并发数
+    enable_risk_auto_ban: Optional[bool] = False        # Auto-ban on concurrent limit exceed
 
 class SetupModel(BaseModel):
     emby_host: str

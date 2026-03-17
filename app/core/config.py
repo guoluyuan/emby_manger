@@ -91,7 +91,12 @@ DEFAULT_CONFIG = {
     "secret_key": "",
     "cors_origins": [],
     "playback_data_mode": _get_playback_mode_from_env(),
-    "disable_update_check": False
+    "disable_update_check": False,
+    # Risk control defaults
+    "enable_risk_control": False,
+    "default_max_concurrent": 2,
+    "enable_risk_auto_ban": False,
+    "risk_scan_interval_sec": 60
 }
 
 class ConfigManager:

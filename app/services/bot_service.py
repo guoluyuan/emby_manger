@@ -331,13 +331,26 @@ class NotificationBot:
         username = data.get("username", "未知")
         current = data.get("current", 0)
         limit = data.get("limit", 0)
+        auto_ban = data.get("auto_ban", False)
+        auto_ban_result = data.get("auto_ban_result", None)
+        auto_kick_total = data.get("auto_kick_total", 0)
+        auto_kick_success = data.get("auto_kick_success", 0)
+        if auto_ban and auto_ban_result is True:
+            if auto_kick_total > 0:
+                action_note = f"已自动封禁并踢线({auto_kick_success}/{auto_kick_total})"
+            else:
+                action_note = "已自动封禁"
+        elif auto_ban and auto_ban_result is False:
+            action_note = "自动封禁失败，请尽快处理"
+        else:
+            action_note = "请立即处理"
         devices_info = data.get("devices_info", "未知设备")
         
         msg = (f"🚨 <b>【风控预警】 账号并发越界</b>\n\n"
                f"👤 <b>涉事用户：</b>{username}\n"
                f"📈 <b>当前并发：</b>{current} / 额度 {limit}\n"
                f"📱 <b>违规设备：</b>\n{devices_info}\n\n"
-               f"⚠️ <i>天眼系统已记录，请立即进行处置！</i>")
+               f"⚠️ <i>天眼系统已记录，{action_note}！</i>")
         
         keyboard = {"inline_keyboard": []}
         if uid:
