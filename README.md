@@ -1,6 +1,4 @@
-# EmbyPulse（映迹）
-
-本仓库为二次修改版本，基于原项目 https://github.com/zeyu8023/emby-pulse 调整。
+本仓库为 EmbyPulse（映迹） 二次修改版本，基于原项目 https://github.com/zeyu8023/emby-pulse 调整。
 
 ## 变更概览（精简）
 
