@@ -5,6 +5,7 @@
 ## 变更概览（精简）
 
 主要调整：
+- 网页初始化配置添加EMBY_HOST和EMBY_API设置，方便配置
 - 前端资源本地化，避免 CDN 被拦截导致空白
 - 去重/榜单/播放记录展示修复与优化
 - 用户社区影片可直接跳转emby网页端，跳转时内外网智能切换优化
@@ -118,7 +119,7 @@ services:
 2. 确认插件已启用并处于运行状态。
 3. 若首次安装无历史数据，至少产生一次播放记录后再刷新页面。
 
-### 容器更新（Docker）
+### 容器手动更新（Docker）
 
 ```bash
 cd docker-compose.yml所在目录
@@ -184,92 +185,6 @@ Windows：
 
 4. 首次访问 `http://localhost:10307/` 在网页中完成配置（Emby 地址与 API Key）
 
-## ⚙️ 配置说明
-
-以下为部署后建议优先检查的核心配置项：
-
-### Emby 基础配置
-
-- `emby_host`：Emby 服务器地址，例如 `http://127.0.0.1:8096`
-- `emby_api_key`：Emby 后台生成的 API Key
-- `webhook_token`：Webhook 安全校验令牌，需与 Emby Webhook 地址中的 `token` 保持一致
-- `emby_public_url`：对外访问 Emby 的公网地址，用于生成跳转链接
-
-### 播放统计配置
-
-- `playback_data_mode`：播放数据模式，支持 `sqlite` 或 `api`
-- `DB_PATH`：本地模式下 Playback Reporting 数据库文件路径
-- `hidden_users`：需要在大盘中隐藏的用户 ID 列表
-
-#### 🧩 两种模式如何选择（小白必看）
-
-**API 模式（推荐：不方便挂载数据库时）**
-- 适合：极空间、群晖、云服务器、容器里拿不到数据库文件的环境
-- 优点：部署最省心，只要填 `EMBY_API_KEY` 即可启动
-- 注意：需要安装 Emby 官方 Playback Reporting 插件（两种模式都需要）
-
-**本地数据库模式（推荐：可挂载数据库时）**
-- 适合：本地 Docker 或能挂载 Emby 数据目录的 NAS
-- 优点：查询性能更高，统计更及时
-- 注意：必须正确填写 `DB_PATH`，且容器内要能访问该文件
-
-说明：
-- `sqlite` 模式直接读取数据库文件，性能更高，适合本地 Docker 挂载场景
-- `api` 模式通过 Emby 插件接口穿透查询，部署最轻量，适合无法挂载数据库的环境
-
-### Telegram 配置
-
-- `tg_bot_token`：Telegram Bot Token
-- `tg_chat_id`：接收主动通知的目标聊天 ID
-- `proxy_url`：Telegram 网络代理，可选
-
-支持能力：
-- 播放开始 / 停止推送
-- 入库通知推送
-- 报表推送
-- 机器人指令交互
-
-### 企业微信配置
-
-- `wecom_corpid`：企业 ID
-- `wecom_corpsecret`：应用 Secret
-- `wecom_agentid`：应用 AgentId
-- `wecom_touser`：默认推送目标，通常可填 `@all`
-- `wecom_proxy_url`：企业微信 API 地址，默认 `https://qyapi.weixin.qq.com`
-
-支持能力：
-- 文本与图文通知
-- 自定义菜单
-- 播放与入库事件推送
-
-### MoviePilot 配置
-
-- `moviepilot_url`：MoviePilot 服务地址
-- `moviepilot_token`：MoviePilot API Token
-- `moviepilot_downloader`：MoviePilot 下载器名称（从 MP 端拉取选择）
-- `moviepilot_save_path`：MoviePilot 默认保存路径（可自动读取并回填）
-
-支持能力：
-- 缺集搜索
-- 一键下发下载任务
-- 与缺集管理联动完成补货流程
-
-### 下载器截胡配置
-
-当前支持：
-- qBittorrent
-- Transmission
-
-常用配置项：
-- `client_type`：下载器类型
-- `client_url`：下载器地址，例如 `http://127.0.0.1:8080`
-- `client_user`：下载器账号
-- `client_pass`：下载器密码
-
-支持能力：
-- 季包推送后自动锁定下载任务
-- 根据目标集数筛出 wanted 文件
-- 自动剔除非目标集文件，实现精准补集
 
 ## 📄 许可证与开源协议
 
