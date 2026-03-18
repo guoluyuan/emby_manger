@@ -62,6 +62,92 @@ document.addEventListener('alpine:init', () => {
         toast: { show: false, message: '', type: 'success' }, feedbackModal: { open: false, itemName: '', posterPath: '', issueType: '缺少字幕', desc: '' }, feedbackIssues: ['缺少字幕', '字幕错位', '视频卡顿/花屏', '清晰度太低', '音轨无声/音画不同步', '其他问题'], isFeedbackSubmitting: false,
         posterStudio: { open: false, isLoading: false, isSaving: false, period: 'month', periodLabel: '本月 观影报告', data: null, useCoverBg: false, top1BgBase64: null, rankRows: [] },
         html2canvasPromise: null,
+        loadedTabs: { explore: false, request: false, profile: false },
+
+        _normalizeTab(tab) {
+            const t = String(tab || '').toLowerCase();
+            return ['explore', 'request', 'profile'].includes(t) ? t : 'explore';
+        },
+        _getTabFromUrl() {
+            try {
+                const u = new URL(window.location.href);
+                const rawQueryTab = u.searchParams.get('tab');
+                if (rawQueryTab) return this._normalizeTab(rawQueryTab);
+                const rawHashTab = (u.hash || '').replace(/^#/, '').trim();
+                if (rawHashTab) return this._normalizeTab(rawHashTab);
+            } catch (e) {}
+            return '';
+        },
+        _getSavedTab() {
+            try {
+                const saved = localStorage.getItem('ep_request_tab');
+                if (!saved) return '';
+                return this._normalizeTab(saved);
+            } catch (e) {
+                return '';
+            }
+        },
+        _rememberTab(tab) {
+            try {
+                localStorage.setItem('ep_request_tab', this._normalizeTab(tab));
+            } catch (e) {}
+        },
+        _syncTabToUrl(tab) {
+            try {
+                const t = this._normalizeTab(tab);
+                const u = new URL(window.location.href);
+                u.searchParams.set('tab', t);
+                if (u.hash) u.hash = '';
+                history.replaceState(history.state, '', `${u.pathname}${u.search}${u.hash}`);
+            } catch (e) {}
+        },
+        _resolveInitialTab() {
+            const fromUrl = this._getTabFromUrl();
+            if (fromUrl) return fromUrl;
+            const fromSaved = this._getSavedTab();
+            if (fromSaved) return fromSaved;
+            return 'explore';
+        },
+        _activateProfileTab() {
+            // Profile tab uses x-if, DOM gets recreated. Reset chart state to ensure re-render.
+            try { if (this.charts.hour) this.charts.hour.destroy(); } catch(e) {}
+            try { if (this.charts.trend) this.charts.trend.destroy(); } catch(e) {}
+            try { if (this.charts.device) this.charts.device.destroy(); } catch(e) {}
+            try { if (this.charts.client) this.charts.client.destroy(); } catch(e) {}
+            this.chartRendered = { hour: false, trend: false, device: false, client: false };
+            this.chartVisibility = { hour: false, trend: false, device: false, client: false };
+            this.profileObserversInitialized = false;
+            this.setupProfileChartObservers();
+            if (!this.statsLoaded) this.loadProfileStats();
+            else setTimeout(() => this.renderCharts(), 150);
+            // rAF 双重兜底：防止 DOM 重建后首次渲染未命中
+            requestAnimationFrame(() => requestAnimationFrame(() => this.renderCharts()));
+        },
+        _ensureTabData(tab) {
+            const t = this._normalizeTab(tab);
+            if (t === 'explore') {
+                if (!this.loadedTabs.explore) {
+                    this.loadedTabs.explore = true;
+                    this.loadServerData();
+                }
+                return;
+            }
+            if (t === 'request') {
+                if (!this.loadedTabs.request) {
+                    this.loadedTabs.request = true;
+                    this.loadRecommendations();
+                }
+                return;
+            }
+            if (t === 'profile') {
+                this._activateProfileTab();
+                if (!this.loadedTabs.profile) this.loadedTabs.profile = true;
+            }
+        },
+        _applyInitialTab() {
+            const initTab = this._resolveInitialTab();
+            this.$nextTick(() => this.switchTab(initTab, { scroll: false, persist: true, syncUrl: true }));
+        },
 
         async initTheme() { 
             this.isDarkMode = document.documentElement.classList.contains('dark'); 
@@ -77,7 +163,7 @@ document.addEventListener('alpine:init', () => {
                     this.serverUrlPublic = data.server_url_public || ''; 
                     this.serverUrl = await this.pickBestServerUrl(); 
                     this.serverId = data.server_id || ''; 
-                    this.loadServerData(); 
+                    this._applyInitialTab();
                 } 
             } catch(e) {} 
             this.isLoaded = true; 
@@ -108,7 +194,7 @@ document.addEventListener('alpine:init', () => {
                     } 
                     this.isLoggedIn = true; 
                     this.applyLoginBackground(false);
-                    this.loadServerData(); 
+                    this._applyInitialTab();
                     this.showToast('登录成功'); 
                 } else { 
                     this.showToast(data.message, 'error'); 
@@ -226,7 +312,6 @@ document.addEventListener('alpine:init', () => {
                 if (topM.status === 'success') this.serverTopMovies = topM.data; 
                 if (topS.status === 'success') this.serverTopSeries = topS.data; if (topS.status !== 'success' || !topS.data || topS.data.length === 0) { try { const fallbackS = await fetch('/api/stats/top_movies?user_id=all&category=Episode&sort_by=count').then(r => r.json()); if (fallbackS.status === 'success') this.serverTopSeries = fallbackS.data.slice(0, 10); } catch(e) {} } 
             } catch(e) {} 
-            if (this.currentTab === 'request' && !this.recommendLoaded) this.loadRecommendations();
         },
 
         async loadRecommendations() {
@@ -245,25 +330,16 @@ document.addEventListener('alpine:init', () => {
             } catch(e) { console.log("无热门数据"); }
         },
 
-        switchTab(tab) { 
-            this.currentTab = tab; 
-            this.$nextTick(() => window.scrollTo(0, 0)); 
-            if (tab === 'profile') { 
-                // Profile tab uses x-if, DOM gets recreated. Reset chart state to ensure re-render.
-                try { if (this.charts.hour) this.charts.hour.destroy(); } catch(e) {}
-                try { if (this.charts.trend) this.charts.trend.destroy(); } catch(e) {}
-                try { if (this.charts.device) this.charts.device.destroy(); } catch(e) {}
-                try { if (this.charts.client) this.charts.client.destroy(); } catch(e) {}
-                this.chartRendered = { hour: false, trend: false, device: false, client: false };
-                this.chartVisibility = { hour: false, trend: false, device: false, client: false };
-                this.profileObserversInitialized = false;
-                this.setupProfileChartObservers(); 
-                if (!this.statsLoaded) this.loadProfileStats(); 
-                else setTimeout(() => this.renderCharts(), 150);
-                // rAF 双重兜底：防止 DOM 重建后首次渲染未命中
-                requestAnimationFrame(() => requestAnimationFrame(() => this.renderCharts()));
-            } 
-            if (tab === 'request' && !this.recommendLoaded) this.loadRecommendations(); 
+        switchTab(tab, options = {}) { 
+            const t = this._normalizeTab(tab);
+            const persist = options.persist !== false;
+            const syncUrl = options.syncUrl !== false;
+            const scroll = options.scroll !== false;
+            this.currentTab = t; 
+            if (persist) this._rememberTab(t);
+            if (syncUrl) this._syncTabToUrl(t);
+            if (scroll) this.$nextTick(() => window.scrollTo(0, 0));
+            this.$nextTick(() => this._ensureTabData(t));
         },
 
         setupProfileChartObservers() {
@@ -326,7 +402,7 @@ document.addEventListener('alpine:init', () => {
         async submitRequest() { if (this.activeItem.media_type === 'movie' && (this.activeItem.local_status === 2 || this.isRequestSubmitted(this.activeItem.tmdb_id, 0))) return; this.isSubmitting = true; const seasons = this.activeItem.media_type === 'tv' ? this.selectedSeasons.map(Number).filter(sn => !this.isRequestSubmitted(this.activeItem.tmdb_id, sn)) : [0]; if (this.activeItem.media_type === 'tv' && seasons.length === 0) { this.showToast('✅ 已提交申请，等待管理员处理'); this.isSubmitting = false; return; } const payload = { tmdb_id: this.activeItem.tmdb_id, media_type: this.activeItem.media_type, title: this.activeItem.title, year: this.activeItem.year, poster_path: this.activeItem.poster_path, overview: this.activeItem.overview, seasons }; try { const res = await fetch('/api/requests/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const text = await res.text(); let data = {}; try { data = JSON.parse(text); } catch(e) { data = { message: text }; } if (res.ok && (data.status === 'success' || !data.detail)) { this.showToast('✅ ' + (data.message || '心愿已发送！')); this.closeModal(); this.openQueueModal('request'); } else { this.showToast('❌ ' + (data.message || data.detail || '提交异常'), 'error'); } } catch (e) { this.showToast('网络异常', 'error'); } finally { this.isSubmitting = false; } },
         openFeedbackModal(itemName, posterPath = '') { this.feedbackModal.itemName = itemName; this.feedbackModal.posterPath = posterPath; this.feedbackModal.issueType = '缺少字幕'; this.feedbackModal.desc = ''; this.feedbackModal.open = true; if(this.isModalOpen) this.closeModal(); if(this.showcaseModal.open) this.closeShowcaseModal(); },
         async submitFeedback() { this.isFeedbackSubmitting = true; try { const res = await fetch('/api/requests/feedback/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_name: this.feedbackModal.itemName, issue_type: this.feedbackModal.issueType, description: this.feedbackModal.desc, poster_path: this.feedbackModal.posterPath }) }); const text = await res.text(); let data = {}; try { data = JSON.parse(text); } catch(e) { data = { message: text }; } if (res.ok && (data.status === 'success' || !data.detail)) { this.showToast(data.message || '反馈成功'); this.feedbackModal.open = false; this.openQueueModal('feedback'); } else { this.showToast(data.message || data.detail || '报错失败', 'error'); } } catch(e) { this.showToast('网络错误', 'error'); } finally { this.isFeedbackSubmitting = false; } },
-        async searchMedia() { if (!this.searchQuery.trim()) return; this.isSearching = true; if (this.currentTab !== 'request') this.currentTab = 'request'; window.scrollTo(0, 0); try { const res = await fetch(`/api/requests/search?query=${encodeURIComponent(this.searchQuery)}`); const data = await res.json(); if (data.status === 'success') { this.searchResults = data.data; if (data.data.length === 0) this.showToast('未找到结果', 'error'); } } catch (e) { this.showToast('网络错误', 'error'); } finally { this.isSearching = false; } },
+        async searchMedia() { if (!this.searchQuery.trim()) return; this.isSearching = true; if (this.currentTab !== 'request') this.switchTab('request', { scroll: false }); window.scrollTo(0, 0); try { const res = await fetch(`/api/requests/search?query=${encodeURIComponent(this.searchQuery)}`); const data = await res.json(); if (data.status === 'success') { this.searchResults = data.data; if (data.data.length === 0) this.showToast('未找到结果', 'error'); } } catch (e) { this.showToast('网络错误', 'error'); } finally { this.isSearching = false; } },
 
         async loadProfileStats() { if (this.statsLoaded || !this.userId) return; this.isStatsLoading = true; try { const [stats, badges, trend] = await Promise.all([ fetch(`/api/stats/user_details?user_id=${this.userId}`).then(r => r.json()), fetch(`/api/stats/badges?user_id=${this.userId}`).then(r => r.json()), fetch(`/api/stats/trend?dimension=day&user_id=${this.userId}`).then(r => r.json()) ]); if (stats.status === 'success') this.userStats = stats.data; if (badges.status === 'success') this.userBadges = badges.data; if (trend.status === 'success') this.userTrend = trend.data; this.statsLoaded = true; this.chartRendered = { hour: false, trend: false, device: false, client: false }; this.renderCharts(); } catch(e) {} this.isStatsLoading = false; },
 
