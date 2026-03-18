@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import Optional
 from app.core.config import cfg
 from app.core.database import query_db, get_base_filter
@@ -9,7 +9,12 @@ import re
 import datetime
 from collections import defaultdict
 
-router = APIRouter()
+def require_stats_access(request: Request):
+    if request.session.get("user") or request.session.get("req_user"):
+        return
+    raise HTTPException(status_code=401, detail="Unauthorized")
+
+router = APIRouter(dependencies=[Depends(require_stats_access)])
 
 def get_existing_item_ids(ids):
     ids = [str(i) for i in ids if i]

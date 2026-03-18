@@ -39,7 +39,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 🔥 核心修复：把动态版本参数移到耗时的依赖安装之后！
-ARG APP_VERSION=1.2.0.0
+ARG APP_VERSION=1.2.0.80
 ENV APP_VERSION=${APP_VERSION}
 
 # 2. 复制所有项目文件到容器 (这里改了 HTML 才会重新复制，但不会重新 pip install)

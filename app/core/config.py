@@ -133,6 +133,13 @@ class ConfigManager:
     def set(self, key, value): 
         self.config[key] = value
         self.save()
+
+    def update(self, values: dict, save: bool = True):
+        if not isinstance(values, dict):
+            return
+        self.config.update(values)
+        if save:
+            self.save()
     
     def get_all(self): 
         return self.config

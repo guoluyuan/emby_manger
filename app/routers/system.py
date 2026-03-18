@@ -83,9 +83,11 @@ def setup_system(data: SetupModel, request: Request):
     except:
         return {"status": "error", "message": "服务器地址无法访问"}
 
-    cfg["server_type"] = server_type
-    cfg["emby_host"] = host
-    cfg["emby_api_key"] = api_key
+    cfg.update({
+        "server_type": server_type,
+        "emby_host": host,
+        "emby_api_key": api_key
+    }, save=False)
     save_config()
     return {"status": "success", "message": "初始化完成"}
 
@@ -144,37 +146,39 @@ def api_update_settings(data: SettingsModel, request: Request):
     except:
         return {"status": "error", "message": "服务器地址无法访问"}
 
-    cfg["server_type"] = server_type
-    cfg["emby_host"] = data.emby_host
-    cfg["emby_api_key"] = data.emby_api_key
-    cfg["tmdb_api_key"] = data.tmdb_api_key
-    cfg["proxy_url"] = data.proxy_url
-    cfg["webhook_token"] = data.webhook_token
-    cfg["hidden_users"] = data.hidden_users
-    cfg["cors_origins"] = data.cors_origins or []
-    cfg["emby_public_url"] = data.emby_public_url
-    cfg["user_public_url"] = getattr(data, "user_public_url", "")
-    cfg["user_lan_url"] = getattr(data, "user_lan_url", "")
-    cfg["admin_login_bg_url"] = getattr(data, "admin_login_bg_url", "")
-    cfg["request_login_bg_url"] = getattr(data, "request_login_bg_url", "")
-    cfg["admin_login_bg_pc"] = getattr(data, "admin_login_bg_pc", "")
-    cfg["admin_login_bg_mobile"] = getattr(data, "admin_login_bg_mobile", "")
-    cfg["request_login_bg_pc"] = getattr(data, "request_login_bg_pc", "")
-    cfg["request_login_bg_mobile"] = getattr(data, "request_login_bg_mobile", "")
-    cfg["admin_login_bg_blur"] = getattr(data, "admin_login_bg_blur", 12)
-    cfg["request_login_bg_blur"] = getattr(data, "request_login_bg_blur", 10)
-    cfg["default_invite_template_user_id"] = getattr(data, "default_invite_template_user_id", "")
-    cfg["welcome_message"] = data.welcome_message
-    cfg["client_download_url"] = data.client_download_url
-    cfg["moviepilot_url"] = data.moviepilot_url
-    cfg["moviepilot_token"] = data.moviepilot_token
-    cfg["moviepilot_downloader"] = getattr(data, "moviepilot_downloader", "")
-    cfg["moviepilot_save_path"] = getattr(data, "moviepilot_save_path", "")
-    cfg["pulse_url"] = data.pulse_url
-    cfg["playback_data_mode"] = getattr(data, "playback_data_mode", "sqlite")
-    cfg["notify_user_login"] = getattr(data, "notify_user_login", False)
-    cfg["notify_item_deleted"] = getattr(data, "notify_item_deleted", False)
-    cfg["disable_update_check"] = getattr(data, "disable_update_check", False)
+    cfg.update({
+        "server_type": server_type,
+        "emby_host": data.emby_host,
+        "emby_api_key": data.emby_api_key,
+        "tmdb_api_key": data.tmdb_api_key,
+        "proxy_url": data.proxy_url,
+        "webhook_token": data.webhook_token,
+        "hidden_users": data.hidden_users,
+        "cors_origins": data.cors_origins or [],
+        "emby_public_url": data.emby_public_url,
+        "user_public_url": getattr(data, "user_public_url", ""),
+        "user_lan_url": getattr(data, "user_lan_url", ""),
+        "admin_login_bg_url": getattr(data, "admin_login_bg_url", ""),
+        "request_login_bg_url": getattr(data, "request_login_bg_url", ""),
+        "admin_login_bg_pc": getattr(data, "admin_login_bg_pc", ""),
+        "admin_login_bg_mobile": getattr(data, "admin_login_bg_mobile", ""),
+        "request_login_bg_pc": getattr(data, "request_login_bg_pc", ""),
+        "request_login_bg_mobile": getattr(data, "request_login_bg_mobile", ""),
+        "admin_login_bg_blur": getattr(data, "admin_login_bg_blur", 12),
+        "request_login_bg_blur": getattr(data, "request_login_bg_blur", 10),
+        "default_invite_template_user_id": getattr(data, "default_invite_template_user_id", ""),
+        "welcome_message": data.welcome_message,
+        "client_download_url": data.client_download_url,
+        "moviepilot_url": data.moviepilot_url,
+        "moviepilot_token": data.moviepilot_token,
+        "moviepilot_downloader": getattr(data, "moviepilot_downloader", ""),
+        "moviepilot_save_path": getattr(data, "moviepilot_save_path", ""),
+        "pulse_url": data.pulse_url,
+        "playback_data_mode": getattr(data, "playback_data_mode", "sqlite"),
+        "notify_user_login": getattr(data, "notify_user_login", False),
+        "notify_item_deleted": getattr(data, "notify_item_deleted", False),
+        "disable_update_check": getattr(data, "disable_update_check", False)
+    }, save=False)
     
     save_config()
     

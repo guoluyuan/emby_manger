@@ -71,6 +71,29 @@ def init_db():
         # 👇 新增：登录失败统计与锁定表
         c.execute('''CREATE TABLE IF NOT EXISTS login_attempts (ip TEXT, scope TEXT, failed_count INTEGER DEFAULT 0, locked_until INTEGER DEFAULT 0, last_failed INTEGER DEFAULT 0, PRIMARY KEY (ip, scope))''')
 
+        # 常用查询索引，降低统计页与风控页扫描成本
+        indexes = [
+            ("idx_playback_datecreated", "PlaybackActivity", "DateCreated"),
+            ("idx_playback_user_date", "PlaybackActivity", "UserId, DateCreated"),
+            ("idx_playback_itemid", "PlaybackActivity", "ItemId"),
+            ("idx_playback_itemtype", "PlaybackActivity", "ItemType"),
+            ("idx_playback_clientname", "PlaybackActivity", "ClientName"),
+            ("idx_playback_client", "PlaybackActivity", "Client"),
+            ("idx_playback_devicename", "PlaybackActivity", "DeviceName"),
+            ("idx_users_meta_expire_date", "users_meta", "expire_date"),
+            ("idx_media_requests_status_created", "media_requests", "status, created_at"),
+            ("idx_request_users_user_requested", "request_users", "user_id, requested_at"),
+            ("idx_gap_records_status_created", "gap_records", "status, created_at"),
+            ("idx_risk_logs_user_created", "risk_logs", "user_id, created_at"),
+            ("idx_sys_notifications_read_created", "sys_notifications", "is_read, created_at"),
+            ("idx_login_attempts_locked_until", "login_attempts", "locked_until")
+        ]
+        for index_name, table_name, columns in indexes:
+            try:
+                c.execute(f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({columns})")
+            except Exception:
+                pass
+
         conn.commit()
         conn.close()
     except Exception as e: 

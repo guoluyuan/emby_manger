@@ -117,11 +117,6 @@ class UserRegisterModel(BaseModel):
     username: str
     password: str
 
-class BatchActionModel(BaseModel):
-    user_ids: List[str]
-    action: str  
-    value: Optional[str] = None  
-
 class MediaRequestSubmitModel(BaseModel):
     tmdb_id: int
     media_type: str  

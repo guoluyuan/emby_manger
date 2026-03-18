@@ -15,7 +15,7 @@ logger = logging.getLogger("uvicorn")
 templates = Jinja2Templates(directory="templates")
 router = APIRouter()
 
-APP_VERSION = os.environ.get("APP_VERSION", "1.2.0.Dev.20260314.2")
+APP_VERSION = os.environ.get("APP_VERSION", "1.2.0.80")
 REQUEST_ASSET_VER = os.environ.get("REQUEST_ASSET_VER") or "20260315.6"
 
 def _extract_host_ip(url: str):

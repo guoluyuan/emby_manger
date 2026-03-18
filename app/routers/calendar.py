@@ -7,7 +7,7 @@ from app.core.config import templates, cfg
 router = APIRouter()
 
 # 🔥 获取应用版本号
-APP_VERSION = os.environ.get("APP_VERSION", "1.2.0.Dev")
+APP_VERSION = os.environ.get("APP_VERSION", "1.2.0.80")
 
 # 定义请求模型
 class CalendarConfigReq(BaseModel):

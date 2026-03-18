@@ -193,7 +193,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         if path in ("/api/login", "/api/requests/auth", "/api/setup", "/api/register"):
             return await call_next(request)
         if request.method in ("POST", "PUT", "PATCH", "DELETE"):
-            session = request.session if hasattr(request, "session") else {}
+            session = request.scope.get("session") or {}
             if session and (session.get("user") or session.get("req_user")):
                 token = request.headers.get("x-csrf-token")
                 if not token or token != session.get("csrf_token"):
