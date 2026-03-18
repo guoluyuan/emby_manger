@@ -443,6 +443,25 @@ let allUsers = [];
 let hiddenUsers = [];
 let mpDownloaders = [];
 
+function markUpdateSuccessPending() {
+    try {
+        localStorage.setItem('ep_update_success_pending', String(Date.now()));
+    } catch (e) {}
+}
+
+function consumeUpdateSuccessPendingToast() {
+    try {
+        const raw = localStorage.getItem('ep_update_success_pending');
+        if (!raw) return;
+        localStorage.removeItem('ep_update_success_pending');
+        const ts = Number(raw || 0);
+        if (!Number.isFinite(ts)) return;
+        if (Date.now() - ts <= 5 * 60 * 1000) {
+            setTimeout(() => showToast('更新成功，服务已恢复可用', 'success'), 600);
+        }
+    } catch (e) {}
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     const uRes = await fetch('/api/users');
     const uJson = await uRes.json();
@@ -464,6 +483,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
     await loadSettings();
+    consumeUpdateSuccessPendingToast();
     if (!window.__disableUpdateCheck) {
         checkDockerUpdate(true, false);
     }
@@ -821,6 +841,7 @@ async function applyDockerUpdate() {
         const res = await fetch('/api/system/docker_update/apply', { method: 'POST' });
         const json = await res.json();
         if (json.status !== 'success') throw new Error(json.message || '更新失败');
+        markUpdateSuccessPending();
         showToast(json.message || '已触发更新', 'success');
         setUpdateUI({
             title: '更新已触发',

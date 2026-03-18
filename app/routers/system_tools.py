@@ -11,7 +11,7 @@ import subprocess
 from collections import deque
 from fastapi import APIRouter, Request
 from app.core.config import cfg
-from app.core.database import query_db
+from app.core.database import query_db, add_sys_notification
 
 router = APIRouter(prefix="/api/system", tags=["System Tools"])
 
@@ -93,6 +93,49 @@ def ping_url(url, proxies=None):
 
 def _run_cmd(args, timeout=90):
     return subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+
+def _is_transient_pull_error(msg: str) -> bool:
+    text = (msg or "").lower()
+    if not text:
+        return False
+    transient_markers = (
+        "connection reset by peer",
+        "read: connection reset by peer",
+        "tls handshake timeout",
+        "i/o timeout",
+        "context deadline exceeded",
+        "temporary failure in name resolution",
+        "no route to host",
+        "503 service unavailable",
+        "429 too many requests",
+        "net/http: request canceled",
+        "eof",
+        "timeout"
+    )
+    return any(marker in text for marker in transient_markers)
+
+def _run_pull_with_retry(args, timeout=300, max_attempts=3, base_delay_sec=2):
+    last_msg = ""
+    for attempt in range(1, max_attempts + 1):
+        try:
+            res = _run_cmd(args, timeout=timeout)
+            msg = (res.stderr or res.stdout or "").strip()
+            if res.returncode == 0:
+                return True, msg
+            last_msg = msg or f"exit code {res.returncode}"
+            can_retry = attempt < max_attempts and _is_transient_pull_error(last_msg)
+            if not can_retry:
+                break
+        except subprocess.TimeoutExpired as e:
+            last_msg = f"命令超时({timeout}s): {e}"
+            if attempt >= max_attempts:
+                break
+
+        delay = base_delay_sec * (2 ** (attempt - 1))
+        logger.warning(f"[更新拉取] 第{attempt}次失败，{delay}s后重试：{last_msg[:300]}")
+        time.sleep(delay)
+
+    return False, last_msg or "unknown"
 
 def _get_container_id():
     # 允许手动指定（避免 HOSTNAME 非容器 ID 的场景）
@@ -265,8 +308,7 @@ def _get_image_digest(image: str):
     return ""
 
 def _pull_image(image: str):
-    res = _run_cmd(["docker", "pull", image], timeout=300)
-    return res.returncode == 0, (res.stderr or res.stdout or "").strip()
+    return _run_pull_with_retry(["docker", "pull", image], timeout=300, max_attempts=3, base_delay_sec=2)
 
 def _compose_args(files, project_name: str = ""):
     args = []
@@ -301,10 +343,10 @@ def _pull_helper_image():
     ])
     last_err = ""
     for img in candidates:
-        res = _run_cmd(["docker", "pull", img], timeout=120)
-        if res.returncode == 0:
+        ok, msg = _run_pull_with_retry(["docker", "pull", img], timeout=120, max_attempts=3, base_delay_sec=2)
+        if ok:
             return img, ""
-        last_err = (res.stderr or res.stdout or "").strip()
+        last_err = msg
     return "", last_err or "unknown"
 
 @router.get("/network_check")
@@ -503,9 +545,8 @@ async def docker_update_apply(request: Request):
                     "-v", f"{compose_host}:/compose",
                     "-w", "/compose",
                     helper_image] + compose_cmd + ["pull", service]
-    pull_res = _run_cmd(run_pull, timeout=300)
-    if pull_res.returncode != 0:
-        err_msg = (pull_res.stderr or pull_res.stdout or "").strip()
+    pull_ok, err_msg = _run_pull_with_retry(run_pull, timeout=300, max_attempts=3, base_delay_sec=2)
+    if not pull_ok:
         return {"status": "error", "message": f"拉取更新失败: {err_msg or 'unknown'}"}
 
     if helper_image.startswith("docker:"):
@@ -527,7 +568,17 @@ async def docker_update_apply(request: Request):
         err_msg = (up_res.stderr or up_res.stdout or "").strip()
         return {"status": "error", "message": f"应用更新失败: {err_msg or 'unknown'}"}
 
-    return {"status": "success", "message": "更新已触发，容器将短暂重启"}
+    try:
+        add_sys_notification(
+            notify_type="system",
+            title="✅ 容器更新完成",
+            message=f"服务 {service} 已完成镜像拉取并重启。",
+            action_url="/settings#docker-update"
+        )
+    except Exception as e:
+        logger.warning(f"[更新通知] 写入系统通知失败: {e}")
+
+    return {"status": "success", "message": "更新成功，镜像已拉取并完成重启"}
 
 @router.get("/logs")
 async def get_logs(lines: int = 150):
